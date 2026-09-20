@@ -39,6 +39,8 @@ def _construir_mensagens(
         }
     ]
 
+    historico = historico[-12:] if historico else []
+
     for mensagem in historico:
         texto = ""
 
@@ -136,6 +138,110 @@ def gerar_resposta(
         raise RuntimeError(
             f"Resposta Gemini inválida: {data}"
         ) from erro
+
+
+def gerar_resposta_pesquisa(
+    api_key,
+    historico,
+    contexto_memoria,
+    contexto_entidade=None,
+    contexto_conversa=None
+):
+    """Responde consultas externas usando Gemini com Google Search grounding."""
+    if not api_key:
+        raise RuntimeError("Chave da Gemini não configurada.")
+
+    url = (
+        "https://generativelanguage.googleapis.com/v1beta/"
+        f"models/{config.MODELO}:generateContent"
+        f"?key={api_key}"
+    )
+
+    mensagens = _construir_mensagens(
+        historico[-8:] if historico else [],
+        contexto_memoria,
+        contexto_entidade,
+        contexto_conversa
+    )
+
+    payload = {
+        "system_instruction": {
+            "parts": [
+                {
+                    "text": (
+                        mensagens[0]["content"]
+                        + "\n\nPESQUISA EXTERNA:\n"
+                        + "Esta pergunta depende de informação externa. "
+                        + "Use a Pesquisa Google para verificar os fatos antes "
+                        + "de responder. Não invente. Seja objetivo e informe "
+                        + "as fontes encontradas quando houver."
+                    )
+                }
+            ]
+        },
+        "contents": [
+            {
+                "role": (
+                    "model"
+                    if mensagem["role"] == "assistant"
+                    else "user"
+                ),
+                "parts": [{"text": mensagem["content"]}]
+            }
+            for mensagem in mensagens[1:]
+        ],
+        "tools": [
+            {
+                "google_search": {}
+            }
+        ]
+    }
+
+    response = requests.post(
+        url,
+        json=payload,
+        timeout=config.TIMEOUT_API
+    )
+
+    if response.status_code != 200:
+        raise RuntimeError(
+            f"Pesquisa Gemini retornou {response.status_code}: "
+            f"{response.text}"
+        )
+
+    data = response.json()
+
+    try:
+        resposta = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+    except (KeyError, IndexError, TypeError) as erro:
+        raise RuntimeError(
+            f"Resposta da pesquisa Gemini inválida: {data}"
+        ) from erro
+
+    if not resposta:
+        raise RuntimeError("Pesquisa Gemini retornou resposta vazia.")
+
+    fontes = []
+    grounding = data.get("candidates", [{}])[0].get(
+        "groundingMetadata",
+        {}
+    )
+
+    for chunk in grounding.get("groundingChunks", []):
+        web = chunk.get("web", {})
+        uri = web.get("uri")
+        titulo = web.get("title")
+
+        if uri and uri not in [fonte["url"] for fonte in fontes]:
+            fontes.append({
+                "titulo": titulo or uri,
+                "url": uri
+            })
+
+    return {
+        "resposta": resposta,
+        "fontes": fontes
+    }
 
 
 def verificar_ia_local():
