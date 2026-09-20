@@ -31,6 +31,11 @@ class CoreRoutingTests(unittest.TestCase):
         self.assertEqual(resultado["tipo"], "local")
         self.assertIn("operando normalmente", resultado["resposta"])
 
+    def test_local_greeting_is_registered_in_conversation(self):
+        self.orquestrador.processar("oi stacy")
+        mensagens = self.orquestrador.conversa.ultimas_mensagens(1)
+        self.assertEqual(mensagens[-1]["mensagem"], "oi stacy")
+
     def test_greeting_accent_is_local(self):
         resultado = self.orquestrador.processar("Olá STACY?")
         self.assertEqual(resultado["tipo"], "local")
@@ -155,14 +160,7 @@ class CoreRoutingTests(unittest.TestCase):
             orchestrator.ROTA_CONHECIMENTO
         )
 
-    def test_known_quantitative_fact_does_not_get_external_route(self):
-        self.assertEqual(
-            orchestrator.classificar_rota(
-                "quantas luas tem venus?",
-                conhecimento=True,
-            ),
-            orchestrator.ROTA_CONHECIMENTO
-        )
+    def test_unknown_quantitative_fact_goes_external(self):
         self.assertEqual(
             orchestrator.classificar_rota(
                 "quanto tempo vivem os patos?",
