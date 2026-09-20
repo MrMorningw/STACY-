@@ -77,23 +77,6 @@ class StacyOrchestrator:
                 "tipo": "vazio"
             }
 
-        # Fatos determinísticos e previamente verificados são resolvidos pelo CORE.
-        # A IA local não deve ser a autoridade para esse tipo de resposta.
-        resposta_conhecimento = knowledge.consultar(mensagem)
-
-        if resposta_conhecimento is None:
-            resposta_conhecimento = knowledge.consultar_contextual(
-                mensagem,
-                self.conversa.ultimas_mensagens(6)
-            )
-
-        if resposta_conhecimento is not None:
-            return {
-                "tipo": "conhecimento_verificado",
-                "resposta": resposta_conhecimento,
-                "origem": "core"
-            }
-
         if self.acao_pendente is not None:
 
             confirmacao = mensagem.lower()
@@ -219,6 +202,23 @@ class StacyOrchestrator:
                         "A alteração foi cancelada."
                     )
                 }
+
+        # Fatos determinísticos são resolvidos pelo CORE depois de uma
+        # confirmação pendente, para não deixar ações aguardando sem tratamento.
+        resposta_conhecimento = knowledge.consultar(mensagem)
+
+        if resposta_conhecimento is None:
+            resposta_conhecimento = knowledge.consultar_contextual(
+                mensagem,
+                self.conversa.ultimas_mensagens(6)
+            )
+
+        if resposta_conhecimento is not None:
+            return {
+                "tipo": "conhecimento_verificado",
+                "resposta": resposta_conhecimento,
+                "origem": "core"
+            }
 
         entidade_detectada = entity_resolver.resolver(
             mensagem,
