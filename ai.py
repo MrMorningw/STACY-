@@ -308,6 +308,9 @@ def gerar_resposta_local(
     sistema_local = (
         "Você é STACY, assistente pessoal do senhor Danley. "
         "Responda em português, de forma curta, natural e útil. "
+        "A ÚLTIMA MENSAGEM DO USUÁRIO é a consulta atual e deve ser o foco principal da resposta. "
+        "Responda diretamente à consulta atual; não responda uma mensagem anterior e não repita "
+        "uma resposta anterior. O histórico serve apenas para contexto quando necessário. "
         "Use os dados fornecidos pelo STACY CORE quando forem relevantes. "
         "Não diga que não possui acesso à memória quando os dados estiverem presentes. "
         "Não invente informações. Não afirme experiências próprias que não aconteceram. "
@@ -324,7 +327,10 @@ def gerar_resposta_local(
         sistema_local += "\nENTIDADE ATUAL:\n" + entidade_local
 
     if conversa_local:
-        sistema_local += "\nCONTEXTO RECENTE:\n" + conversa_local
+        sistema_local += (
+            "\nCONTEXTO RECENTE (use somente como apoio, nunca como consulta atual):\n"
+            + conversa_local
+        )
 
     mensagens = [{"role": "system", "content": sistema_local}]
 
