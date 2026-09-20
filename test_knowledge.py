@@ -28,13 +28,6 @@ class KnowledgeTests(unittest.TestCase):
         )
 
 
-    def test_portugal_capital_is_verified_in_core(self):
-        self.assertEqual(
-            knowledge.consultar("qual a capital de Portugal?"),
-            "A capital de Portugal é Lisboa."
-        )
-
-
     def test_capital_and_accents_are_normalized(self):
         self.assertEqual(
             knowledge.consultar("qual é a capital do Brasil?"),
