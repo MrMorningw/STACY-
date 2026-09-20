@@ -46,7 +46,18 @@ def interpretar(mensagem):
             "acao": "sair"
         }
 
-    if normalizado == "memoria":
+    if normalizado in [
+        "memoria",
+        "mostre minha memoria",
+        "mostra minha memoria",
+        "mostrar minha memoria",
+        "o que voce guardou",
+        "o que voce guardou de mim",
+        "o que voce lembra de mim",
+        "o que esta guardado",
+        "o que esta salvo",
+        "quais informacoes voce guardou"
+    ]:
         return {
             "tipo": "memoria",
             "acao": "mostrar"
