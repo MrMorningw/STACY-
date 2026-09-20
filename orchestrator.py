@@ -654,8 +654,7 @@ class StacyOrchestrator:
                 "tipo": "local",
                 "resposta": (
                     "Encontrei estas informações "
-                    "na memória, senhor:
-"
+                    "na memória, senhor:\n"
                     + "\n".join(linhas)
                 ),
                 "resultados": resultados
