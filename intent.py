@@ -75,8 +75,7 @@ def interpretar(mensagem):
         "você lembra meus objetivos"
     ]
 
-    consulta = normalizado.rstrip("?")
-    consulta_flexivel = normalizado_sem_acentos.rstrip("?")
+    # Remove pontuação/espaços nas extremidades para aceitar\n    # variações como "qual meu nome ?" e "qual meu nome?".\n    consulta = normalizado.rstrip("?!.,;: ")\n    consulta_flexivel = normalizado_sem_acentos.rstrip("?!.,;: ")
 
     if consulta in consultas_usuario or consulta_flexivel in [
         "qual e o meu nome",
@@ -95,8 +94,7 @@ def interpretar(mensagem):
         "quais meus projetos",
         "quais projetos eu tenho",
         "voce lembra meus projetos",
-        "quais sao os meus projetos",
-        "quais sao as minhas projetos"
+        "quais sao os meus projetos"
     ]:
         return {
             "tipo": "memoria",
@@ -109,8 +107,7 @@ def interpretar(mensagem):
         "quais meus objetivos",
         "quais objetivos eu tenho",
         "voce lembra meus objetivos",
-        "quais sao os meus objetivos",
-        "quais sao as minhas objetivos"
+        "quais sao os meus objetivos"
     ]:
         return {
             "tipo": "memoria",
