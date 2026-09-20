@@ -66,11 +66,20 @@ def classificar_rota(mensagem, intencao=None, comando=None, conhecimento=False):
     # 2) PESQUISA EXPLÍCITA: pedido direto do usuário sempre significa Web.
     gatilhos_externos = (
         "pesquise", "pesquisar", "pesquisa na internet",
-        "procure na internet", "procure no google",
-        "pesquisa no google", "na internet", "no google",
-        "fontes", "fonte"
+        "procure", "busque", "pesquisa no google",
+        "procure no google", "na internet", "no google"
     )
     if any(_contem_termo(texto, gatilho) for gatilho in gatilhos_externos):
+        return ROTA_PESQUISA_EXTERNA
+
+    # Pedido explícito de fontes também exige consulta externa, mas
+    # somente em construções que indiquem essa intenção; "fontes" isolada
+    # pode aparecer em perguntas conceituais.
+    gatilhos_fontes = (
+        "me de fontes", "me dê fontes", "com fontes",
+        "cite fontes", "fontes sobre", "fontes para"
+    )
+    if any(_contem_termo(texto, gatilho) for gatilho in gatilhos_fontes):
         return ROTA_PESQUISA_EXTERNA
 
     # 3) PESQUISA IMPLÍCITA: atualidade ou fatos externos verificáveis.
