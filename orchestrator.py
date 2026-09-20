@@ -572,6 +572,14 @@ class StacyOrchestrator:
                     }
                 }
 
+            return {
+                "tipo": "local",
+                "resposta": (
+                    f"Senhor, '{valor}' já estava registrado "
+                    f"em '{categoria}' ou o formato informado é inválido."
+                )
+            }
+
         if acao == "esquecer":
 
             if not categoria or not valor:
@@ -588,10 +596,18 @@ class StacyOrchestrator:
                 return {
                     "tipo": "local",
                     "resposta": (
-                        "Informação removida "
+                        f"Informação '{valor}' removida "
                         "da memória, senhor."
                     )
                 }
+
+            return {
+                "tipo": "local",
+                "resposta": (
+                    f"Não encontrei '{valor}' em '{categoria}', "
+                    "senhor. Nenhuma informação foi alterada."
+                )
+            }
 
         if acao == "mostrar":
 
