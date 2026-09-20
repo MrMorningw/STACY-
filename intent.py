@@ -112,7 +112,19 @@ def interpretar(mensagem):
     consulta = normalizado.rstrip("?!.,;: ")
     consulta_flexivel = normalizado_sem_acentos.rstrip("?!.,;: ")
 
-    if corresponde_frase(consulta, consultas_usuario + [
+    # Remove conectores conversacionais no início sem exigir uma regra
+    # específica para cada pergunta. Ex.: "otimo, quais são meus projetos?"
+    prefixos_conversacionais = (
+        "otimo ", "ótimo ", "certo ", "ok ", "beleza ",
+        "entao ", "então "
+    )
+    consulta_sem_prefixo = consulta
+    for prefixo in prefixos_conversacionais:
+        if consulta_sem_prefixo.startswith(prefixo):
+            consulta_sem_prefixo = consulta_sem_prefixo[len(prefixo):].strip()
+            break
+
+    if corresponde_frase(consulta_sem_prefixo, consultas_usuario + [
         "qual e o meu nome",
         "qual meu nome",
         "como eu me chamo",
@@ -124,7 +136,7 @@ def interpretar(mensagem):
             "categoria": "usuario"
         }
 
-    if corresponde_frase(consulta, consultas_projetos + [
+    if corresponde_frase(consulta_sem_prefixo, consultas_projetos + [
         "quais sao meus projetos",
         "quais meus projetos",
         "quais projetos eu tenho",
@@ -139,7 +151,7 @@ def interpretar(mensagem):
             "categoria": "projetos"
         }
 
-    if corresponde_frase(consulta, consultas_objetivos + [
+    if corresponde_frase(consulta_sem_prefixo, consultas_objetivos + [
         "quais sao meus objetivos",
         "quais meus objetivos",
         "quais objetivos eu tenho",
