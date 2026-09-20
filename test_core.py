@@ -63,6 +63,27 @@ class CoreRoutingTests(unittest.TestCase):
         self.assertEqual(resultado["tipo"], "tarefas")
         self.assertIn("estudar direito", resultado["resposta"])
 
+    def test_followup_tasks_query_uses_core(self):
+        original_listar = orchestrator.tasks.listar
+        try:
+            orchestrator.tasks.listar = lambda data=None: [
+                {
+                    "id": "T-1",
+                    "titulo": "estudar direito",
+                    "data": None,
+                    "hora": None,
+                    "status": "pendente"
+                }
+            ]
+            resultado = self.orquestrador.processar(
+                "e as minhas tarefas ?"
+            )
+        finally:
+            orchestrator.tasks.listar = original_listar
+
+        self.assertEqual(resultado["tipo"], "tarefas")
+        self.assertIn("estudar direito", resultado["resposta"])
+
     def test_exit_with_punctuation_is_command(self):
         resultado = self.orquestrador.processar("sair?")
         self.assertEqual(resultado["tipo"], "sair")
