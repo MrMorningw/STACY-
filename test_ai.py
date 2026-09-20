@@ -45,7 +45,6 @@ class AIInfrastructureTests(unittest.TestCase):
         resultado = ai.gerar_resposta_pesquisa(
             "chave",
             [{"role": "user", "parts": [{"text": "quanto vivem os patos?"}]}],
-            "[]"
         )
 
         self.assertEqual(resultado["resposta"], "Resposta pesquisada.")
