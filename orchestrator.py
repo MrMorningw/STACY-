@@ -48,8 +48,13 @@ def classificar_rota(mensagem, intencao=None, comando=None, conhecimento=False):
     marcadores_internos = (
         "meus projetos", "meus objetivos", "minhas preferencias",
         "minhas tarefas", "minhas informacoes", "o que voce guardou",
-        "o que voce sabe sobre mim", "minha memoria", "minha memoria",
-        "dados sobre mim", "informacoes sobre mim"
+        "o que voce sabe sobre mim", "minha memoria",
+        "dados sobre mim", "informacoes sobre mim",
+        "me diga meus projetos", "me diga meus objetivos",
+        "qual e meu projeto", "qual e o meu projeto",
+        "qual e meu objetivo", "qual e o meu objetivo",
+        "quais sao meus projetos", "quais sao os meus projetos",
+        "quais sao meus objetivos", "quais sao os meus objetivos"
     )
     if any(marcador in texto for marcador in marcadores_internos):
         return ROTA_INTERNA
@@ -991,77 +996,6 @@ class StacyOrchestrator:
             }
 
         return None
-
-    def _pesquisa_explicita(self, mensagem):
-        texto = (mensagem or "").strip().lower()
-        texto = unicodedata.normalize("NFD", texto)
-        texto = "".join(
-            caractere
-            for caractere in texto
-            if unicodedata.category(caractere) != "Mn"
-        )
-        texto = " ".join(texto.split())
-
-        gatilhos_explicitos = (
-            "pesquise", "pesquisar", "pesquisa na internet",
-            "procure na internet", "procure no google",
-            "pesquisa no google", "na internet", "no google",
-            "fonte", "fontes"
-        )
-        return any(gatilho in texto for gatilho in gatilhos_explicitos)
-
-    def _deve_pesquisar_web(self, mensagem):
-        texto = (mensagem or "").strip().lower()
-        texto = unicodedata.normalize("NFD", texto)
-        texto = "".join(
-            caractere
-            for caractere in texto
-            if unicodedata.category(caractere) != "Mn"
-        )
-        texto = " ".join(texto.split())
-
-        if not texto:
-            return False
-
-        # Consultas explícitas sempre usam pesquisa externa.
-        gatilhos_explicitos = (
-            "pesquise", "pesquisar", "pesquisa na internet",
-            "procure na internet", "procure no google",
-            "pesquisa no google", "na internet", "no google",
-            "fonte", "fontes"
-        )
-        if any(gatilho in texto for gatilho in gatilhos_explicitos):
-            return True
-
-        # Informação temporal/currente exige fonte externa.
-        termos_temporais = (
-            "hoje", "agora", "atual", "atualmente", "ultimo",
-            "ultima", "ultimos", "ultimas", "recentemente",
-            "noticia", "noticias"
-        )
-        if any(
-            f" {termo} " in f" {texto} "
-            for termo in termos_temporais
-        ):
-            return True
-
-        # Perguntas factuais comuns. Não usamos '?' sozinho: isso evita
-        # transformar qualquer conversa em consulta Google e gastar quota.
-        iniciadores_factuais = (
-            "quem ", "qual ", "quais ", "quando ", "onde ",
-            "quanto ", "quantos ", "quantas ", "por que ", "porque "
-        )
-        if texto.startswith(iniciadores_factuais):
-            return True
-
-        # Perguntas de vida/biologia e fatos objetivos que não começam
-        # pelos iniciadores acima.
-        padroes_factuais = (
-            "quantos anos vive", "quanto tempo vive", "quanto tempo vivem",
-            "qual a idade de", "qual o tamanho de", "qual a populacao de",
-            "qual e a populacao de", "tem quantas luas", "possui quantas luas"
-        )
-        return any(padrao in texto for padrao in padroes_factuais)
 
     def _pesquisar_web(self, mensagem):
         self.historico.append({
