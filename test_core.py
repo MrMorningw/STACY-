@@ -148,6 +148,26 @@ class CoreRoutingTests(unittest.TestCase):
         self.assertEqual(resultado["tipo"], "pesquisa_indisponivel")
         self.assertIn("Não vou inventar", resultado["resposta"])
 
+    def test_memory_recall_is_human_readable(self):
+        resultado = self.orquestrador.processar("o que você guardou de mim?")
+        self.assertEqual(resultado["tipo"], "local")
+        self.assertIn("STACY", resultado["resposta"])
+        self.assertIn("aprender ingles", resultado["resposta"])
+
+    def test_duplicate_memory_does_not_fall_into_ai(self):
+        resultado = self.orquestrador.processar(
+            "memorize projetos.STACY"
+        )
+        self.assertEqual(resultado["tipo"], "local")
+        self.assertIn("já estava registrado", resultado["resposta"])
+
+    def test_missing_memory_removal_does_not_fall_into_ai(self):
+        resultado = self.orquestrador.processar(
+            "esquecer projetos.NAO_EXISTE"
+        )
+        self.assertEqual(resultado["tipo"], "local")
+        self.assertIn("Nenhuma informação foi alterada", resultado["resposta"])
+
     def test_verified_knowledge_stays_in_core(self):
         resultado = self.orquestrador.processar("quantas luas tem venus?")
         self.assertEqual(resultado["tipo"], "conhecimento_verificado")
