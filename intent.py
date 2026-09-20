@@ -10,7 +10,7 @@ def normalizar_flexivel(texto):
     return texto.rstrip("?!.,;: ").replace("saos ", "sao ")
 
 
-def corresponde_frase(texto, candidatos, limiar=0.86):
+def corresponde_frase(texto, candidatos, limiar=0.93):
     alvo = normalizar_flexivel(texto)
     for candidato in candidatos:
         candidato_normalizado = normalizar_flexivel(candidato)
