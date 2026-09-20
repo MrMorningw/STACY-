@@ -9,6 +9,7 @@ import entity_resolver
 import action
 import conversation
 import tasks
+import knowledge
 
 
 class StacyOrchestrator:
@@ -74,6 +75,17 @@ class StacyOrchestrator:
         if not mensagem:
             return {
                 "tipo": "vazio"
+            }
+
+        # Fatos determinísticos e previamente verificados são resolvidos pelo CORE.
+        # A IA local não deve ser a autoridade para esse tipo de resposta.
+        resposta_conhecimento = knowledge.consultar(mensagem)
+
+        if resposta_conhecimento is not None:
+            return {
+                "tipo": "conhecimento_verificado",
+                "resposta": resposta_conhecimento,
+                "origem": "core"
             }
 
         if self.acao_pendente is not None:
