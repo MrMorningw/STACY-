@@ -160,6 +160,28 @@ class CoreRoutingTests(unittest.TestCase):
             )
         )
 
+    def test_duck_lifespan_uses_external_research(self):
+        original = orchestrator.ai.gerar_resposta_pesquisa
+        try:
+            orchestrator.ai.gerar_resposta_pesquisa = lambda *args, **kwargs: {
+                "resposta": "Resposta pesquisada sobre a expectativa de vida dos patos.",
+                "fontes": [
+                    {
+                        "titulo": "Fonte teste",
+                        "url": "https://example.com/patos"
+                    }
+                ]
+            }
+            resultado = self.orquestrador.processar(
+                "quanto tempo vivem os patos?"
+            )
+        finally:
+            orchestrator.ai.gerar_resposta_pesquisa = original
+
+        self.assertEqual(resultado["tipo"], "pesquisa")
+        self.assertIn("expectativa de vida", resultado["resposta"])
+        self.assertEqual(resultado["fontes"][0]["url"], "https://example.com/patos")
+
     def test_web_research_failure_returns_clean_result(self):
         original = orchestrator.ai.gerar_resposta_pesquisa
         try:
