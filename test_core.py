@@ -109,6 +109,23 @@ class CoreRoutingTests(unittest.TestCase):
         self.assertEqual(projetos["categoria"], "projetos")
         self.assertEqual(objetivos["categoria"], "objetivos")
 
+    def test_memory_recall_command_uses_core(self):
+        resultado = intent.interpretar("o que você guardou de mim?")
+        self.assertEqual(resultado["tipo"], "memoria")
+        self.assertEqual(resultado["acao"], "mostrar")
+
+    def test_external_factual_query_is_marked_for_web(self):
+        self.assertTrue(
+            self.orquestrador._deve_pesquisar_web(
+                "quanto tempo vivem os patos?"
+            )
+        )
+        self.assertTrue(
+            self.orquestrador._deve_pesquisar_web(
+                "pesquise a população atual do Brasil"
+            )
+        )
+
     def test_verified_knowledge_stays_in_core(self):
         resultado = self.orquestrador.processar("quantas luas tem venus?")
         self.assertEqual(resultado["tipo"], "conhecimento_verificado")
