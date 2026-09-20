@@ -47,7 +47,6 @@ class CoreRoutingTests(unittest.TestCase):
         self.assertEqual(resultado["tipo"], "memoria")
         self.assertEqual(resultado["categoria"], "objetivos")
 
-
     def test_tasks_query_with_punctuation_is_structured(self):
         original_listar = orchestrator.tasks.listar
         try:
@@ -110,16 +109,26 @@ class CoreRoutingTests(unittest.TestCase):
         self.assertEqual(projetos["categoria"], "projetos")
         self.assertEqual(objetivos["categoria"], "objetivos")
 
-
     def test_verified_knowledge_stays_in_core(self):
         resultado = self.orquestrador.processar("quantas luas tem venus?")
         self.assertEqual(resultado["tipo"], "conhecimento_verificado")
         self.assertIn("não possui luas naturais", resultado["resposta"])
 
     def test_factual_followup_uses_conversation_context(self):
-        self.orquestrador.processar(
-            "qual fruta é verde e começa com a?"
-        )
+        original_ai = self.orquestrador._usar_ai
+        try:
+            self.orquestrador._usar_ai = lambda mensagem: {
+                "tipo": "ai",
+                "resposta": "Resposta inicial.",
+                "origem": "teste"
+            }
+
+            self.orquestrador.processar(
+                "qual fruta é verde e começa com a?"
+            )
+        finally:
+            self.orquestrador._usar_ai = original_ai
+
         resultado = self.orquestrador.processar(
             "tem um caroço no meio"
         )
