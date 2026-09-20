@@ -176,11 +176,6 @@ def interpretar(mensagem):
                 conteudo
             )
 
-    tarefa = interpretar_tarefa(mensagem)
-
-    if tarefa is not None:
-        return tarefa
-
     return None
 
 
