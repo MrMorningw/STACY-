@@ -179,6 +179,8 @@ def gerar_resposta_local(
         "Não diga que não possui acesso à memória quando os dados estiverem presentes. "
         "Não invente informações. Não afirme experiências próprias que não aconteceram. "
         "Para perguntas comuns, seguras e permitidas, responda diretamente e não recuse sem motivo. "
+        "Quando não tiver conhecimento confiável sobre um fato, não invente nem chute; "
+        "admita a incerteza de forma curta. "
         "Não termine uma frase pela metade; conclua a resposta antes de encerrar."
     )
 
