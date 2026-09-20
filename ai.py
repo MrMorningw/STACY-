@@ -142,8 +142,7 @@ def gerar_resposta(
 
 def gerar_resposta_pesquisa(
     api_key,
-    historico,
-    contexto_conversa=None
+    historico
 ):
     """Pesquisa fatos externos com Gemini + Google Search sem enviar memória persistente."""
     if not api_key:
@@ -159,13 +158,6 @@ def gerar_resposta_pesquisa(
 
     # Pesquisa externa não recebe a memória persistente nem a entidade completa.
     # Isso reduz exposição de dados pessoais e mantém o prompt enxuto.
-    contexto = ""
-    if contexto_conversa:
-        contexto = (
-            "\n\nCONTEXTO CONVERSACIONAL MÍNIMO:\n"
-            + contexto_conversa
-        )
-
     sistema = (
         "Você é STACY, assistente pessoal do senhor Danley. "
         "Responda em português, de forma objetiva. "
@@ -175,7 +167,6 @@ def gerar_resposta_pesquisa(
         "Diferencie fatos de estimativas ou opiniões e informe a fonte quando "
         "a informação for relevante. "
         "Não revele nem solicite dados pessoais desnecessários."
-        + contexto
     )
 
     contents = []
