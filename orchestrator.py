@@ -1,4 +1,5 @@
 import json
+import unicodedata
 import context
 import entity_store
 import memory
@@ -371,6 +372,12 @@ class StacyOrchestrator:
 
                 return resultado_intencao
 
+        # Consultas externas/factuais seguem para pesquisa com Google Search
+        # no Gemini. A IA local fica reservada para conversa e raciocínio leve,
+        # evitando respostas factuais inventadas no modelo pequeno.
+        if self._deve_pesquisar_web(mensagem):
+            return self._pesquisar_web(mensagem)
+
         return self._usar_ai(mensagem)
 
     def _registrar_resultado_conversa(self, resultado):
@@ -548,9 +555,13 @@ class StacyOrchestrator:
                 return {
                     "tipo": "local",
                     "resposta": (
-                        f"Informação registrada "
-                        f"em '{categoria}', senhor."
-                    )
+                        f"Guardado, senhor. Registrei '{valor}' "
+                        f"em '{categoria}'."
+                    ),
+                    "memoria": {
+                        "categoria": categoria,
+                        "valor": valor
+                    }
                 }
 
         if acao == "esquecer":
@@ -868,6 +879,124 @@ class StacyOrchestrator:
             }
 
         return None
+
+    def _deve_pesquisar_web(self, mensagem):
+        texto = (mensagem or "").strip().lower()
+
+        texto = unicodedata.normalize("NFD", texto)
+        texto = "".join(
+            caractere
+            for caractere in texto
+            if unicodedata.category(caractere) != "Mn"
+        )
+
+        if not texto:
+            return False
+
+        gatilhos_explicitos = [
+            "pesquise",
+            "pesquisar",
+            "pesquisa na internet",
+            "procure na internet",
+            "procure no google",
+            "pesquisa no google",
+            "na internet",
+            "no google",
+            "fonte",
+            "fontes"
+        ]
+
+        if any(gatilho in texto for gatilho in gatilhos_explicitos):
+            return True
+
+        termos_temporais = [
+            "hoje",
+            "agora",
+            "atual",
+            "atualmente",
+            "ultimo",
+            "ultima",
+            "ultimos",
+            "ultimas",
+            "recentemente",
+            "noticia",
+            "noticias"
+        ]
+
+        if any(termo in texto for termo in termos_temporais):
+            return True
+
+        iniciadores = [
+            "quem ",
+            "qual ",
+            "quais ",
+            "quando ",
+            "onde ",
+            "quanto ",
+            "quantos ",
+            "quantas ",
+            "por que ",
+            "porque ",
+            "como "
+        ]
+
+        return texto.startswith(tuple(iniciadores)) or "?" in mensagem
+
+    def _pesquisar_web(self, mensagem):
+        self.historico.append({
+            "role": "user",
+            "parts": [{"text": mensagem}]
+        })
+
+        contexto_memoria = json.dumps(
+            self.memoria,
+            ensure_ascii=False,
+            indent=2
+        )
+
+        contexto_entidade = None
+
+        if self.entidade_contextual is not None:
+            entidade = entity_store.obter_por_id(
+                self.entidades,
+                self.entidade_contextual["id"]
+            )
+
+            if entidade is not None:
+                contexto_entidade = json.dumps(
+                    entidade,
+                    ensure_ascii=False,
+                    indent=2
+                )
+
+        contexto_conversa = json.dumps(
+            self.conversa.ultimas_mensagens(6),
+            ensure_ascii=False,
+            indent=2
+        )
+
+        resultado = ai.gerar_resposta_pesquisa(
+            self.api_key,
+            self.historico,
+            contexto_memoria,
+            contexto_entidade,
+            contexto_conversa
+        )
+
+        resposta = resultado["resposta"]
+        fontes = resultado.get("fontes", [])
+
+        self.historico.append({
+            "role": "model",
+            "parts": [{"text": resposta}]
+        })
+
+        return {
+            "tipo": "pesquisa",
+            "resposta": resposta,
+            "origem": "gemini_google",
+            "fontes": fontes
+        }
 
     def _usar_ai(
         self,
