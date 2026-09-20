@@ -248,9 +248,9 @@ class CoreRoutingTests(unittest.TestCase):
     def test_factual_verb_typo_is_normalized_for_routing(self):
         self.assertEqual(
             orchestrator._normalizar_rota(
-                "quantos presidentes o brasil teve?"
+                "quantos presidentes o brasil possui?"
             ),
-            "quantos presidentes o brasil teve"
+            "quantos presidentes o brasil possui"
         )
 
     def test_unknown_count_with_past_tense_goes_external(self):
