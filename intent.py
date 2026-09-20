@@ -677,6 +677,9 @@ def interpretar_tarefa(mensagem):
         "mostrar minhas tarefas",
         "quais são minhas tarefas",
         "quais sao minhas tarefas",
+        "e as minhas tarefas",
+        "e minhas tarefas",
+        "e as tarefas",
         "quais tarefas eu tenho",
         "listar tarefas",
         "mostrar tarefas",
@@ -692,6 +695,9 @@ def interpretar_tarefa(mensagem):
 
     consultas_listar_flexiveis = [
         "quais sao as minhas tarefas",
+        "e as minhas tarefas",
+        "e minhas tarefas",
+        "e as tarefas",
         "quais sao minhas tarefas",
         "quais tarefas eu tenho",
         "minhas tarefas"
