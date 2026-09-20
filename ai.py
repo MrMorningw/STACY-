@@ -146,24 +146,50 @@ def gerar_resposta_local(
 ):
     url = config.LOCAL_AI_URL
 
-    # A IA local roda no telefone: use um contexto compacto para
-    # evitar que memória/histórico grande provoque timeouts.
-    historico_local = historico[-6:] if historico else []
+    # O modelo local roda no telefone: mantenha o prompt pequeno.
+    # Contexto excessivo aumenta muito o tempo de processamento no Qwen 1.5B.
+    historico_local = historico[-2:] if historico else []
 
     def _limitar(texto, limite):
         texto = texto or ""
         return texto[-limite:]
 
-    memoria_local = _limitar(contexto_memoria, 2000)
-    entidade_local = _limitar(contexto_entidade, 1000)
-    conversa_local = _limitar(contexto_conversa, 2000)
+    memoria_local = _limitar(contexto_memoria, 1000)
+    entidade_local = _limitar(contexto_entidade, 500)
+    conversa_local = _limitar(contexto_conversa, 800)
 
-    mensagens = _construir_mensagens(
-        historico_local,
-        memoria_local,
-        entidade_local,
-        conversa_local
+    sistema_local = (
+        "Você é STACY, assistente pessoal do senhor Danley. "
+        "Responda em português, de forma curta, natural e útil. "
+        "Use os dados fornecidos pelo STACY CORE quando forem relevantes. "
+        "Não diga que não possui acesso à memória quando os dados estiverem presentes. "
+        "Não invente informações."
     )
+
+    if memoria_local:
+        sistema_local += "\nMEMÓRIA DO CORE:\n" + memoria_local
+
+    if entidade_local:
+        sistema_local += "\nENTIDADE ATUAL:\n" + entidade_local
+
+    if conversa_local:
+        sistema_local += "\nCONTEXTO RECENTE:\n" + conversa_local
+
+    mensagens = [{"role": "system", "content": sistema_local}]
+
+    for mensagem in historico_local:
+        texto = ""
+        for parte in mensagem.get("parts", []):
+            if isinstance(parte, dict):
+                texto += parte.get("text", "")
+            elif isinstance(parte, str):
+                texto += parte
+
+        if texto:
+            role = mensagem.get("role", "user")
+            if role == "model":
+                role = "assistant"
+            mensagens.append({"role": role, "content": texto})
 
     payload = {
         "messages": mensagens,
@@ -180,8 +206,7 @@ def gerar_resposta_local(
 
     if response.status_code != 200:
         raise RuntimeError(
-            f"IA local HTTP {response.status_code}: "
-            + response.text
+            f"IA local HTTP {response.status_code}: " + response.text
         )
 
     data = response.json()
