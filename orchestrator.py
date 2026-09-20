@@ -82,9 +82,11 @@ def classificar_rota(mensagem, intencao=None, comando=None, conhecimento=False):
     if any(f" {termo} " in f" {texto} " for termo in termos_temporais):
         return ROTA_PESQUISA_EXTERNA
 
+    # Iniciadores realmente factuais. "qual/quais" não bastam sozinhos:
+    # perguntas como "qual a diferença..." podem ser conversa/estudo local.
     iniciadores_factuais = (
-        "quem ", "qual ", "quais ", "quando ", "onde ",
-        "quanto ", "quantos ", "quantas ", "por que ", "porque "
+        "quem ", "quando ", "onde ", "quanto ", "quantos ",
+        "quantas ", "por que ", "porque "
     )
     if texto.startswith(iniciadores_factuais):
         return ROTA_PESQUISA_EXTERNA
@@ -479,6 +481,17 @@ class StacyOrchestrator:
 
         # Se chegou aqui, a rota definida é IA local. A pesquisa externa
         # nunca é acionada implicitamente depois desta decisão.
+        if rota == ROTA_INTERNA:
+            return {
+                "tipo": "local",
+                "resposta": (
+                    "Entendi que o senhor está falando de dados internos da STACY, "
+                    "mas não consegui identificar a operação solicitada. "
+                    "Nenhuma pesquisa externa ou IA foi acionada."
+                ),
+                "rota": rota
+            }
+
         return self._usar_ai(mensagem)
 
     def _registrar_resultado_conversa(self, resultado):
