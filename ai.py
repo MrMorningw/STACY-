@@ -1,5 +1,6 @@
 import requests
 import config
+from urllib.parse import urlparse
 
 
 def _construir_mensagens(
@@ -144,29 +145,26 @@ def gerar_resposta_pesquisa(
     api_key,
     historico
 ):
-    """Pesquisa fatos externos com Gemini + Google Search sem enviar memória persistente."""
+    """Pesquisa fatos externos com Gemini + Google Search, sem memória persistente."""
     if not api_key:
         raise RuntimeError("Chave da Gemini não configurada.")
 
     url = (
         "https://generativelanguage.googleapis.com/v1beta/"
         f"models/{config.MODELO}:generateContent"
-        f"?key={api_key}"
     )
 
-    historico_pesquisa = historico[-6:] if historico else []
+    historico_pesquisa = historico[-1:] if historico else []
 
-    # Pesquisa externa não recebe a memória persistente nem a entidade completa.
-    # Isso reduz exposição de dados pessoais e mantém o prompt enxuto.
     sistema = (
         "Você é STACY, assistente pessoal do senhor Danley. "
         "Responda em português, de forma objetiva. "
         "Esta é uma consulta externa. Use obrigatoriamente a Pesquisa Google "
-        "para verificar fatos antes de responder. "
-        "Não invente nem complete lacunas por suposição. "
-        "Diferencie fatos de estimativas ou opiniões e informe a fonte quando "
-        "a informação for relevante. "
-        "Não revele nem solicite dados pessoais desnecessários."
+        "para verificar os fatos antes de responder. "
+        "Não invente, não chute e não complete lacunas por suposição. "
+        "Se as fontes não forem suficientes, diga que não foi possível verificar. "
+        "Diferencie fatos de estimativas ou opiniões e informe as fontes quando "
+        "forem relevantes. Não revele nem solicite dados pessoais desnecessários."
     )
 
     contents = []
@@ -178,12 +176,15 @@ def gerar_resposta_pesquisa(
             elif isinstance(parte, str):
                 texto += parte
 
+        texto = texto.strip()
         if texto:
-            role = mensagem.get("role", "user")
             contents.append({
-                "role": "model" if role == "model" else "user",
-                "parts": [{"text": texto[-1200:]}]
+                "role": "user",
+                "parts": [{"text": texto[-2000:]}]
             })
+
+    if not contents:
+        raise RuntimeError("Consulta externa vazia.")
 
     payload = {
         "system_instruction": {"parts": [{"text": sistema}]},
@@ -193,6 +194,10 @@ def gerar_resposta_pesquisa(
 
     response = requests.post(
         url,
+        headers={
+            "x-goog-api-key": api_key,
+            "Content-Type": "application/json"
+        },
         json=payload,
         timeout=config.RESEARCH_API_TIMEOUT
     )
@@ -209,26 +214,45 @@ def gerar_resposta_pesquisa(
         raise RuntimeError("Pesquisa Gemini retornou JSON inválido.") from erro
 
     try:
-        resposta = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+        partes = data["candidates"][0]["content"]["parts"]
     except (KeyError, IndexError, TypeError) as erro:
         raise RuntimeError(
             f"Resposta da pesquisa Gemini inválida: {data}"
         ) from erro
 
+    textos = []
+    for parte in partes:
+        if isinstance(parte, dict) and parte.get("text"):
+            textos.append(parte["text"].strip())
+
+    resposta = "\n".join(texto for texto in textos if texto).strip()
     if not resposta:
         raise RuntimeError("Pesquisa Gemini retornou resposta vazia.")
 
     fontes = []
     vistos = set()
-    grounding = data.get("candidates", [{}])[0].get("groundingMetadata", {})
+    grounding = data.get("candidates", [{}])[0].get(
+        "groundingMetadata", {}
+    )
 
     for chunk in grounding.get("groundingChunks", []):
-        web = chunk.get("web", {})
+        web = chunk.get("web", {}) if isinstance(chunk, dict) else {}
         uri = web.get("uri")
         titulo = web.get("title") or uri
-        if uri and uri not in vistos:
+
+        if not isinstance(uri, str):
+            continue
+
+        parsed = urlparse(uri)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            continue
+
+        if uri not in vistos:
             vistos.add(uri)
-            fontes.append({"titulo": titulo, "url": uri})
+            fontes.append({
+                "titulo": titulo,
+                "url": uri
+            })
 
     if not fontes:
         raise RuntimeError(
@@ -236,7 +260,6 @@ def gerar_resposta_pesquisa(
         )
 
     return {"resposta": resposta, "fontes": fontes}
-
 
 def verificar_ia_local():
     """Verifica rapidamente se o llama-server local está acessível."""
