@@ -1,5 +1,6 @@
 import json
 import unicodedata
+from difflib import SequenceMatcher
 import context
 import entity_store
 import memory
@@ -25,10 +26,6 @@ def _normalizar_rota(texto):
     texto = (texto or "").strip().lower()
     texto = unicodedata.normalize("NFD", texto)
 
-    # Tolerância a erro de digitação comum sem alterar o restante da frase.
-    texto = texto.replace("quantaa ", "quantas ")
-    texto = texto.replace("quantoo ", "quanto ")
-
     caracteres = []
     for caractere in texto:
         categoria = unicodedata.category(caractere)
@@ -41,7 +38,35 @@ def _normalizar_rota(texto):
         else:
             caracteres.append(caractere)
 
-    return " ".join("".join(caracteres).split())
+    texto = " ".join("".join(caracteres).split())
+
+    # Corrige apenas palavras do vocabulário de roteamento. Isso dá
+    # tolerância a erros de digitação sem transformar perguntas concretas
+    # em respostas pré-programadas.
+    vocabulario = (
+        "quanto", "quantos", "quantas", "qual",
+        "quem", "quando", "onde", "capital", "populacao",
+        "idade", "tamanho", "temperatura", "distancia",
+        "massa", "velocidade", "vive", "vivem", "existem",
+        "tem", "sao", "ha"
+    )
+    tokens = []
+    for token in texto.split():
+        melhor = token
+        melhor_similaridade = 0.0
+        for candidato in vocabulario:
+            if len(token) < 4 or len(candidato) < 4:
+                continue
+            similaridade = SequenceMatcher(None, token, candidato).ratio()
+            if similaridade > melhor_similaridade:
+                melhor_similaridade = similaridade
+                melhor = candidato
+        if melhor_similaridade >= 0.82:
+            tokens.append(melhor)
+        else:
+            tokens.append(token)
+
+    return " ".join(tokens)
 
 
 def _contem_termo(texto, termo):
@@ -108,7 +133,12 @@ def classificar_rota(mensagem, intencao=None, comando=None, conhecimento=False):
         "quando aconteceu ", "onde fica ", "quanto tempo vive",
         "quanto tempo vivem", "quantos anos vive", "qual a idade de",
         "qual o tamanho de", "qual a populacao de",
-        "qual e a populacao de", "tem quantas luas",
+        "qual e a populacao de", "qual a capital de",
+        "qual e a capital de", "qual a temperatura de",
+        "qual e a temperatura de", "qual a distancia de",
+        "qual e a distancia de", "qual a massa de",
+        "qual e a massa de", "qual a velocidade de",
+        "qual e a velocidade de", "tem quantas luas",
         "possui quantas luas"
     )
     if any(padrao in texto for padrao in padroes_factuais):
@@ -222,6 +252,20 @@ class StacyOrchestrator:
                 "tipo": "local",
                 "resposta": respostas_locais[mensagem_normalizada]
             }
+
+        # Tolerância geral para pequenas falhas de digitação em frases locais.
+        for frase, resposta in respostas_locais.items():
+            if len(mensagem_normalizada) >= 6:
+                similaridade = SequenceMatcher(
+                    None,
+                    mensagem_normalizada,
+                    frase
+                ).ratio()
+                if similaridade >= 0.88:
+                    return {
+                        "tipo": "local",
+                        "resposta": resposta
+                    }
 
         if not mensagem:
             return {
