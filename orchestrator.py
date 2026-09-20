@@ -1209,11 +1209,6 @@ class StacyOrchestrator:
             ]
         })
 
-        self.historico.append({
-            "role": "model",
-            "parts": [{"text": resposta}]
-        })
-
         return {
             "tipo": "ai",
             "resposta": resposta,
