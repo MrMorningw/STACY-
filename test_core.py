@@ -248,7 +248,7 @@ class CoreRoutingTests(unittest.TestCase):
     def test_factual_verb_typo_is_normalized_for_routing(self):
         self.assertEqual(
             orchestrator._normalizar_rota(
-                "quantos presidentes o brasil possui?"
+                "quantos presidentes o brasil possuie?"
             ),
             "quantos presidentes o brasil possui"
         )
