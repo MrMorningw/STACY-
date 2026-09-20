@@ -22,10 +22,10 @@ class KnowledgeTests(unittest.TestCase):
         self.assertIn("parece branco", resposta)
         self.assertIn("atmosfera", resposta)
 
-    def test_ducks_answer_does_not_invent_one_lifespan(self):
-        resposta = knowledge.consultar("quanto tempo os patos vivem?")
-        self.assertIn("varia bastante", resposta)
-        self.assertIn("não existe um único tempo de vida", resposta)
+    def test_ducks_are_not_given_an_invented_fixed_lifespan_by_core(self):
+        self.assertIsNone(
+            knowledge.consultar("quanto tempo os patos vivem?")
+        )
 
 
     def test_capital_and_accents_are_normalized(self):
