@@ -231,6 +231,13 @@ class CoreRoutingTests(unittest.TestCase):
             orchestrator.ROTA_PESQUISA_EXTERNA
         )
 
+    def test_typo_quantaa_still_routes_quantitative_question_external(self):
+        self.assertEqual(
+            orchestrator.classificar_rota("quantaa luas tem mercurio?"),
+            orchestrator.ROTA_PESQUISA_EXTERNA
+        )
+
+
     def test_route_normal_conversation_is_local_ai(self):
         self.assertEqual(
             orchestrator.classificar_rota("você está aí?"),
