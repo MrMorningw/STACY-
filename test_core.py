@@ -31,6 +31,11 @@ class CoreRoutingTests(unittest.TestCase):
         self.assertEqual(resultado["tipo"], "local")
         self.assertIn("operando normalmente", resultado["resposta"])
 
+    def test_greeting_accent_is_local(self):
+        resultado = self.orquestrador.processar("Olá STACY?")
+        self.assertEqual(resultado["tipo"], "local")
+        self.assertIn("pronta", resultado["resposta"])
+
     def test_projects_query_uses_core(self):
         resultado = self.orquestrador.processar("quais sao os meus projetos ?")
         self.assertEqual(resultado["tipo"], "local")
