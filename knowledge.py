@@ -31,6 +31,10 @@ CONHECIMENTO_VERIFICADO = [
         "A capital do Brasil é Brasília."
     ),
     (
+        re.compile(r"qual a capital de portugal|qual e a capital de portugal", re.I),
+        "A capital de Portugal é Lisboa."
+    ),
+    (
         re.compile(
             r"quantos dentes tem um ser humano adulto|"
             r"quantos dentes tem um ser humani adulto|"
