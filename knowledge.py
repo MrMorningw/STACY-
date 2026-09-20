@@ -41,10 +41,39 @@ def consultar(mensagem):
     if not texto:
         return None
 
+
+def consultar_contextual(mensagem, historico):
+    """Resolve pistas factuais simples usando mensagens recentes do usuário."""
+    atual = _normalizar(mensagem)
+    if not atual:
+        return None
+
+    anteriores = []
+    for item in reversed(historico or []):
+        if not isinstance(item, dict):
+            continue
+        if item.get("tipo") != "usuario":
+            continue
+        conteudo = item.get("conteudo", "")
+        if conteudo:
+            anteriores.append(_normalizar(conteudo))
+        if len(anteriores) >= 4:
+            break
+
+    if (
+        ("caroco" in atual or "caroço" in atual)
+        and any("fruta verde" in item and "comeca com a" in item for item in anteriores)
+    ):
+        return "A fruta que corresponde a essas pistas é o abacate."
+
+    if "fruta verde" in atual and "caroco" in atual:
+        return "Uma fruta verde com caroço pode ser o abacate, entre outras possibilidades."
+
+    return None
+
     # Variações de digitação comuns que ainda mantêm a intenção inequívoca.
     texto = texto.replace("wuantos", "quantos")
     texto = texto.replace("wuantas", "quantas")
-    texto = texto.replace("wual", "qual")
     texto = texto.replace("wual", "qual")
 
     for padrao, resposta in CONHECIMENTO_VERIFICADO:
