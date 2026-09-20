@@ -42,6 +42,12 @@ class CoreRoutingTests(unittest.TestCase):
         self.assertEqual(resultado["tipo"], "local")
         self.assertIn("aprender ingles", resultado["resposta"])
 
+    def test_objectives_query_does_not_collide_with_projects(self):
+        resultado = intent.interpretar("quais sao os meus objetivos ?")
+        self.assertEqual(resultado["tipo"], "memoria")
+        self.assertEqual(resultado["categoria"], "objetivos")
+
+
     def test_tasks_query_with_punctuation_is_structured(self):
         original_listar = orchestrator.tasks.listar
         try:
