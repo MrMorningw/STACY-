@@ -70,16 +70,6 @@ def consultar(mensagem):
             "alaranjado ou avermelhado, especialmente perto do horizonte."
         )
 
-    if (
-        "quanto tempo" in texto
-        and "pato" in texto
-        and ("vive" in texto or "vivem" in texto)
-    ):
-        return (
-            "A expectativa de vida varia bastante conforme a espécie e as condições "
-            "de vida; não existe um único tempo de vida válido para todos os patos."
-        )
-
     if _tem_pistas_abacate(texto):
         return "A fruta que corresponde a essas pistas é o abacate."
 
