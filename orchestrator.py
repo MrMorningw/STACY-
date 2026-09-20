@@ -158,8 +158,9 @@ def classificar_rota(mensagem, intencao=None, comando=None, conhecimento=False):
         "quantas ",
     )
     verbos_quantitativos = (
-        " vive", " vivem", " tem", " têm", " existem",
-        " sao", " são", " ha", " há"
+        " vive", " vivem", " teve", " tinham", " tem",
+        " possui", "possuem", " existem", " sao", " são",
+        " ha", " há"
     )
     if any(padrao in texto for padrao in padroes_quantitativos):
         if any(verbo in texto for verbo in verbos_quantitativos):
