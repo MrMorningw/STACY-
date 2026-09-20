@@ -162,7 +162,7 @@ def gerar_resposta_local(
 
     # O modelo local roda no telefone: mantenha o prompt pequeno.
     # Contexto excessivo aumenta muito o tempo de processamento no Qwen 1.5B.
-    historico_local = historico[-2:] if historico else []
+    historico_local = historico[-4:] if historico else []
 
     def _limitar(texto, limite):
         texto = texto or ""
