@@ -179,6 +179,58 @@ class CoreRoutingTests(unittest.TestCase):
             orchestrator.ROTA_INTERNA
         )
 
+    def test_self_identity_is_local(self):
+        resultado = self.orquestrador.processar("quem é você?")
+        self.assertEqual(resultado["tipo"], "local")
+        self.assertIn("STACY", resultado["resposta"])
+
+    def test_route_question_words_alone_stay_local(self):
+        self.assertEqual(
+            orchestrator.classificar_rota("qual a diferença entre responsabilidade objetiva e subjetiva?"),
+            orchestrator.ROTA_IA_LOCAL
+        )
+
+    def test_confirmation_accepts_punctuation(self):
+        self.orquestrador.acao_pendente = {
+            "tipo": "remover_tarefa",
+            "tarefa_id": "T-1"
+        }
+        original_remover = orchestrator.tasks.remover
+        try:
+            orchestrator.tasks.remover = lambda tarefa_id: {
+                "id": tarefa_id,
+                "titulo": "teste"
+            }
+            resultado = self.orquestrador.processar("Sim!")
+        finally:
+            orchestrator.tasks.remover = original_remover
+
+        self.assertEqual(resultado["tipo"], "tarefa_removida")
+        self.assertIsNone(self.orquestrador.acao_pendente)
+
+    def test_unrelated_message_clears_stale_pending_action(self):
+        self.orquestrador.acao_pendente = {
+            "tipo": "remover_tarefa",
+            "tarefa_id": "T-1"
+        }
+        self.orquestrador._usar_ai = lambda mensagem: {
+            "tipo": "ai",
+            "resposta": "Resposta local de teste.",
+            "origem": "teste"
+        }
+        resultado = self.orquestrador.processar("Explique responsabilidade civil.")
+        self.assertEqual(resultado["tipo"], "ai")
+        self.assertIsNone(self.orquestrador.acao_pendente)
+
+    def test_internal_intent_overrides_explicit_research_word(self):
+        self.assertEqual(
+            orchestrator.classificar_rota(
+                "pesquise meus objetivos",
+                intencao={"tipo": "memoria", "acao": "consultar", "categoria": "objetivos"}
+            ),
+            orchestrator.ROTA_INTERNA
+        )
+
     def test_verified_knowledge_stays_in_core(self):
         resultado = self.orquestrador.processar("quantas luas tem venus?")
         self.assertEqual(resultado["tipo"], "conhecimento_verificado")
