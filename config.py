@@ -5,9 +5,9 @@ MODELO = "gemini-3.6-flash"
 
 LOCAL_AI_URL = "http://127.0.0.1:8080/v1/chat/completions"
 
-TIMEOUT_API = 60
+TIMEOUT_API = 5
 LOCAL_AI_TIMEOUT = 5
-LOCAL_MAX_TOKENS = 32
+LOCAL_MAX_TOKENS = 24
 
 PERSONALIDADE = """
 Você é STACY, uma assistente pessoal inteligente,
