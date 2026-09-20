@@ -113,6 +113,15 @@ def classificar_rota(mensagem, intencao=None, comando=None, conhecimento=False):
     # Perguntas quantitativas factuais com o substantivo entre o termo
     # interrogativo e o verbo. Ex.: "quanto tempo patos vivem?" e
     # "quantos mares o planeta Terra tem?".
+    # 4) CORE: se o núcleo já possui um fato verificado, ele tem
+    # prioridade sobre padrões quantitativos genéricos.
+    # A exceção é a pesquisa explícita, tratada acima: "pesquise ..."
+    # sempre sai para a pesquisa externa.
+    if conhecimento:
+        return ROTA_CONHECIMENTO
+
+    # 5) PESQUISA IMPLÍCITA: perguntas quantitativas factuais que não
+    # possuem resposta verificada no CORE.
     padroes_quantitativos = (
         "quanto tempo ",
         "quantos ",
@@ -126,12 +135,7 @@ def classificar_rota(mensagem, intencao=None, comando=None, conhecimento=False):
         if any(verbo in texto for verbo in verbos_quantitativos):
             return ROTA_PESQUISA_EXTERNA
 
-    # 4) CORE: se o núcleo já possui um fato verificado, ele tem
-    # prioridade sobre padrões quantitativos genéricos.
-    if conhecimento:
-        return ROTA_CONHECIMENTO
-
-    # 5) IA LOCAL: conversa, estudo e raciocínio sem necessidade externa.
+    # 6) IA LOCAL: conversa, estudo e raciocínio sem necessidade externa.
     return ROTA_IA_LOCAL
 
 
@@ -1203,6 +1207,11 @@ class StacyOrchestrator:
                     "text": resposta
                 }
             ]
+        })
+
+        self.historico.append({
+            "role": "model",
+            "parts": [{"text": resposta}]
         })
 
         return {
