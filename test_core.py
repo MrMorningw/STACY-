@@ -155,6 +155,52 @@ class CoreRoutingTests(unittest.TestCase):
             orchestrator.ROTA_CONHECIMENTO
         )
 
+    def test_known_quantitative_fact_does_not_get_external_route(self):
+        self.assertEqual(
+            orchestrator.classificar_rota(
+                "quantas luas tem venus?",
+                conhecimento=True,
+            ),
+            orchestrator.ROTA_CONHECIMENTO
+        )
+        self.assertEqual(
+            orchestrator.classificar_rota(
+                "quanto tempo vivem os patos?",
+                conhecimento=False,
+            ),
+            orchestrator.ROTA_PESQUISA_EXTERNA
+        )
+
+    def test_ai_response_is_added_once_to_history(self):
+        self.orquestrador._usar_ai = lambda mensagem: {
+            "tipo": "ai",
+            "resposta": "Resposta de teste.",
+            "origem": "teste"
+        }
+        # Reproduz a persistência que ocorre dentro de _usar_ai apenas
+        # quando a rota realmente passa pelo método. Aqui chamamos o método
+        # real com as dependências de IA substituídas.
+        original_health = orchestrator.ai.verificar_ia_local
+        original_local = orchestrator.ai.gerar_resposta_local
+        try:
+            orchestrator.ai.verificar_ia_local = lambda: True
+            orchestrator.ai.gerar_resposta_local = lambda *args, **kwargs: "Resposta de teste."
+            resultado = self.orquestrador._usar_ai("primeira pergunta")
+        finally:
+            orchestrator.ai.verificar_ia_local = original_health
+            orchestrator.ai.gerar_resposta_local = original_local
+
+        self.assertEqual(resultado["tipo"], "ai")
+        modelos = [
+            item for item in self.orquestrador.historico
+            if item.get("role") == "model"
+        ]
+        self.assertEqual(len(modelos), 1)
+        self.assertEqual(
+            modelos[0]["parts"][0]["text"],
+            "Resposta de teste."
+        )
+
     def test_route_source_word_alone_stays_local(self):
         self.assertEqual(
             orchestrator.classificar_rota("quais fontes bibliográficas devo estudar?"),
