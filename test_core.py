@@ -238,6 +238,21 @@ class CoreRoutingTests(unittest.TestCase):
         self.assertEqual(resultado["tipo"], "memoria")
         self.assertEqual(resultado["categoria"], "projetos")
 
+    def test_conversational_prefix_with_comma_is_tolerated(self):
+        resultado = intent.interpretar(
+            "certo, quais sao meus objetivos?"
+        )
+        self.assertEqual(resultado["tipo"], "memoria")
+        self.assertEqual(resultado["categoria"], "objetivos")
+
+    def test_factual_verb_typo_is_normalized_for_routing(self):
+        self.assertEqual(
+            orchestrator._normalizar_rota(
+                "quantos presidentes o brasil teve?"
+            ),
+            "quantos presidentes o brasil teve"
+        )
+
     def test_unknown_count_with_past_tense_goes_external(self):
         self.assertEqual(
             orchestrator.classificar_rota(
