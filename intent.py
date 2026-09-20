@@ -1,4 +1,24 @@
 import unicodedata
+from difflib import SequenceMatcher
+
+
+def normalizar_flexivel(texto):
+    texto = (texto or "").strip().lower()
+    texto = unicodedata.normalize("NFD", texto)
+    texto = "".join(caractere for caractere in texto if unicodedata.category(caractere) != "Mn")
+    texto = " ".join(texto.split())
+    return texto.rstrip("?!.,;: ").replace("saos ", "sao ")
+
+
+def corresponde_frase(texto, candidatos, limiar=0.86):
+    alvo = normalizar_flexivel(texto)
+    for candidato in candidatos:
+        candidato_normalizado = normalizar_flexivel(candidato)
+        if alvo == candidato_normalizado:
+            return True
+        if len(alvo) >= 8 and SequenceMatcher(None, alvo, candidato_normalizado).ratio() >= limiar:
+            return True
+    return False
 
 def interpretar(mensagem):
 
@@ -20,7 +40,7 @@ def interpretar(mensagem):
     # COMANDOS DIRETOS
     # =========================
 
-    if normalizado in ["sair", "exit", "quit"]:
+    if corresponde_frase(normalizado, ["sair", "exit", "quit"], limiar=0.90):
         return {
             "tipo": "comando",
             "acao": "sair"
@@ -81,38 +101,42 @@ def interpretar(mensagem):
     consulta = normalizado.rstrip("?!.,;: ")
     consulta_flexivel = normalizado_sem_acentos.rstrip("?!.,;: ")
 
-    if consulta in consultas_usuario or consulta_flexivel in [
+    if corresponde_frase(consulta, consultas_usuario + [
         "qual e o meu nome",
         "qual meu nome",
         "como eu me chamo",
         "voce sabe meu nome"
-    ]:
+    ]):
         return {
             "tipo": "memoria",
             "acao": "consultar",
             "categoria": "usuario"
         }
 
-    if consulta in consultas_projetos or consulta_flexivel in [
+    if corresponde_frase(consulta, consultas_projetos + [
         "quais sao meus projetos",
         "quais meus projetos",
         "quais projetos eu tenho",
         "voce lembra meus projetos",
-        "quais sao os meus projetos"
-    ]:
+        "quais sao os meus projetos",
+        "e os meus projetos",
+        "e meus projetos"
+    ]):
         return {
             "tipo": "memoria",
             "acao": "consultar",
             "categoria": "projetos"
         }
 
-    if consulta in consultas_objetivos or consulta_flexivel in [
+    if corresponde_frase(consulta, consultas_objetivos + [
         "quais sao meus objetivos",
         "quais meus objetivos",
         "quais objetivos eu tenho",
         "voce lembra meus objetivos",
-        "quais sao os meus objetivos"
-    ]:
+        "quais sao os meus objetivos",
+        "e os meus objetivos",
+        "e meus objetivos"
+    ]):
         return {
             "tipo": "memoria",
             "acao": "consultar",
@@ -703,7 +727,7 @@ def interpretar_tarefa(mensagem):
         "minhas tarefas"
     ]
 
-    if normalizado in consultas_listar or normalizado_flexivel in consultas_listar_flexiveis:
+    if corresponde_frase(normalizado, consultas_listar + consultas_listar_flexiveis):
 
         return {
             "tipo": "tarefa",
