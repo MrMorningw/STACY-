@@ -137,6 +137,15 @@ class CoreRoutingTests(unittest.TestCase):
             orchestrator.ROTA_INTERNA
         )
 
+    def test_explicit_research_has_priority_over_core_knowledge(self):
+        self.assertEqual(
+            orchestrator.classificar_rota(
+                "pesquise quantas luas tem venus",
+                conhecimento=True,
+            ),
+            orchestrator.ROTA_PESQUISA_EXTERNA
+        )
+
     def test_route_core_knowledge_is_separate_from_external_research(self):
         self.assertEqual(
             orchestrator.classificar_rota(
