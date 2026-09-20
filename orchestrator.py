@@ -578,10 +578,8 @@ class StacyOrchestrator:
 
                 resposta = (
                     "Estas são as informações do senhor "
-                    "que estão na memória:
-"
-                    + "
-".join(
+                    "que estão na memória:\n"
+                    + "\n".join(
                         f"• {linha}"
                         for linha in linhas
                     )
@@ -590,10 +588,8 @@ class StacyOrchestrator:
             else:
 
                 resposta = (
-                    f"Seus {categoria}, senhor:
-"
-                    + "
-".join(
+                    f"Seus {categoria}, senhor:\n"
+                    + "\n".join(
                         f"• {item}"
                         for item in dados
                     )
@@ -660,8 +656,7 @@ class StacyOrchestrator:
                     "Encontrei estas informações "
                     "na memória, senhor:
 "
-                    + "
-".join(linhas)
+                    + "\n".join(linhas)
                 ),
                 "resultados": resultados
             }
