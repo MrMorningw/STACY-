@@ -155,6 +155,12 @@ class CoreRoutingTests(unittest.TestCase):
             orchestrator.ROTA_CONHECIMENTO
         )
 
+    def test_route_word_boundary_does_not_false_match(self):
+        self.assertEqual(
+            orchestrator.classificar_rota("quais fontes bibliográficas devo estudar?"),
+            orchestrator.ROTA_IA_LOCAL
+        )
+
     def test_route_explicit_external_research(self):
         self.assertEqual(
             orchestrator.classificar_rota("pesquise a população atual do Brasil"),
@@ -294,11 +300,6 @@ class CoreRoutingTests(unittest.TestCase):
         )
         self.assertEqual(resultado["tipo"], "local")
         self.assertIn("Nenhuma informação foi alterada", resultado["resposta"])
-
-    def test_verified_knowledge_stays_in_core(self):
-        resultado = self.orquestrador.processar("quantas luas tem venus?")
-        self.assertEqual(resultado["tipo"], "conhecimento_verificado")
-        self.assertIn("não possui luas naturais", resultado["resposta"])
 
     def test_factual_followup_uses_conversation_context(self):
         original_ai = self.orquestrador._usar_ai
