@@ -231,11 +231,25 @@ class CoreRoutingTests(unittest.TestCase):
             orchestrator.ROTA_PESQUISA_EXTERNA
         )
 
-    def test_typo_quantaa_still_routes_quantitative_question_external(self):
+    def test_typo_in_routing_vocabulary_is_normalized_generally(self):
         self.assertEqual(
-            orchestrator.classificar_rota("quantaa luas tem mercurio?"),
+            orchestrator._normalizar_rota("quantaa"),
+            "quantas"
+        )
+
+    def test_capital_fact_question_is_external_without_core_answer(self):
+        self.assertEqual(
+            orchestrator.classificar_rota(
+                "qual a capital de Portugal?",
+                conhecimento=False,
+            ),
             orchestrator.ROTA_PESQUISA_EXTERNA
         )
+
+    def test_small_typo_in_local_phrase_uses_local_response(self):
+        resultado = self.orquestrador.processar("como voce esya?")
+        self.assertEqual(resultado["tipo"], "local")
+        self.assertIn("operando normalmente", resultado["resposta"])
 
 
     def test_route_normal_conversation_is_local_ai(self):
