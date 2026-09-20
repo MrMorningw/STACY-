@@ -233,6 +233,17 @@ class StacyOrchestrator:
             mensagem
         )
 
+        # Consultas simples de memória devem ser resolvidas pelo CORE
+        # antes de contexto/IA, evitando que o modelo invente dados.
+        if (
+            isinstance(intencao, dict)
+            and intencao.get("tipo") == "memoria"
+            and intencao.get("acao") == "consultar"
+        ):
+            resultado_memoria = self._processar_intencao(intencao)
+            if resultado_memoria is not None:
+                return resultado_memoria
+
         resultado_tarefa = self._processar_tarefa(
             intencao
         )
