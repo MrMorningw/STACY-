@@ -145,7 +145,7 @@ class CoreRoutingTests(unittest.TestCase):
                 RuntimeError("429 quota")
             )
             resultado = self.orquestrador.processar(
-                "quanto tempo vivem os patos?"
+                "pesquise a população atual do Brasil"
             )
         finally:
             orchestrator.ai.gerar_resposta_pesquisa = original
