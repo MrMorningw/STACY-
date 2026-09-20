@@ -23,13 +23,18 @@ CONHECIMENTO_VERIFICADO = [
     ),
     (
         re.compile(
-            r"quantos dentes tem um ser humano adulto|quantos dentes tem um ser humani adulto|quantos dentes tem um adulto",
+            r"quantos dentes tem um ser humano adulto|"
+            r"quantos dentes tem um ser humani adulto|"
+            r"quantos dentes tem um adulto",
             re.I
         ),
         "Um adulto normalmente tem 32 dentes permanentes, incluindo os quatro sisos."
     ),
     (
-        re.compile(r"qual a cor de um carro vermelho|qual e a cor de um carro vermelho", re.I),
+        re.compile(
+            r"qual a cor de um carro vermelho|qual e a cor de um carro vermelho",
+            re.I
+        ),
         "Um carro vermelho é, por definição, vermelho."
     ),
 ]
@@ -41,36 +46,6 @@ def consultar(mensagem):
     if not texto:
         return None
 
-
-def consultar_contextual(mensagem, historico):
-    """Resolve pistas factuais simples usando mensagens recentes do usuário."""
-    atual = _normalizar(mensagem)
-    if not atual:
-        return None
-
-    anteriores = []
-    for item in reversed(historico or []):
-        if not isinstance(item, dict):
-            continue
-        if item.get("tipo") != "usuario":
-            continue
-        conteudo = item.get("conteudo", "")
-        if conteudo:
-            anteriores.append(_normalizar(conteudo))
-        if len(anteriores) >= 4:
-            break
-
-    if (
-        ("caroco" in atual or "caroço" in atual)
-        and any("fruta verde" in item and "comeca com a" in item for item in anteriores)
-    ):
-        return "A fruta que corresponde a essas pistas é o abacate."
-
-    if "fruta verde" in atual and "caroco" in atual:
-        return "Uma fruta verde com caroço pode ser o abacate, entre outras possibilidades."
-
-    return None
-
     # Variações de digitação comuns que ainda mantêm a intenção inequívoca.
     texto = texto.replace("wuantos", "quantos")
     texto = texto.replace("wuantas", "quantas")
@@ -80,11 +55,7 @@ def consultar_contextual(mensagem, historico):
         if padrao.search(texto):
             return resposta
 
-    # Respostas factuais compostas por pistas simples e inequívocas.
-    if (
-        "qual a cor" in texto
-        and "sol" in texto
-    ):
+    if "qual a cor" in texto and "sol" in texto:
         return (
             "Visto do espaço, o Sol parece branco. "
             "Da superfície da Terra, a atmosfera pode fazê-lo parecer amarelado, "
@@ -105,11 +76,56 @@ def consultar_contextual(mensagem, historico):
         "fruta verde" in texto
         and "comeca com a" in texto
         and "caroco" in texto
-    ) or (
-        "fruta verde" in texto
-        and "comeca com a" in texto
-        and "caroco" in texto.replace("caroço", "caroco")
     ):
         return "A fruta que corresponde a essas pistas é o abacate."
+
+    if "fruta verde" in texto and "caroco" in texto:
+        return (
+            "Uma fruta verde com caroço pode ser o abacate, "
+            "entre outras possibilidades."
+        )
+
+    return None
+
+
+def consultar_contextual(mensagem, historico):
+    """Resolve pistas factuais simples usando mensagens recentes do usuário."""
+    atual = _normalizar(mensagem)
+
+    if not atual:
+        return None
+
+    anteriores = []
+
+    for item in reversed(historico or []):
+        if not isinstance(item, dict):
+            continue
+
+        if item.get("tipo") != "usuario":
+            continue
+
+        conteudo = item.get("conteudo", "")
+
+        if conteudo:
+            anteriores.append(_normalizar(conteudo))
+
+        if len(anteriores) >= 4:
+            break
+
+    if (
+        "caroco" in atual
+        and any(
+            "fruta verde" in item
+            and "comeca com a" in item
+            for item in anteriores
+        )
+    ):
+        return "A fruta que corresponde a essas pistas é o abacate."
+
+    if "fruta verde" in atual and "caroco" in atual:
+        return (
+            "Uma fruta verde com caroço pode ser o abacate, "
+            "entre outras possibilidades."
+        )
 
     return None
