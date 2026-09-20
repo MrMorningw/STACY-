@@ -62,7 +62,6 @@ class StacyOrchestrator:
                 "resposta": respostas_locais[mensagem_normalizada]
             }
 
-
         mensagem = mensagem.strip()
 
         self.conversa.registrar_mensagem(mensagem)
@@ -71,10 +70,6 @@ class StacyOrchestrator:
             return {
                 "tipo": "vazio"
             }
-
-        # =========================
-        # 1. AÇÃO PENDENTE
-        # =========================
 
         if self.acao_pendente is not None:
 
@@ -202,10 +197,6 @@ class StacyOrchestrator:
                     )
                 }
 
-        # =========================
-        # 2. RESOLUÇÃO DE ENTIDADE
-        # =========================
-
         entidade_detectada = entity_resolver.resolver(
             mensagem,
             self.entidades,
@@ -229,11 +220,6 @@ class StacyOrchestrator:
                     entidade["id"]
                 )
 
-
-        # =========================
-        # 3. COMANDO / INTENÇÃO
-        # =========================
-
         comando = command.identificar_comando(
             mensagem
         )
@@ -248,10 +234,6 @@ class StacyOrchestrator:
 
         if resultado_tarefa is not None:
             return resultado_tarefa
-
-        # =========================
-        # 4. ACTION ENGINE
-        # =========================
 
         entidade_atual = None
 
@@ -297,10 +279,6 @@ class StacyOrchestrator:
                         "entidade": entidade_atual
                     }
 
-        # =========================
-        # 5. CONTEXT ENGINE
-        # =========================
-
         contexto = context.interpretar_contexto(
             mensagem,
             entity_store,
@@ -337,10 +315,6 @@ class StacyOrchestrator:
                         "resultado": resultado
                     }
 
-        # =========================
-        # 6. COMANDOS
-        # =========================
-
         if comando is not None:
 
             if comando == "sair":
@@ -348,10 +322,6 @@ class StacyOrchestrator:
                 return {
                     "tipo": "sair"
                 }
-
-        # =========================
-        # 7. INTENÇÃO
-        # =========================
 
         if intencao is not None:
 
@@ -366,10 +336,6 @@ class StacyOrchestrator:
             if resultado_intencao is not None:
 
                 return resultado_intencao
-
-        # =========================
-        # 8. IA
-        # =========================
 
         return self._usar_ai(mensagem)
 
@@ -507,7 +473,8 @@ class StacyOrchestrator:
                     f"• {chave}: {valor}"
                 )
 
-            return "\n".join(linhas)
+            return "
+".join(linhas)
 
         return None
 
@@ -612,8 +579,10 @@ class StacyOrchestrator:
 
                 resposta = (
                     "Estas são as informações do senhor "
-                    "que estão na memória:\n"
-                    + "\n".join(
+                    "que estão na memória:
+"
+                    + "
+".join(
                         f"• {linha}"
                         for linha in linhas
                     )
@@ -622,8 +591,10 @@ class StacyOrchestrator:
             else:
 
                 resposta = (
-                    f"Seus {categoria}, senhor:\n"
-                    + "\n".join(
+                    f"Seus {categoria}, senhor:
+"
+                    + "
+".join(
                         f"• {item}"
                         for item in dados
                     )
@@ -688,8 +659,10 @@ class StacyOrchestrator:
                 "tipo": "local",
                 "resposta": (
                     "Encontrei estas informações "
-                    "na memória, senhor:\n"
-                    + "\n".join(linhas)
+                    "na memória, senhor:
+"
+                    + "
+".join(linhas)
                 ),
                 "resultados": resultados
             }
@@ -912,34 +885,46 @@ class StacyOrchestrator:
             indent=2
         )
 
+        erros = []
+
         try:
-            resposta = ai.gerar_resposta(
-                self.api_key,
+            resposta = ai.gerar_resposta_local(
                 self.historico,
                 contexto_memoria,
                 contexto_entidade,
                 contexto_conversa
             )
 
-        except Exception as erro_gemini:
+            origem = "local"
 
-            print(f"[STACY] Gemini indisponível: {erro_gemini}")
-            print("[STACY] Usando IA local como fallback...")
+        except Exception as erro_local:
+
+            erros.append(f"IA local: {erro_local}")
+
+            print(
+                "[STACY] IA local indisponível; "
+                "tentando Gemini como fallback..."
+            )
 
             try:
-                resposta = ai.gerar_resposta_local(
+                resposta = ai.gerar_resposta(
+                    self.api_key,
                     self.historico,
                     contexto_memoria,
                     contexto_entidade,
                     contexto_conversa
                 )
 
-            except Exception as erro_local:
+                origem = "gemini"
+
+            except Exception as erro_gemini:
+
+                erros.append(f"Gemini: {erro_gemini}")
 
                 raise RuntimeError(
-                    f"Gemini e IA local indisponíveis. "
-                    f"Gemini: {erro_gemini} | Local: {erro_local}"
-                )
+                    "IA local e Gemini indisponíveis. "
+                    + " | ".join(erros)
+                ) from erro_gemini
 
         self.historico.append({
             "role": "model",
@@ -952,5 +937,7 @@ class StacyOrchestrator:
 
         return {
             "tipo": "ai",
-            "resposta": resposta
+            "resposta": resposta,
+            "origem": origem
         }
+    }
