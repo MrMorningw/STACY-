@@ -1,108 +1,37 @@
-import os
-import subprocess
 import requests
 import config
 
 
-def gerar_resposta(
-    api_key,
+def _construir_mensagens(
     historico,
     contexto_memoria,
     contexto_entidade=None,
     contexto_conversa=None
 ):
-
-    url = (
-        "https://generativelanguage.googleapis.com/v1beta/"
-        f"models/{config.MODELO}:generateContent"
-        f"?key={api_key}"
-    )
-
-    prompt_sistema = (
+    sistema = (
         config.PERSONALIDADE
-        + "\n\n"
-        + "MEMÓRIA PERSISTENTE DO USUÁRIO:\n"
+        + "\n\nMEMÓRIA PERSISTENTE DO USUÁRIO:\n"
         + contexto_memoria
     )
 
-    if contexto_entidade is not None:
-
-        prompt_sistema += (
-            "\n\n"
-            + "ENTIDADE ATUAL NO CONTEXTO:\n"
-            + contexto_entidade
-        )
-
-    if contexto_conversa is not None:
-
-        prompt_sistema += (
-            "\n\n"
-            + "CONTEXTO CONVERSACIONAL RECENTE:\n"
-            + contexto_conversa
-        )
-
-    payload = {
-        "system_instruction": {
-            "parts": [
-                {
-                    "text": prompt_sistema
-                }
-            ]
-        },
-        "contents": historico
-    }
-
-    response = requests.post(
-        url,
-        json=payload,
-        timeout=config.TIMEOUT_API
-    )
-
-    if response.status_code != 200:
-
-        raise RuntimeError(
-            f"API retornou {response.status_code}: "
-            f"{response.text}"
-        )
-
-    data = response.json()
-
-    return (
-        data["candidates"][0]
-        ["content"]["parts"][0]
-        ["text"]
-    )
-
-def gerar_resposta_local(
-    historico,
-    contexto_memoria,
-    contexto_entidade=None,
-    contexto_conversa=None
-):
-    url = "http://127.0.0.1:8080/v1/chat/completions"
-
-    mensagens = [
-        {
-            "role": "system",
-            "content": (
-                config.PERSONALIDADE
-                + "\n\nMEMÓRIA PERSISTENTE DO USUÁRIO:\n"
-                + contexto_memoria
-            )
-        }
-    ]
-
     if contexto_entidade:
-        mensagens[0]["content"] += (
+        sistema += (
             "\n\nENTIDADE ATUAL:\n"
             + contexto_entidade
         )
 
     if contexto_conversa:
-        mensagens[0]["content"] += (
-            "\n\nCONTEXTO CONVERSACIONAL:\n"
+        sistema += (
+            "\n\nCONTEXTO CONVERSACIONAL RECENTE:\n"
             + contexto_conversa
         )
+
+    mensagens = [
+        {
+            "role": "system",
+            "content": sistema
+        }
+    ]
 
     for mensagem in historico:
         texto = ""
@@ -124,17 +53,111 @@ def gerar_resposta_local(
                 "content": texto
             })
 
+    return mensagens
+
+
+def gerar_resposta(
+    api_key,
+    historico,
+    contexto_memoria,
+    contexto_entidade=None,
+    contexto_conversa=None
+):
+    if not api_key:
+        raise RuntimeError("Chave da Gemini não configurada.")
+
+    url = (
+        "https://generativelanguage.googleapis.com/v1beta/"
+        f"models/{config.MODELO}:generateContent"
+        f"?key={api_key}"
+    )
+
+    mensagens = _construir_mensagens(
+        historico,
+        contexto_memoria,
+        contexto_entidade,
+        contexto_conversa
+    )
+
+    contents = []
+
+    for mensagem in mensagens[1:]:
+        contents.append({
+            "role": (
+                "model"
+                if mensagem["role"] == "assistant"
+                else "user"
+            ),
+            "parts": [
+                {
+                    "text": mensagem["content"]
+                }
+            ]
+        })
+
+    payload = {
+        "system_instruction": {
+            "parts": [
+                {
+                    "text": mensagens[0]["content"]
+                }
+            ]
+        },
+        "contents": contents
+    }
+
+    response = requests.post(
+        url,
+        json=payload,
+        timeout=config.TIMEOUT_API
+    )
+
+    if response.status_code != 200:
+        raise RuntimeError(
+            f"API Gemini retornou {response.status_code}: "
+            f"{response.text}"
+        )
+
+    data = response.json()
+
+    try:
+        return (
+            data["candidates"][0]
+            ["content"]["parts"][0]
+            ["text"]
+        ).strip()
+    except (KeyError, IndexError, TypeError) as erro:
+        raise RuntimeError(
+            f"Resposta Gemini inválida: {data}"
+        ) from erro
+
+
+def gerar_resposta_local(
+    historico,
+    contexto_memoria,
+    contexto_entidade=None,
+    contexto_conversa=None
+):
+    url = config.LOCAL_AI_URL
+
+    mensagens = _construir_mensagens(
+        historico,
+        contexto_memoria,
+        contexto_entidade,
+        contexto_conversa
+    )
+
     payload = {
         "messages": mensagens,
         "temperature": 0.7,
-        "max_tokens": 64,
+        "max_tokens": config.LOCAL_MAX_TOKENS,
         "stream": False
     }
 
     response = requests.post(
         url,
         json=payload,
-        timeout=15
+        timeout=config.LOCAL_AI_TIMEOUT
     )
 
     if response.status_code != 200:
@@ -145,4 +168,14 @@ def gerar_resposta_local(
 
     data = response.json()
 
-    return data["choices"][0]["message"]["content"].strip()
+    try:
+        resposta = data["choices"][0]["message"]["content"].strip()
+    except (KeyError, IndexError, TypeError) as erro:
+        raise RuntimeError(
+            f"Resposta da IA local inválida: {data}"
+        ) from erro
+
+    if not resposta:
+        raise RuntimeError("IA local retornou resposta vazia.")
+
+    return resposta
