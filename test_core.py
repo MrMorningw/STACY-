@@ -161,6 +161,18 @@ class CoreRoutingTests(unittest.TestCase):
             orchestrator.ROTA_IA_LOCAL
         )
 
+    def test_route_source_word_alone_stays_local(self):
+        self.assertEqual(
+            orchestrator.classificar_rota("quais fontes bibliográficas devo estudar?"),
+            orchestrator.ROTA_IA_LOCAL
+        )
+
+    def test_route_explicit_source_request_is_external(self):
+        self.assertEqual(
+            orchestrator.classificar_rota("me dê fontes sobre responsabilidade civil"),
+            orchestrator.ROTA_PESQUISA_EXTERNA
+        )
+
     def test_route_explicit_external_research(self):
         self.assertEqual(
             orchestrator.classificar_rota("pesquise a população atual do Brasil"),
