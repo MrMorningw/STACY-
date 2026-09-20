@@ -45,6 +45,11 @@ class StacyOrchestrator:
         mensagem_normalizada = mensagem.strip().lower()
 
         respostas_locais = {
+            "oi stacy": "Olá, senhor. Estou pronta.",
+            "ola stacy": "Olá, senhor. Estou pronta.",
+            "olá stacy": "Olá, senhor. Estou pronta.",
+            "como voce esta": "Estou operando normalmente, senhor. Pronta para continuar.",
+            "como você está": "Estou operando normalmente, senhor. Pronta para continuar.",
             "teste": "Teste recebido, senhor. STACY está operacional.",
             "testar": "Teste recebido, senhor. STACY está operacional.",
             "teste stacy": "Teste recebido, senhor. STACY está operacional.",
