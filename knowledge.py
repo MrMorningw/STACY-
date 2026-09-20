@@ -1,33 +1,86 @@
 import re
+import unicodedata
+
+
+def _normalizar(texto):
+    texto = (texto or "").strip().lower()
+    texto = unicodedata.normalize("NFD", texto)
+    return "".join(
+        caractere
+        for caractere in texto
+        if unicodedata.category(caractere) != "Mn"
+    )
 
 
 CONHECIMENTO_VERIFICADO = [
     (
-        re.compile(r"quantas luas tem venus|quantas luas tem vênus", re.I),
+        re.compile(r"quantas luas tem v(?:e|ê)nus|quantas luas.*venus", re.I),
         "Vênus não possui luas naturais conhecidas."
     ),
     (
-        re.compile(r"qual a capital do brasil", re.I),
+        re.compile(r"qual a capital do brasil|qual e a capital do brasil", re.I),
         "A capital do Brasil é Brasília."
     ),
     (
-        re.compile(r"quantos dentes tem um ser humano adulto|quantos dentes tem um adulto", re.I),
+        re.compile(
+            r"quantos dentes tem um ser humano adulto|quantos dentes tem um adulto",
+            re.I
+        ),
         "Um adulto normalmente tem 32 dentes permanentes, incluindo os quatro sisos."
     ),
     (
-        re.compile(r"qual a cor de um carro vermelho", re.I),
+        re.compile(r"qual a cor de um carro vermelho|qual e a cor de um carro vermelho", re.I),
         "Um carro vermelho é, por definição, vermelho."
     ),
 ]
 
 
 def consultar(mensagem):
-    texto = (mensagem or "").strip()
+    texto = _normalizar(mensagem)
+
     if not texto:
         return None
+
+    # Variações de digitação comuns que ainda mantêm a intenção inequívoca.
+    texto = texto.replace("wuantos", "quantos")
+    texto = texto.replace("wuantas", "quantas")
+    texto = texto.replace("wual", "qual")
+    texto = texto.replace("wual", "qual")
 
     for padrao, resposta in CONHECIMENTO_VERIFICADO:
         if padrao.search(texto):
             return resposta
+
+    # Respostas factuais compostas por pistas simples e inequívocas.
+    if (
+        "qual a cor" in texto
+        and "sol" in texto
+    ):
+        return (
+            "Visto do espaço, o Sol parece branco. "
+            "Da superfície da Terra, a atmosfera pode fazê-lo parecer amarelado, "
+            "alaranjado ou avermelhado, especialmente perto do horizonte."
+        )
+
+    if (
+        "quanto tempo" in texto
+        and "pato" in texto
+        and ("vive" in texto or "vivem" in texto)
+    ):
+        return (
+            "A expectativa de vida varia bastante conforme a espécie e as condições "
+            "de vida; não existe um único tempo de vida válido para todos os patos."
+        )
+
+    if (
+        "fruta verde" in texto
+        and "comeca com a" in texto
+        and "caroco" in texto
+    ) or (
+        "fruta verde" in texto
+        and "comeca com a" in texto
+        and "caroco" in texto.replace("caroço", "caroco")
+    ):
+        return "A fruta que corresponde a essas pistas é o abacate."
 
     return None
