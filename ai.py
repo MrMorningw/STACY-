@@ -19,6 +19,10 @@ def _construir_mensagens(
         + "projetos, objetivos ou outras informações presentes nesses dados, "
         + "responda usando-os diretamente. NÃO diga que não possui acesso à "
         + "memória quando os dados estiverem presentes. NÃO invente dados."
+        + "\n\nA ÚLTIMA MENSAGEM DO USUÁRIO é a consulta atual e deve ser o foco "
+        + "principal da resposta. Responda diretamente à consulta atual; não responda "
+        + "uma mensagem anterior e não repita uma resposta anterior. O histórico serve "
+        + "apenas como contexto quando necessário."
     )
 
     if contexto_entidade:
@@ -334,7 +338,12 @@ def gerar_resposta_local(
 
     mensagens = [{"role": "system", "content": sistema_local}]
 
-    for mensagem in historico_local:
+    # O último item é a consulta atual: mantenha-a explicitamente por último.
+    # Isso reduz a chance de modelos pequenos responderem ao histórico anterior.
+    mensagens_anteriores = historico_local[:-1]
+    mensagem_atual = historico_local[-1] if historico_local else None
+
+    for mensagem in mensagens_anteriores:
         texto = ""
         for parte in mensagem.get("parts", []):
             if isinstance(parte, dict):
@@ -349,6 +358,18 @@ def gerar_resposta_local(
             # Evita reenviar mensagens extensas de erro/quota ao modelo local.
             texto = _limitar(texto, 400)
             mensagens.append({"role": role, "content": texto})
+
+    if mensagem_atual:
+        texto = ""
+        for parte in mensagem_atual.get("parts", []):
+            if isinstance(parte, dict):
+                texto += parte.get("text", "")
+            elif isinstance(parte, str):
+                texto += parte
+
+        texto = _limitar(texto, 600)
+        if texto:
+            mensagens.append({"role": "user", "content": texto})
 
     payload = {
         "messages": mensagens,
