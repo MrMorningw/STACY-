@@ -126,6 +126,28 @@ class CoreRoutingTests(unittest.TestCase):
             )
         )
 
+    def test_web_routing_does_not_use_question_mark_alone(self):
+        self.assertFalse(
+            self.orquestrador._deve_pesquisar_web(
+                "você está aí?"
+            )
+        )
+
+    def test_web_research_failure_returns_clean_result(self):
+        original = orchestrator.ai.gerar_resposta_pesquisa
+        try:
+            orchestrator.ai.gerar_resposta_pesquisa = lambda *args, **kwargs: (_ for _ in ()).throw(
+                RuntimeError("429 quota")
+            )
+            resultado = self.orquestrador.processar(
+                "quanto tempo vivem os patos?"
+            )
+        finally:
+            orchestrator.ai.gerar_resposta_pesquisa = original
+
+        self.assertEqual(resultado["tipo"], "pesquisa_indisponivel")
+        self.assertIn("Não vou inventar", resultado["resposta"])
+
     def test_verified_knowledge_stays_in_core(self):
         resultado = self.orquestrador.processar("quantas luas tem venus?")
         self.assertEqual(resultado["tipo"], "conhecimento_verificado")
