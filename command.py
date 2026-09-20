@@ -1,6 +1,6 @@
 def identificar_comando(mensagem):
 
-    comando = mensagem.strip().lower()
+    comando = mensagem.strip().lower().rstrip("?!.,;: ")
 
     if comando in ["sair", "exit", "quit"]:
         return "sair"
