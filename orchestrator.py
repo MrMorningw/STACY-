@@ -110,6 +110,22 @@ def classificar_rota(mensagem, intencao=None, comando=None, conhecimento=False):
     if any(padrao in texto for padrao in padroes_factuais):
         return ROTA_PESQUISA_EXTERNA
 
+    # Perguntas quantitativas factuais com o substantivo entre o termo
+    # interrogativo e o verbo. Ex.: "quanto tempo patos vivem?" e
+    # "quantos mares o planeta Terra tem?".
+    padroes_quantitativos = (
+        "quanto tempo ",
+        "quantos ",
+        "quantas ",
+    )
+    verbos_quantitativos = (
+        " vive", " vivem", " tem", " têm", " existem",
+        " sao", " são", " ha", " há"
+    )
+    if any(padrao in texto for padrao in padroes_quantitativos):
+        if any(verbo in texto for verbo in verbos_quantitativos):
+            return ROTA_PESQUISA_EXTERNA
+
     # 4) CORE: somente depois de excluir uma necessidade externa.
     if conhecimento:
         return ROTA_CONHECIMENTO
