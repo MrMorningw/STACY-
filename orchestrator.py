@@ -1175,8 +1175,8 @@ class StacyOrchestrator:
                 erros.append(f"Gemini: {erro_gemini}")
 
                 raise RuntimeError(
-                    "IA local e Gemini indisponíveis. "
-                    + " | ".join(erros)
+                    "Não consegui obter uma resposta da IA agora, senhor. "
+                    "A IA local está indisponível e o Gemini não respondeu dentro do tempo esperado."
                 ) from erro_gemini
 
         self.historico.append({
