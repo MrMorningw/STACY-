@@ -120,11 +120,17 @@ def interpretar(mensagem):
     )
     consulta_sem_prefixo = consulta_flexivel
     for prefixo in prefixos_conversacionais:
+        # Aceita pontuação entre o conector e a pergunta.
+        restante = consulta_sem_prefixo[len(prefixo):]
         if consulta_sem_prefixo == prefixo:
             consulta_sem_prefixo = ""
             break
-        if consulta_sem_prefixo.startswith(prefixo + " "):
-            consulta_sem_prefixo = consulta_sem_prefixo[len(prefixo):].strip()
+        if (
+            consulta_sem_prefixo.startswith(prefixo)
+            and restante
+            and restante[0] in " ,;:-.!?"
+        ):
+            consulta_sem_prefixo = restante.lstrip(" ,;:-.!?").strip()
             break
 
     if corresponde_frase(consulta_sem_prefixo, consultas_usuario + [
