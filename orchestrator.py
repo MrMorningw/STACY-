@@ -32,10 +32,11 @@ def _normalizar_rota(texto):
 
 
 def classificar_rota(mensagem, intencao=None, comando=None, conhecimento=False):
-    """Define uma única rota, com fronteiras explícitas entre os subsistemas."""
+    """Classifica a mensagem em uma única rota, sem misturar responsabilidades."""
     texto = _normalizar_rota(mensagem)
 
-    # 1. DADOS/COMANDOS DA PRÓPRIA STACY: nunca são pesquisa externa.
+    # PRIORIDADE 1 — OPERAÇÕES INTERNAS DA STACY.
+    # Memória, tarefas e comandos estruturados nunca são enviados para IA ou Web.
     if comando in {"memoria", "buscar", "memorize", "esquecer"}:
         return ROTA_INTERNA
 
@@ -44,62 +45,59 @@ def classificar_rota(mensagem, intencao=None, comando=None, conhecimento=False):
         if tipo in {"memoria", "tarefa"}:
             return ROTA_INTERNA
 
-    # Consultas naturais sobre dados do usuário/projetos/tarefas.
     marcadores_internos = (
         "meus projetos", "meus objetivos", "minhas preferencias",
         "minhas tarefas", "minhas informacoes", "o que voce guardou",
-        "o que voce sabe sobre mim", "minha memoria",
-        "dados sobre mim", "informacoes sobre mim",
-        "me diga meus projetos", "me diga meus objetivos",
-        "qual e meu projeto", "qual e o meu projeto",
-        "qual e meu objetivo", "qual e o meu objetivo",
-        "quais sao meus projetos", "quais sao os meus projetos",
-        "quais sao meus objetivos", "quais sao os meus objetivos"
+        "o que voce sabe sobre mim", "minha memoria", "dados sobre mim",
+        "informacoes sobre mim", "me diga meus projetos",
+        "me diga meus objetivos", "qual e meu projeto",
+        "qual e o meu projeto", "qual e meu objetivo",
+        "qual e o meu objetivo", "quais sao meus projetos",
+        "quais sao os meus projetos", "quais sao meus objetivos",
+        "quais sao os meus objetivos"
     )
     if any(marcador in texto for marcador in marcadores_internos):
         return ROTA_INTERNA
 
-    # 2. CONHECIMENTO DETERMINÍSTICO já mantido no CORE.
-    # Não é IA local e não é internet.
-    if conhecimento:
-        return ROTA_CONHECIMENTO
-
-    # 3. PESQUISA EXTERNA: somente quando a intenção é buscar/verificar fora.
+    # PRIORIDADE 2 — PEDIDO EXPLÍCITO DE PESQUISA.
+    # "Pesquise/procure na Internet/Google" significa Web, mesmo que o CORE
+    # possua um fato relacionado. O pedido explícito do usuário vence o CORE.
     gatilhos_externos = (
         "pesquise", "pesquisar", "pesquisa na internet",
         "procure na internet", "procure no google",
         "pesquisa no google", "na internet", "no google",
-        "fonte", "fontes"
+        "fontes", "fonte"
     )
     if any(gatilho in texto for gatilho in gatilhos_externos):
         return ROTA_PESQUISA_EXTERNA
 
+    # PRIORIDADE 3 — CONHECIMENTO DETERMINÍSTICO DO CORE.
+    # Não é Internet e não é geração da IA local.
+    if conhecimento:
+        return ROTA_CONHECIMENTO
+
+    # PRIORIDADE 4 — NECESSIDADE IMPLÍCITA DE INFORMAÇÃO EXTERNA.
+    # Usada quando a pergunta pede fato verificável que o CORE não possui.
     termos_temporais = (
-        "hoje", "agora", "atual", "atualmente", "ultimo",
-        "ultima", "ultimos", "ultimas", "recentemente",
-        "noticia", "noticias"
+        "hoje", "agora", "atual", "atualmente", "ultimo", "ultima",
+        "ultimos", "ultimas", "recentemente", "noticia", "noticias"
     )
     if any(f" {termo} " in f" {texto} " for termo in termos_temporais):
         return ROTA_PESQUISA_EXTERNA
 
-    # Iniciadores realmente factuais. "qual/quais" não bastam sozinhos:
-    # perguntas como "qual a diferença..." podem ser conversa/estudo local.
-    iniciadores_factuais = (
-        "quem ", "quando ", "onde ", "quanto ", "quantos ",
-        "quantas ", "por que ", "porque "
-    )
-    if texto.startswith(iniciadores_factuais):
-        return ROTA_PESQUISA_EXTERNA
-
     padroes_factuais = (
-        "quantos anos vive", "quanto tempo vive", "quanto tempo vivem",
-        "qual a idade de", "qual o tamanho de", "qual a populacao de",
-        "qual e a populacao de", "tem quantas luas", "possui quantas luas"
+        "quem e ", "quem foi ", "quem sao ", "quando foi ",
+        "quando aconteceu ", "onde fica ", "quanto tempo vive",
+        "quanto tempo vivem", "quantos anos vive", "qual a idade de",
+        "qual o tamanho de", "qual a populacao de",
+        "qual e a populacao de", "tem quantas luas",
+        "possui quantas luas"
     )
     if any(padrao in texto for padrao in padroes_factuais):
         return ROTA_PESQUISA_EXTERNA
 
-    # 4. Conversa/raciocínio sem necessidade de fonte externa.
+    # "qual/quais/por que/quanto" isolados NÃO definem pesquisa.
+    # Podem ser perguntas de estudo ou conversa e seguem para a IA local.
     return ROTA_IA_LOCAL
 
 
