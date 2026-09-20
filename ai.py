@@ -138,6 +138,20 @@ def gerar_resposta(
         ) from erro
 
 
+def verificar_ia_local():
+    """Verifica rapidamente se o llama-server local está acessível."""
+    health_url = config.LOCAL_AI_URL.rsplit("/v1/", 1)[0] + "/health"
+
+    try:
+        response = requests.get(
+            health_url,
+            timeout=config.LOCAL_HEALTH_TIMEOUT
+        )
+        return response.status_code == 200
+    except requests.RequestException:
+        return False
+
+
 def gerar_resposta_local(
     historico,
     contexto_memoria,
