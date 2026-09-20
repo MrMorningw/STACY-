@@ -212,6 +212,13 @@ class StacyOrchestrator:
                     )
                 }
 
+        # Uma solicitação explícita de pesquisa deve sempre chegar ao
+        # provedor externo, mesmo que o CORE conheça um fato relacionado.
+        # Isso respeita literalmente pedidos como "pesquise ..." e evita
+        # transformar uma solicitação de fonte em resposta local.
+        if self._pesquisa_explicita(mensagem):
+            return self._pesquisar_web(mensagem)
+
         # Fatos determinísticos são resolvidos pelo CORE depois de uma
         # confirmação pendente, para não deixar ações aguardando sem tratamento.
         resposta_conhecimento = knowledge.consultar(mensagem)
@@ -903,6 +910,24 @@ class StacyOrchestrator:
             }
 
         return None
+
+    def _pesquisa_explicita(self, mensagem):
+        texto = (mensagem or "").strip().lower()
+        texto = unicodedata.normalize("NFD", texto)
+        texto = "".join(
+            caractere
+            for caractere in texto
+            if unicodedata.category(caractere) != "Mn"
+        )
+        texto = " ".join(texto.split())
+
+        gatilhos_explicitos = (
+            "pesquise", "pesquisar", "pesquisa na internet",
+            "procure na internet", "procure no google",
+            "pesquisa no google", "na internet", "no google",
+            "fonte", "fontes"
+        )
+        return any(gatilho in texto for gatilho in gatilhos_explicitos)
 
     def _deve_pesquisar_web(self, mensagem):
         texto = (mensagem or "").strip().lower()
