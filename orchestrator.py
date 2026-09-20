@@ -42,7 +42,7 @@ class StacyOrchestrator:
 
     def _processar_interno(self, mensagem):
 
-        mensagem_normalizada = mensagem.strip().lower()
+        mensagem_normalizada = mensagem.strip().lower().rstrip("?!.,;: ")
 
         respostas_locais = {
             "oi stacy": "Olá, senhor. Estou pronta.",
@@ -899,7 +899,7 @@ class StacyOrchestrator:
         try:
             resposta = ai.gerar_resposta_local(
                 self.historico,
-                contexto_memoria,
+                "",  # O CORE já resolve consultas estruturadas; local AI recebe só o necessário.
                 contexto_entidade,
                 contexto_conversa
             )
