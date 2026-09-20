@@ -45,7 +45,7 @@ class AIInfrastructureTests(unittest.TestCase):
         resultado = ai.gerar_resposta_pesquisa(
             "chave",
             [{"role": "user", "parts": [{"text": "quanto vivem os patos?"}]}],
-            "{}"
+            "[]"
         )
 
         self.assertEqual(resultado["resposta"], "Resposta pesquisada.")
@@ -55,6 +55,7 @@ class AIInfrastructureTests(unittest.TestCase):
         )
         payload = mock_post.call_args.kwargs["json"]
         self.assertEqual(payload["tools"], [{"google_search": {}}])
+        self.assertNotIn("MEMÓRIA PERSISTENTE", payload["system_instruction"]["parts"][0]["text"])
 
     def test_local_prompt_keeps_core_memory(self):
         mensagens = ai._construir_mensagens(
