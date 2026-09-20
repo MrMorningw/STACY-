@@ -12,6 +12,15 @@ def _normalizar(texto):
     )
 
 
+def _tem_pistas_abacate(texto):
+    return (
+        "fruta" in texto
+        and "verde" in texto
+        and "comeca com a" in texto
+        and "caroco" in texto
+    )
+
+
 CONHECIMENTO_VERIFICADO = [
     (
         re.compile(r"quantas luas tem venus|quantas luas.*venus", re.I),
@@ -46,7 +55,6 @@ def consultar(mensagem):
     if not texto:
         return None
 
-    # Variações de digitação comuns que ainda mantêm a intenção inequívoca.
     texto = texto.replace("wuantos", "quantos")
     texto = texto.replace("wuantas", "quantas")
     texto = texto.replace("wual", "qual")
@@ -72,14 +80,10 @@ def consultar(mensagem):
             "de vida; não existe um único tempo de vida válido para todos os patos."
         )
 
-    if (
-        "fruta verde" in texto
-        and "comeca com a" in texto
-        and "caroco" in texto
-    ):
+    if _tem_pistas_abacate(texto):
         return "A fruta que corresponde a essas pistas é o abacate."
 
-    if "fruta verde" in texto and "caroco" in texto:
+    if "fruta" in texto and "verde" in texto and "caroco" in texto:
         return (
             "Uma fruta verde com caroço pode ser o abacate, "
             "entre outras possibilidades."
@@ -115,14 +119,15 @@ def consultar_contextual(mensagem, historico):
     if (
         "caroco" in atual
         and any(
-            "fruta verde" in item
+            "fruta" in item
+            and "verde" in item
             and "comeca com a" in item
             for item in anteriores
         )
     ):
         return "A fruta que corresponde a essas pistas é o abacate."
 
-    if "fruta verde" in atual and "caroco" in atual:
+    if "fruta" in atual and "verde" in atual and "caroco" in atual:
         return (
             "Uma fruta verde com caroço pode ser o abacate, "
             "entre outras possibilidades."
