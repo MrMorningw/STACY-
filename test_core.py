@@ -231,6 +231,29 @@ class CoreRoutingTests(unittest.TestCase):
             orchestrator.ROTA_PESQUISA_EXTERNA
         )
 
+    def test_conversational_prefix_does_not_break_memory_query(self):
+        resultado = intent.interpretar(
+            "otimo. wuais sao meus projetos?"
+        )
+        self.assertEqual(resultado["tipo"], "memoria")
+        self.assertEqual(resultado["categoria"], "projetos")
+
+    def test_unknown_count_with_past_tense_goes_external(self):
+        self.assertEqual(
+            orchestrator.classificar_rota(
+                "quantos presidentes o brasil ja teve?"
+            ),
+            orchestrator.ROTA_PESQUISA_EXTERNA
+        )
+
+    def test_specific_translation_request_goes_external(self):
+        self.assertEqual(
+            orchestrator.classificar_rota(
+                "como se diz eu te amo em latim?"
+            ),
+            orchestrator.ROTA_PESQUISA_EXTERNA
+        )
+
     def test_typo_in_routing_vocabulary_is_normalized_generally(self):
         self.assertEqual(
             orchestrator._normalizar_rota("quantaa"),
