@@ -31,19 +31,23 @@ def _normalizar_rota(texto):
     )
 
 
+def _contem_termo(texto, termo):
+    """Verifica termo/frase sem casar dentro de outra palavra."""
+    texto = f" {texto.strip()} "
+    termo = f" {termo.strip()} "
+    return termo in texto
+
+
 def classificar_rota(mensagem, intencao=None, comando=None, conhecimento=False):
-    """Classifica a mensagem em uma única rota, sem misturar responsabilidades."""
+    """Classifica a mensagem em exatamente uma rota."""
     texto = _normalizar_rota(mensagem)
 
-    # PRIORIDADE 1 — OPERAÇÕES INTERNAS DA STACY.
-    # Memória, tarefas e comandos estruturados nunca são enviados para IA ou Web.
+    # 1) INTERNO: dados e operações da própria STACY nunca saem para IA/Web.
     if comando in {"memoria", "buscar", "memorize", "esquecer"}:
         return ROTA_INTERNA
 
-    if isinstance(intencao, dict):
-        tipo = intencao.get("tipo")
-        if tipo in {"memoria", "tarefa"}:
-            return ROTA_INTERNA
+    if isinstance(intencao, dict) and intencao.get("tipo") in {"memoria", "tarefa"}:
+        return ROTA_INTERNA
 
     marcadores_internos = (
         "meus projetos", "meus objetivos", "minhas preferencias",
@@ -56,33 +60,25 @@ def classificar_rota(mensagem, intencao=None, comando=None, conhecimento=False):
         "quais sao os meus projetos", "quais sao meus objetivos",
         "quais sao os meus objetivos"
     )
-    if any(marcador in texto for marcador in marcadores_internos):
+    if any(_contem_termo(texto, marcador) for marcador in marcadores_internos):
         return ROTA_INTERNA
 
-    # PRIORIDADE 2 — PEDIDO EXPLÍCITO DE PESQUISA.
-    # "Pesquise/procure na Internet/Google" significa Web, mesmo que o CORE
-    # possua um fato relacionado. O pedido explícito do usuário vence o CORE.
+    # 2) PESQUISA EXPLÍCITA: pedido direto do usuário sempre significa Web.
     gatilhos_externos = (
         "pesquise", "pesquisar", "pesquisa na internet",
         "procure na internet", "procure no google",
         "pesquisa no google", "na internet", "no google",
         "fontes", "fonte"
     )
-    if any(gatilho in texto for gatilho in gatilhos_externos):
+    if any(_contem_termo(texto, gatilho) for gatilho in gatilhos_externos):
         return ROTA_PESQUISA_EXTERNA
 
-    # PRIORIDADE 3 — CONHECIMENTO DETERMINÍSTICO DO CORE.
-    # Não é Internet e não é geração da IA local.
-    if conhecimento:
-        return ROTA_CONHECIMENTO
-
-    # PRIORIDADE 4 — NECESSIDADE IMPLÍCITA DE INFORMAÇÃO EXTERNA.
-    # Usada quando a pergunta pede fato verificável que o CORE não possui.
+    # 3) PESQUISA IMPLÍCITA: atualidade ou fatos externos verificáveis.
     termos_temporais = (
         "hoje", "agora", "atual", "atualmente", "ultimo", "ultima",
         "ultimos", "ultimas", "recentemente", "noticia", "noticias"
     )
-    if any(f" {termo} " in f" {texto} " for termo in termos_temporais):
+    if any(_contem_termo(texto, termo) for termo in termos_temporais):
         return ROTA_PESQUISA_EXTERNA
 
     padroes_factuais = (
@@ -96,8 +92,11 @@ def classificar_rota(mensagem, intencao=None, comando=None, conhecimento=False):
     if any(padrao in texto for padrao in padroes_factuais):
         return ROTA_PESQUISA_EXTERNA
 
-    # "qual/quais/por que/quanto" isolados NÃO definem pesquisa.
-    # Podem ser perguntas de estudo ou conversa e seguem para a IA local.
+    # 4) CORE: somente depois de excluir uma necessidade externa.
+    if conhecimento:
+        return ROTA_CONHECIMENTO
+
+    # 5) IA LOCAL: conversa, estudo e raciocínio sem necessidade externa.
     return ROTA_IA_LOCAL
 
 
@@ -311,12 +310,24 @@ class StacyOrchestrator:
         comando = command.identificar_comando(mensagem)
         intencao = intent.interpretar(mensagem)
 
-        resposta_conhecimento = knowledge.consultar(mensagem)
-        if resposta_conhecimento is None:
-            resposta_conhecimento = knowledge.consultar_contextual(
-                mensagem,
-                self.conversa.ultimas_mensagens(6)
-            )
+        rota_previa = classificar_rota(
+            mensagem,
+            intencao=intencao,
+            comando=comando,
+            conhecimento=False
+        )
+
+        resposta_conhecimento = None
+        if rota_previa not in {
+            ROTA_INTERNA,
+            ROTA_PESQUISA_EXTERNA,
+        }:
+            resposta_conhecimento = knowledge.consultar(mensagem)
+            if resposta_conhecimento is None:
+                resposta_conhecimento = knowledge.consultar_contextual(
+                    mensagem,
+                    self.conversa.ultimas_mensagens(6)
+                )
 
         rota = classificar_rota(
             mensagem,
