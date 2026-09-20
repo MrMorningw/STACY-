@@ -33,8 +33,7 @@ class CoreRoutingTests(unittest.TestCase):
 
     def test_local_greeting_is_registered_in_conversation(self):
         self.orquestrador.processar("oi stacy")
-        mensagens = self.orquestrador.conversa.ultimas_mensagens(1)
-        self.assertEqual(mensagens[-1]["conteudo"], "oi stacy")
+        self.assertEqual(\n            self.orquestrador.conversa.obter_ultima_mensagem(),\n            "oi stacy"\n        )
 
     def test_greeting_accent_is_local(self):
         resultado = self.orquestrador.processar("Olá STACY?")
