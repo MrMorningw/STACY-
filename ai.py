@@ -140,11 +140,23 @@ def gerar_resposta_local(
 ):
     url = config.LOCAL_AI_URL
 
+    # A IA local roda no telefone: use um contexto compacto para
+    # evitar que memória/histórico grande provoque timeouts.
+    historico_local = historico[-6:] if historico else []
+
+    def _limitar(texto, limite):
+        texto = texto or ""
+        return texto[-limite:]
+
+    memoria_local = _limitar(contexto_memoria, 2000)
+    entidade_local = _limitar(contexto_entidade, 1000)
+    conversa_local = _limitar(contexto_conversa, 2000)
+
     mensagens = _construir_mensagens(
-        historico,
-        contexto_memoria,
-        contexto_entidade,
-        contexto_conversa
+        historico_local,
+        memoria_local,
+        entidade_local,
+        conversa_local
     )
 
     payload = {
