@@ -60,7 +60,7 @@ class CoreRoutingTests(unittest.TestCase):
         finally:
             orchestrator.tasks.listar = original_listar
 
-        self.assertEqual(resultado["tipo"], "tarefa")
+        self.assertEqual(resultado["tipo"], "tarefas")
         self.assertIn("estudar direito", resultado["resposta"])
 
     def test_exit_with_punctuation_is_command(self):
