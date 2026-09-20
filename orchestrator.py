@@ -101,6 +101,11 @@ def classificar_rota(mensagem, intencao=None, comando=None, conhecimento=False):
     return ROTA_IA_LOCAL
 
 
+def _normalizar_confirmacao(texto):
+    texto = _normalizar_rota(texto)
+    return texto.rstrip("?!.,;: ")
+
+
 class StacyOrchestrator:
 
     def __init__(
@@ -156,7 +161,10 @@ class StacyOrchestrator:
             "ola": "Olá, senhor. Estou pronta.",
             "bom dia": "Bom dia, senhor. STACY está pronta.",
             "boa tarde": "Boa tarde, senhor. STACY está pronta.",
-            "boa noite": "Boa noite, senhor. STACY está pronta."
+            "boa noite": "Boa noite, senhor. STACY está pronta.",
+            "quem e voce": "Sou a STACY, sua assistente pessoal. Opero com um núcleo local e, quando necessário, uso recursos externos autorizados.",
+            "o que voce e": "Sou a STACY, sua assistente pessoal.",
+            "o que voce faz": "Posso ajudar com organização, tarefas, memória, estudos e conversação."
         }
 
         if mensagem_normalizada in respostas_locais:
@@ -176,15 +184,11 @@ class StacyOrchestrator:
 
         if self.acao_pendente is not None:
 
-            confirmacao = mensagem.lower()
+            confirmacao = _normalizar_confirmacao(mensagem)
 
-            if confirmacao in [
-                "sim",
-                "s",
-                "pode",
-                "confirmo",
-                "confirmado"
-            ]:
+            if confirmacao in {
+                "sim", "s", "pode", "confirmo", "confirmado"
+            }:
 
                 acao = self.acao_pendente
 
@@ -282,13 +286,9 @@ class StacyOrchestrator:
                     "resultado": resultado
                 }
 
-            if confirmacao in [
-                "não",
-                "nao",
-                "n",
-                "cancele",
-                "cancelar"
-            ]:
+            if confirmacao in {
+                "nao", "n", "cancele", "cancelar"
+            }:
 
                 self.acao_pendente = None
 
@@ -299,6 +299,11 @@ class StacyOrchestrator:
                         "A alteração foi cancelada."
                     )
                 }
+
+            # Uma mensagem diferente de confirmação não deve deixar uma ação
+            # antiga armada para um futuro "sim". A consulta atual continua
+            # normalmente, mas a confirmação anterior é descartada.
+            self.acao_pendente = None
 
         # O roteador decide a origem antes de qualquer IA.
         # A classificação interna é prioritária para impedir que dados pessoais
