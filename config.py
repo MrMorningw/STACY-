@@ -8,7 +8,7 @@ LOCAL_AI_URL = "http://127.0.0.1:8080/v1/chat/completions"
 TIMEOUT_API = 5
 LOCAL_AI_TIMEOUT = 20
 LOCAL_HEALTH_TIMEOUT = 0.35
-LOCAL_MAX_TOKENS = 24
+LOCAL_MAX_TOKENS = 64
 
 PERSONALIDADE = """
 Você é STACY, uma assistente pessoal inteligente,
