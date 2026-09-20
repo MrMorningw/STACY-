@@ -47,8 +47,8 @@ def _normalizar_rota(texto):
         "quanto", "quantos", "quantas", "qual",
         "quem", "quando", "onde", "capital", "populacao",
         "idade", "tamanho", "temperatura", "distancia",
-        "massa", "velocidade", "vive", "vivem", "existem",
-        "tem", "sao", "ha"
+        "massa", "velocidade", "vive", "vivem", "teve", "tinham",
+        "existem", "tem", "possui", "possuem", "sao", "ha"
     )
     tokens = []
     for token in texto.split():
