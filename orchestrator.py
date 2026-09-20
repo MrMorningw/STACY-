@@ -933,4 +933,3 @@ class StacyOrchestrator:
             "resposta": resposta,
             "origem": origem
         }
-    }
