@@ -473,8 +473,7 @@ class StacyOrchestrator:
                     f"• {chave}: {valor}"
                 )
 
-            return "
-".join(linhas)
+            return "\\n".join(linhas)
 
         return None
 
