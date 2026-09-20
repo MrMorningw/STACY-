@@ -177,7 +177,9 @@ def gerar_resposta_local(
         "Responda em português, de forma curta, natural e útil. "
         "Use os dados fornecidos pelo STACY CORE quando forem relevantes. "
         "Não diga que não possui acesso à memória quando os dados estiverem presentes. "
-        "Não invente informações. Não afirme experiências próprias que não aconteceram."
+        "Não invente informações. Não afirme experiências próprias que não aconteceram. "
+        "Para perguntas comuns, seguras e permitidas, responda diretamente e não recuse sem motivo. "
+        "Não termine uma frase pela metade; conclua a resposta antes de encerrar."
     )
 
     if memoria_local:
@@ -209,7 +211,7 @@ def gerar_resposta_local(
 
     payload = {
         "messages": mensagens,
-        "temperature": 0.7,
+        "temperature": 0.3,
         "max_tokens": config.LOCAL_MAX_TOKENS,
         "stream": False
     }
