@@ -14,7 +14,7 @@ def _normalizar(texto):
 
 CONHECIMENTO_VERIFICADO = [
     (
-        re.compile(r"quantas luas tem v(?:e|ê)nus|quantas luas.*venus", re.I),
+        re.compile(r"quantas luas tem venus|quantas luas.*venus", re.I),
         "Vênus não possui luas naturais conhecidas."
     ),
     (
@@ -23,7 +23,7 @@ CONHECIMENTO_VERIFICADO = [
     ),
     (
         re.compile(
-            r"quantos dentes tem um ser humano adulto|quantos dentes tem um adulto",
+            r"quantos dentes tem um ser humano adulto|quantos dentes tem um ser humani adulto|quantos dentes tem um adulto",
             re.I
         ),
         "Um adulto normalmente tem 32 dentes permanentes, incluindo os quatro sisos."
