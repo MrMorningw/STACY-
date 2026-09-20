@@ -179,6 +179,18 @@ class CoreRoutingTests(unittest.TestCase):
             orchestrator.ROTA_PESQUISA_EXTERNA
         )
 
+    def test_route_quantitative_lifespan_question_is_external(self):
+        self.assertEqual(
+            orchestrator.classificar_rota("quanto tempo patos vivem?"),
+            orchestrator.ROTA_PESQUISA_EXTERNA
+        )
+
+    def test_route_quantitative_count_question_is_external(self):
+        self.assertEqual(
+            orchestrator.classificar_rota("quantos mares o planeta Terra tem?"),
+            orchestrator.ROTA_PESQUISA_EXTERNA
+        )
+
     def test_route_normal_conversation_is_local_ai(self):
         self.assertEqual(
             orchestrator.classificar_rota("você está aí?"),
