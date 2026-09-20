@@ -3,13 +3,14 @@ import unicodedata
 def interpretar(mensagem):
 
     texto = mensagem.strip()
-    normalizado = texto.lower()
+    normalizado = texto.lower().rstrip("?!.,;: ")
     normalizado_sem_acentos = "".join(
         caractere
         for caractere in unicodedata.normalize("NFD", normalizado)
         if unicodedata.category(caractere) != "Mn"
     )
     # Tolerância a erro de digitação comum: "saos" -> "sao".
+    normalizado_sem_acentos = normalizado_sem_acentos.rstrip("?!.,;: ")
     normalizado_sem_acentos = normalizado_sem_acentos.replace("saos ", "sao ")
 
     if not texto:
