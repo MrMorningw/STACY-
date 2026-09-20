@@ -621,7 +621,7 @@ def extrair_data_hora_tarefa(texto):
 def interpretar_tarefa(mensagem):
 
     texto = mensagem.strip()
-    normalizado = texto.lower()
+    normalizado = texto.lower().rstrip("?!.,;: ")
 
     # =========================
     #    texto = mensagem.strip()
@@ -688,7 +688,7 @@ def interpretar_tarefa(mensagem):
         caractere
         for caractere in unicodedata.normalize("NFD", normalizado)
         if unicodedata.category(caractere) != "Mn"
-    ).replace("saos ", "sao ")
+    ).rstrip("?!.,;: ").replace("saos ", "sao ")
 
     consultas_listar_flexiveis = [
         "quais sao as minhas tarefas",
