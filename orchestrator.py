@@ -24,11 +24,20 @@ ROTA_PESQUISA_EXTERNA = "pesquisa_externa"
 def _normalizar_rota(texto):
     texto = (texto or "").strip().lower()
     texto = unicodedata.normalize("NFD", texto)
-    return "".join(
-        caractere
-        for caractere in texto
-        if unicodedata.category(caractere) != "Mn"
-    )
+
+    caracteres = []
+    for caractere in texto:
+        categoria = unicodedata.category(caractere)
+
+        if categoria == "Mn":
+            continue
+
+        if categoria.startswith("P"):
+            caracteres.append(" ")
+        else:
+            caracteres.append(caractere)
+
+    return " ".join("".join(caracteres).split())
 
 
 def _contem_termo(texto, termo):
