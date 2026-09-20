@@ -34,7 +34,7 @@ class CoreRoutingTests(unittest.TestCase):
     def test_local_greeting_is_registered_in_conversation(self):
         self.orquestrador.processar("oi stacy")
         mensagens = self.orquestrador.conversa.ultimas_mensagens(1)
-        self.assertEqual(mensagens[-1]["mensagem"], "oi stacy")
+        self.assertEqual(mensagens[-1]["conteudo"], "oi stacy")
 
     def test_greeting_accent_is_local(self):
         resultado = self.orquestrador.processar("Olá STACY?")
@@ -177,7 +177,7 @@ class CoreRoutingTests(unittest.TestCase):
             orchestrator.ai.gerar_resposta_local = (
                 lambda *args, **kwargs: "Resposta de teste."
             )
-            resultado = self.orquestrador._usar_ai("primeira pergunta")
+            resultado = orchestrator.StacyOrchestrator._usar_ai(self.orquestrador, "primeira pergunta")
         finally:
             orchestrator.ai.verificar_ia_local = original_health
             orchestrator.ai.gerar_resposta_local = original_local
