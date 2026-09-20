@@ -84,6 +84,26 @@ class CoreRoutingTests(unittest.TestCase):
         self.assertEqual(resultado["tipo"], "tarefas")
         self.assertIn("estudar direito", resultado["resposta"])
 
+    def test_typo_tolerance_keeps_structured_task_query(self):
+        resultado = intent.interpretar(
+            "quais sao minhas tafefas?"
+        )
+        self.assertEqual(resultado["tipo"], "tarefa")
+        self.assertEqual(resultado["acao"], "listar")
+
+    def test_typo_tolerance_keeps_structured_project_query(self):
+        resultado = intent.interpretar(
+            "quais saos meus projtos?"
+        )
+        self.assertEqual(resultado["tipo"], "memoria")
+        self.assertEqual(resultado["categoria"], "projetos")
+
+    def test_natural_followup_projects_and_objectives(self):
+        projetos = intent.interpretar("e os meus projetos?")
+        objetivos = intent.interpretar("e meus objetivos?")
+        self.assertEqual(projetos["categoria"], "projetos")
+        self.assertEqual(objetivos["categoria"], "objetivos")
+
     def test_exit_with_punctuation_is_command(self):
         resultado = self.orquestrador.processar("sair?")
         self.assertEqual(resultado["tipo"], "sair")
