@@ -110,6 +110,22 @@ class CoreRoutingTests(unittest.TestCase):
         self.assertEqual(projetos["categoria"], "projetos")
         self.assertEqual(objetivos["categoria"], "objetivos")
 
+
+    def test_verified_knowledge_stays_in_core(self):
+        resultado = self.orquestrador.processar("quantas luas tem venus?")
+        self.assertEqual(resultado["tipo"], "conhecimento_verificado")
+        self.assertIn("não possui luas naturais", resultado["resposta"])
+
+    def test_factual_followup_uses_conversation_context(self):
+        self.orquestrador.processar(
+            "qual fruta é verde e começa com a?"
+        )
+        resultado = self.orquestrador.processar(
+            "tem um caroço no meio"
+        )
+        self.assertEqual(resultado["tipo"], "conhecimento_verificado")
+        self.assertIn("abacate", resultado["resposta"].lower())
+
     def test_exit_with_punctuation_is_command(self):
         resultado = self.orquestrador.processar("sair?")
         self.assertEqual(resultado["tipo"], "sair")
