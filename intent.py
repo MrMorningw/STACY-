@@ -1,3 +1,5 @@
+import unicodedata
+
 def interpretar(mensagem):
 
     texto = mensagem.strip()
