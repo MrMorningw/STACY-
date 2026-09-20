@@ -901,7 +901,7 @@ class StacyOrchestrator:
                 self.historico,
                 "",  # O CORE já resolve consultas estruturadas; local AI recebe só o necessário.
                 contexto_entidade,
-                contexto_conversa
+                None
             )
 
             origem = "local"
