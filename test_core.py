@@ -172,19 +172,13 @@ class CoreRoutingTests(unittest.TestCase):
         )
 
     def test_ai_response_is_added_once_to_history(self):
-        self.orquestrador._usar_ai = lambda mensagem: {
-            "tipo": "ai",
-            "resposta": "Resposta de teste.",
-            "origem": "teste"
-        }
-        # Reproduz a persistência que ocorre dentro de _usar_ai apenas
-        # quando a rota realmente passa pelo método. Aqui chamamos o método
-        # real com as dependências de IA substituídas.
         original_health = orchestrator.ai.verificar_ia_local
         original_local = orchestrator.ai.gerar_resposta_local
         try:
             orchestrator.ai.verificar_ia_local = lambda: True
-            orchestrator.ai.gerar_resposta_local = lambda *args, **kwargs: "Resposta de teste."
+            orchestrator.ai.gerar_resposta_local = (
+                lambda *args, **kwargs: "Resposta de teste."
+            )
             resultado = self.orquestrador._usar_ai("primeira pergunta")
         finally:
             orchestrator.ai.verificar_ia_local = original_health
