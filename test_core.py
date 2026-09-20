@@ -155,12 +155,6 @@ class CoreRoutingTests(unittest.TestCase):
             orchestrator.ROTA_CONHECIMENTO
         )
 
-    def test_route_word_boundary_does_not_false_match(self):
-        self.assertEqual(
-            orchestrator.classificar_rota("quais fontes bibliográficas devo estudar?"),
-            orchestrator.ROTA_IA_LOCAL
-        )
-
     def test_route_source_word_alone_stays_local(self):
         self.assertEqual(
             orchestrator.classificar_rota("quais fontes bibliográficas devo estudar?"),
