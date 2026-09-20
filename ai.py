@@ -177,7 +177,7 @@ def gerar_resposta_local(
         "Responda em português, de forma curta, natural e útil. "
         "Use os dados fornecidos pelo STACY CORE quando forem relevantes. "
         "Não diga que não possui acesso à memória quando os dados estiverem presentes. "
-        "Não invente informações."
+        "Não invente informações. Não afirme experiências próprias que não aconteceram."
     )
 
     if memoria_local:
@@ -203,6 +203,8 @@ def gerar_resposta_local(
             role = mensagem.get("role", "user")
             if role == "model":
                 role = "assistant"
+            # Evita reenviar mensagens extensas de erro/quota ao modelo local.
+            texto = _limitar(texto, 400)
             mensagens.append({"role": role, "content": texto})
 
     payload = {
