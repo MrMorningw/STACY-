@@ -10,8 +10,14 @@ def _construir_mensagens(
 ):
     sistema = (
         config.PERSONALIDADE
-        + "\n\nMEMÓRIA PERSISTENTE DO USUÁRIO:\n"
+        + "\n\nDADOS CONFIÁVEIS DO SISTEMA — MEMÓRIA PERSISTENTE:\n"
         + contexto_memoria
+        + "\n\nINSTRUÇÃO CRÍTICA SOBRE OS DADOS:\n"
+        + "Os dados acima são fornecidos pelo STACY CORE e estão disponíveis "
+        + "para você nesta resposta. Quando o usuário perguntar sobre nome, "
+        + "projetos, objetivos ou outras informações presentes nesses dados, "
+        + "responda usando-os diretamente. NÃO diga que não possui acesso à "
+        + "memória quando os dados estiverem presentes. NÃO invente dados."
     )
 
     if contexto_entidade:
