@@ -205,15 +205,23 @@ class StacyOrchestrator:
             "o que voce faz": "Posso ajudar com organização, tarefas, memória, estudos e conversação."
         }
 
+        mensagem = mensagem.strip()
+
+        if not mensagem:
+            return {
+                "tipo": "vazio"
+            }
+
+        # Toda mensagem recebida entra no estado conversacional, inclusive
+        # saudações e respostas locais. Isso evita uma quebra silenciosa de
+        # contexto depois de uma interação curta.
+        self.conversa.registrar_mensagem(mensagem)
+
         if mensagem_normalizada in respostas_locais:
             return {
                 "tipo": "local",
                 "resposta": respostas_locais[mensagem_normalizada]
             }
-
-        mensagem = mensagem.strip()
-
-        self.conversa.registrar_mensagem(mensagem)
 
         if not mensagem:
             return {
