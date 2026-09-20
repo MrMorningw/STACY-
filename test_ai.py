@@ -57,6 +57,43 @@ class AIInfrastructureTests(unittest.TestCase):
         self.assertNotIn("MEMÓRIA PERSISTENTE", payload["system_instruction"]["parts"][0]["text"])
 
     @patch("ai.requests.post")
+    def test_web_research_uses_api_key_header(self, mock_post):
+        class Response:
+            status_code = 200
+            text = "ok"
+
+            def json(self):
+                return {
+                    "candidates": [{
+                        "content": {
+                            "parts": [{"text": "Resposta pesquisada."}]
+                        },
+                        "groundingMetadata": {
+                            "groundingChunks": [{
+                                "web": {
+                                    "title": "Fonte teste",
+                                    "uri": "https://example.com/fonte"
+                                }
+                            }]
+                        }
+                    }]
+                }
+
+        mock_post.return_value = Response()
+
+        ai.gerar_resposta_pesquisa(
+            "chave-secreta",
+            [{"role": "user", "parts": [{"text": "pesquise um fato"}]}],
+        )
+
+        chamada = mock_post.call_args
+        self.assertNotIn("key=chave-secreta", chamada.args[0])
+        self.assertEqual(
+            chamada.kwargs["headers"]["x-goog-api-key"],
+            "chave-secreta"
+        )
+
+    @patch("ai.requests.post")
     def test_web_research_requires_sources(self, mock_post):
         class Response:
             status_code = 200
