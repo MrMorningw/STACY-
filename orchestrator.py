@@ -81,6 +81,12 @@ class StacyOrchestrator:
         # A IA local não deve ser a autoridade para esse tipo de resposta.
         resposta_conhecimento = knowledge.consultar(mensagem)
 
+        if resposta_conhecimento is None:
+            resposta_conhecimento = knowledge.consultar_contextual(
+                mensagem,
+                self.conversa.ultimas_mensagens(6)
+            )
+
         if resposta_conhecimento is not None:
             return {
                 "tipo": "conhecimento_verificado",
@@ -918,7 +924,7 @@ class StacyOrchestrator:
                 self.historico,
                 contexto_memoria,
                 contexto_entidade,
-                None
+                contexto_conversa
             )
 
             origem = "local"
