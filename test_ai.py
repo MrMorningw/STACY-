@@ -17,6 +17,45 @@ class AIInfrastructureTests(unittest.TestCase):
         mock_get.side_effect = ai.requests.RequestException("offline")
         self.assertFalse(ai.verificar_ia_local())
 
+    @patch("ai.requests.post")
+    def test_web_research_uses_google_search(self, mock_post):
+        class Response:
+            status_code = 200
+            text = "ok"
+
+            def json(self):
+                return {
+                    "candidates": [{
+                        "content": {
+                            "parts": [{"text": "Resposta pesquisada."}]
+                        },
+                        "groundingMetadata": {
+                            "groundingChunks": [{
+                                "web": {
+                                    "title": "Fonte teste",
+                                    "uri": "https://example.com/fonte"
+                                }
+                            }]
+                        }
+                    }]
+                }
+
+        mock_post.return_value = Response()
+
+        resultado = ai.gerar_resposta_pesquisa(
+            "chave",
+            [{"role": "user", "parts": [{"text": "quanto vivem os patos?"}]}],
+            "{}"
+        )
+
+        self.assertEqual(resultado["resposta"], "Resposta pesquisada.")
+        self.assertEqual(
+            resultado["fontes"][0]["url"],
+            "https://example.com/fonte"
+        )
+        payload = mock_post.call_args.kwargs["json"]
+        self.assertEqual(payload["tools"], [{"google_search": {}}])
+
     def test_local_prompt_keeps_core_memory(self):
         mensagens = ai._construir_mensagens(
             [],
