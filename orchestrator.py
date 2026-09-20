@@ -25,6 +25,10 @@ def _normalizar_rota(texto):
     texto = (texto or "").strip().lower()
     texto = unicodedata.normalize("NFD", texto)
 
+    # Tolerância a erro de digitação comum sem alterar o restante da frase.
+    texto = texto.replace("quantaa ", "quantas ")
+    texto = texto.replace("quantoo ", "quanto ")
+
     caracteres = []
     for caractere in texto:
         categoria = unicodedata.category(caractere)
