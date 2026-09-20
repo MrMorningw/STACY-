@@ -78,7 +78,6 @@ def gerar_resposta(
     url = (
         "https://generativelanguage.googleapis.com/v1beta/"
         f"models/{config.MODELO}:generateContent"
-        f"?key={api_key}"
     )
 
     mensagens = _construir_mensagens(
@@ -117,6 +116,10 @@ def gerar_resposta(
 
     response = requests.post(
         url,
+        headers={
+            "x-goog-api-key": api_key,
+            "Content-Type": "application/json"
+        },
         json=payload,
         timeout=config.TIMEOUT_API
     )
