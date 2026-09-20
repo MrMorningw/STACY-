@@ -75,7 +75,10 @@ def interpretar(mensagem):
         "você lembra meus objetivos"
     ]
 
-    # Remove pontuação/espaços nas extremidades para aceitar\n    # variações como "qual meu nome ?" e "qual meu nome?".\n    consulta = normalizado.rstrip("?!.,;: ")\n    consulta_flexivel = normalizado_sem_acentos.rstrip("?!.,;: ")
+    # Remove pontuação/espaços nas extremidades para aceitar
+    # variações como "qual meu nome ?" e "qual meu nome?".
+    consulta = normalizado.rstrip("?!.,;: ")
+    consulta_flexivel = normalizado_sem_acentos.rstrip("?!.,;: ")
 
     if consulta in consultas_usuario or consulta_flexivel in [
         "qual e o meu nome",
