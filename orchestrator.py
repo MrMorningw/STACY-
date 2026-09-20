@@ -897,9 +897,14 @@ class StacyOrchestrator:
         erros = []
 
         try:
+            if not ai.verificar_ia_local():
+                raise RuntimeError(
+                    "servidor local não está acessível"
+                )
+
             resposta = ai.gerar_resposta_local(
                 self.historico,
-                "",  # O CORE já resolve consultas estruturadas; local AI recebe só o necessário.
+                contexto_memoria,
                 contexto_entidade,
                 None
             )
