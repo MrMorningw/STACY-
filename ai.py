@@ -230,6 +230,11 @@ def gerar_resposta_pesquisa(
             vistos.add(uri)
             fontes.append({"titulo": titulo, "url": uri})
 
+    if not fontes:
+        raise RuntimeError(
+            "Pesquisa Gemini não retornou fontes verificáveis."
+        )
+
     return {"resposta": resposta, "fontes": fontes}
 
 
