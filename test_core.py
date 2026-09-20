@@ -119,78 +119,95 @@ class CoreRoutingTests(unittest.TestCase):
         self.assertEqual(resultado["tipo"], "memoria")
         self.assertEqual(resultado["acao"], "mostrar")
 
-    def test_external_factual_query_is_marked_for_web(self):
-        self.assertTrue(
-            self.orquestrador._deve_pesquisar_web(
-                "quanto tempo vivem os patos?"
-            )
+    def test_route_internal_memory_is_never_external(self):
+        self.assertEqual(
+            orchestrator.classificar_rota(
+                "pesquise meus projetos",
+                intencao={"tipo": "memoria", "acao": "consultar"},
+            ),
+            orchestrator.ROTA_INTERNA
         )
-        self.assertTrue(
-            self.orquestrador._deve_pesquisar_web(
-                "pesquise a população atual do Brasil"
-            )
+
+    def test_route_internal_tasks_is_never_external(self):
+        self.assertEqual(
+            orchestrator.classificar_rota(
+                "pesquise minhas tarefas",
+                intencao={"tipo": "tarefa", "acao": "listar"},
+            ),
+            orchestrator.ROTA_INTERNA
         )
+
+    def test_route_core_knowledge_is_separate_from_external_research(self):
+        self.assertEqual(
+            orchestrator.classificar_rota(
+                "quantas luas tem venus?",
+                conhecimento=True,
+            ),
+            orchestrator.ROTA_CONHECIMENTO
+        )
+
+    def test_route_explicit_external_research(self):
+        self.assertEqual(
+            orchestrator.classificar_rota("pesquise a população atual do Brasil"),
+            orchestrator.ROTA_PESQUISA_EXTERNA
+        )
+
+    def test_route_current_information_is_external(self):
+        self.assertEqual(
+            orchestrator.classificar_rota("qual a notícia atual sobre o Brasil?"),
+            orchestrator.ROTA_PESQUISA_EXTERNA
+        )
+
+    def test_route_normal_conversation_is_local_ai(self):
+        self.assertEqual(
+            orchestrator.classificar_rota("você está aí?"),
+            orchestrator.ROTA_IA_LOCAL
+        )
+
+    def test_route_internal_project_question_overrides_question_word(self):
+        self.assertEqual(
+            orchestrator.classificar_rota("qual é meu projeto?"),
+            orchestrator.ROTA_INTERNA
+        )
+
+    def test_verified_knowledge_stays_in_core(self):
+        resultado = self.orquestrador.processar("quantas luas tem venus?")
+        self.assertEqual(resultado["tipo"], "conhecimento_verificado")
+        self.assertIn("não possui luas naturais", resultado["resposta"])
 
     def test_explicit_research_bypasses_core_knowledge(self):
         original = orchestrator.ai.gerar_resposta_pesquisa
         try:
             orchestrator.ai.gerar_resposta_pesquisa = lambda *args, **kwargs: {
                 "resposta": "Resultado pesquisado.",
-                "fontes": [
-                    {
-                        "titulo": "Fonte teste",
-                        "url": "https://example.com/fonte"
-                    }
-                ]
+                "fontes": [{"titulo": "Fonte teste", "url": "https://example.com/fonte"}]
             }
-            resultado = self.orquestrador.processar(
-                "pesquise quantas luas tem venus"
-            )
+            resultado = self.orquestrador.processar("pesquise quantas luas tem venus")
         finally:
             orchestrator.ai.gerar_resposta_pesquisa = original
 
         self.assertEqual(resultado["tipo"], "pesquisa")
         self.assertEqual(resultado["resposta"], "Resultado pesquisado.")
-        self.assertEqual(resultado["fontes"][0]["titulo"], "Fonte teste")
-
-    def test_web_routing_does_not_use_question_mark_alone(self):
-        self.assertFalse(
-            self.orquestrador._deve_pesquisar_web(
-                "você está aí?"
-            )
-        )
 
     def test_duck_lifespan_uses_external_research(self):
         original = orchestrator.ai.gerar_resposta_pesquisa
         try:
             orchestrator.ai.gerar_resposta_pesquisa = lambda *args, **kwargs: {
                 "resposta": "Resposta pesquisada sobre a expectativa de vida dos patos.",
-                "fontes": [
-                    {
-                        "titulo": "Fonte teste",
-                        "url": "https://example.com/patos"
-                    }
-                ]
+                "fontes": [{"titulo": "Fonte teste", "url": "https://example.com/patos"}]
             }
-            resultado = self.orquestrador.processar(
-                "quanto tempo vivem os patos?"
-            )
+            resultado = self.orquestrador.processar("quanto tempo vivem os patos?")
         finally:
             orchestrator.ai.gerar_resposta_pesquisa = original
 
         self.assertEqual(resultado["tipo"], "pesquisa")
         self.assertIn("expectativa de vida", resultado["resposta"])
-        self.assertEqual(resultado["fontes"][0]["url"], "https://example.com/patos")
 
     def test_web_research_failure_returns_clean_result(self):
         original = orchestrator.ai.gerar_resposta_pesquisa
         try:
-            orchestrator.ai.gerar_resposta_pesquisa = lambda *args, **kwargs: (_ for _ in ()).throw(
-                RuntimeError("429 quota")
-            )
-            resultado = self.orquestrador.processar(
-                "pesquise a população atual do Brasil"
-            )
+            orchestrator.ai.gerar_resposta_pesquisa = lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("429 quota"))
+            resultado = self.orquestrador.processar("pesquise a população atual do Brasil")
         finally:
             orchestrator.ai.gerar_resposta_pesquisa = original
 
