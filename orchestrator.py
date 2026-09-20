@@ -44,7 +44,15 @@ class StacyOrchestrator:
 
     def _processar_interno(self, mensagem):
 
-        mensagem_normalizada = mensagem.strip().lower().rstrip("?!.,;: ")
+        mensagem_normalizada = unicodedata.normalize(
+            "NFD",
+            mensagem.strip().lower().rstrip("?!.,;: ")
+        )
+        mensagem_normalizada = "".join(
+            caractere
+            for caractere in mensagem_normalizada
+            if unicodedata.category(caractere) != "Mn"
+        )
 
         respostas_locais = {
             "oi stacy": "Olá, senhor. Estou pronta.",
@@ -939,17 +947,19 @@ class StacyOrchestrator:
             "parts": [{"text": mensagem}]
         })
 
-        contexto_conversa = json.dumps(
-            self.conversa.ultimas_mensagens(4),
-            ensure_ascii=False,
-            indent=2
-        )
+        # Pesquisa externa recebe somente a consulta atual.
+        # Memória persistente e conversa pessoal não são enviadas ao provedor.
+        historico_pesquisa = [
+            {
+                "role": "user",
+                "parts": [{"text": mensagem}]
+            }
+        ]
 
         try:
             resultado = ai.gerar_resposta_pesquisa(
                 self.api_key,
-                self.historico,
-                contexto_conversa
+                historico_pesquisa
             )
         except Exception as erro:
             # Pesquisa externa não cai na IA local: isso preserva a regra
