@@ -165,6 +165,16 @@ def classificar_rota(mensagem, intencao=None, comando=None, conhecimento=False):
         if any(verbo in texto for verbo in verbos_quantitativos):
             return ROTA_PESQUISA_EXTERNA
 
+    # Traduções exatas devem ser verificadas externamente quando o pedido
+    # exige uma língua específica. A IA local permanece para explicações
+    # linguísticas e conversas sobre linguagem.
+    padroes_traducao = (
+        "como se diz ", "como se fala ",
+        "como traduzir ", "traduza "
+    )
+    if any(padrao in texto for padrao in padroes_traducao):
+        return ROTA_PESQUISA_EXTERNA
+
     # 6) IA LOCAL: conversa, estudo e raciocínio sem necessidade externa.
     return ROTA_IA_LOCAL
 
