@@ -13,6 +13,89 @@ import tasks
 import knowledge
 
 
+
+
+ROTA_INTERNA = "interno"
+ROTA_CONHECIMENTO = "conhecimento_core"
+ROTA_IA_LOCAL = "ia_local"
+ROTA_PESQUISA_EXTERNA = "pesquisa_externa"
+
+
+def _normalizar_rota(texto):
+    texto = (texto or "").strip().lower()
+    texto = unicodedata.normalize("NFD", texto)
+    return "".join(
+        caractere
+        for caractere in texto
+        if unicodedata.category(caractere) != "Mn"
+    )
+
+
+def classificar_rota(mensagem, intencao=None, comando=None, conhecimento=False):
+    """Define uma única rota, com fronteiras explícitas entre os subsistemas."""
+    texto = _normalizar_rota(mensagem)
+
+    # 1. DADOS/COMANDOS DA PRÓPRIA STACY: nunca são pesquisa externa.
+    if comando in {"memoria", "buscar", "memorize", "esquecer"}:
+        return ROTA_INTERNA
+
+    if isinstance(intencao, dict):
+        tipo = intencao.get("tipo")
+        if tipo in {"memoria", "tarefa"}:
+            return ROTA_INTERNA
+
+    # Consultas naturais sobre dados do usuário/projetos/tarefas.
+    marcadores_internos = (
+        "meus projetos", "meus objetivos", "minhas preferencias",
+        "minhas tarefas", "minhas informacoes", "o que voce guardou",
+        "o que voce sabe sobre mim", "minha memoria", "minha memoria",
+        "dados sobre mim", "informacoes sobre mim"
+    )
+    if any(marcador in texto for marcador in marcadores_internos):
+        return ROTA_INTERNA
+
+    # 2. CONHECIMENTO DETERMINÍSTICO já mantido no CORE.
+    # Não é IA local e não é internet.
+    if conhecimento:
+        return ROTA_CONHECIMENTO
+
+    # 3. PESQUISA EXTERNA: somente quando a intenção é buscar/verificar fora.
+    gatilhos_externos = (
+        "pesquise", "pesquisar", "pesquisa na internet",
+        "procure na internet", "procure no google",
+        "pesquisa no google", "na internet", "no google",
+        "fonte", "fontes"
+    )
+    if any(gatilho in texto for gatilho in gatilhos_externos):
+        return ROTA_PESQUISA_EXTERNA
+
+    termos_temporais = (
+        "hoje", "agora", "atual", "atualmente", "ultimo",
+        "ultima", "ultimos", "ultimas", "recentemente",
+        "noticia", "noticias"
+    )
+    if any(f" {termo} " in f" {texto} " for termo in termos_temporais):
+        return ROTA_PESQUISA_EXTERNA
+
+    iniciadores_factuais = (
+        "quem ", "qual ", "quais ", "quando ", "onde ",
+        "quanto ", "quantos ", "quantas ", "por que ", "porque "
+    )
+    if texto.startswith(iniciadores_factuais):
+        return ROTA_PESQUISA_EXTERNA
+
+    padroes_factuais = (
+        "quantos anos vive", "quanto tempo vive", "quanto tempo vivem",
+        "qual a idade de", "qual o tamanho de", "qual a populacao de",
+        "qual e a populacao de", "tem quantas luas", "possui quantas luas"
+    )
+    if any(padrao in texto for padrao in padroes_factuais):
+        return ROTA_PESQUISA_EXTERNA
+
+    # 4. Conversa/raciocínio sem necessidade de fonte externa.
+    return ROTA_IA_LOCAL
+
+
 class StacyOrchestrator:
 
     def __init__(
@@ -212,29 +295,39 @@ class StacyOrchestrator:
                     )
                 }
 
-        # Uma solicitação explícita de pesquisa deve sempre chegar ao
-        # provedor externo, mesmo que o CORE conheça um fato relacionado.
-        # Isso respeita literalmente pedidos como "pesquise ..." e evita
-        # transformar uma solicitação de fonte em resposta local.
-        if self._pesquisa_explicita(mensagem):
-            return self._pesquisar_web(mensagem)
+        # O roteador decide a origem antes de qualquer IA.
+        # A classificação interna é prioritária para impedir que dados pessoais
+        # ou tarefas sejam enviados à pesquisa externa por engano.
+        comando = command.identificar_comando(mensagem)
+        intencao = intent.interpretar(mensagem)
 
-        # Fatos determinísticos são resolvidos pelo CORE depois de uma
-        # confirmação pendente, para não deixar ações aguardando sem tratamento.
         resposta_conhecimento = knowledge.consultar(mensagem)
-
         if resposta_conhecimento is None:
             resposta_conhecimento = knowledge.consultar_contextual(
                 mensagem,
                 self.conversa.ultimas_mensagens(6)
             )
 
-        if resposta_conhecimento is not None:
+        rota = classificar_rota(
+            mensagem,
+            intencao=intencao,
+            comando=comando,
+            conhecimento=resposta_conhecimento is not None
+        )
+
+        if rota == ROTA_CONHECIMENTO:
             return {
                 "tipo": "conhecimento_verificado",
                 "resposta": resposta_conhecimento,
-                "origem": "core"
+                "origem": "core",
+                "rota": rota
             }
+
+        if rota == ROTA_PESQUISA_EXTERNA:
+            return self._pesquisar_web(mensagem)
+
+        # Rotas internas continuam pelo CORE abaixo, onde memória, tarefas,
+        # entidades e ações são executadas sem passar por modelos.
 
         entidade_detectada = entity_resolver.resolver(
             mensagem,
@@ -258,14 +351,6 @@ class StacyOrchestrator:
                 self.conversa.registrar_entidade(
                     entidade["id"]
                 )
-
-        comando = command.identificar_comando(
-            mensagem
-        )
-
-        intencao = intent.interpretar(
-            mensagem
-        )
 
         # Consultas simples de memória devem ser resolvidas pelo CORE
         # antes de contexto/IA, evitando que o modelo invente dados.
@@ -387,12 +472,8 @@ class StacyOrchestrator:
 
                 return resultado_intencao
 
-        # Consultas externas/factuais seguem para pesquisa com Google Search
-        # no Gemini. A IA local fica reservada para conversa e raciocínio leve,
-        # evitando respostas factuais inventadas no modelo pequeno.
-        if self._deve_pesquisar_web(mensagem):
-            return self._pesquisar_web(mensagem)
-
+        # Se chegou aqui, a rota definida é IA local. A pesquisa externa
+        # nunca é acionada implicitamente depois desta decisão.
         return self._usar_ai(mensagem)
 
     def _registrar_resultado_conversa(self, resultado):
