@@ -143,11 +143,9 @@ def gerar_resposta(
 def gerar_resposta_pesquisa(
     api_key,
     historico,
-    contexto_memoria,
-    contexto_entidade=None,
     contexto_conversa=None
 ):
-    """Responde consultas externas usando Gemini com Google Search grounding."""
+    """Pesquisa fatos externos com Gemini + Google Search sem enviar memória persistente."""
     if not api_key:
         raise RuntimeError("Chave da Gemini não configurada.")
 
@@ -157,44 +155,49 @@ def gerar_resposta_pesquisa(
         f"?key={api_key}"
     )
 
-    mensagens = _construir_mensagens(
-        historico[-8:] if historico else [],
-        contexto_memoria,
-        contexto_entidade,
-        contexto_conversa
+    historico_pesquisa = historico[-6:] if historico else []
+
+    # Pesquisa externa não recebe a memória persistente nem a entidade completa.
+    # Isso reduz exposição de dados pessoais e mantém o prompt enxuto.
+    contexto = ""
+    if contexto_conversa:
+        contexto = (
+            "\n\nCONTEXTO CONVERSACIONAL MÍNIMO:\n"
+            + contexto_conversa
+        )
+
+    sistema = (
+        "Você é STACY, assistente pessoal do senhor Danley. "
+        "Responda em português, de forma objetiva. "
+        "Esta é uma consulta externa. Use obrigatoriamente a Pesquisa Google "
+        "para verificar fatos antes de responder. "
+        "Não invente nem complete lacunas por suposição. "
+        "Diferencie fatos de estimativas ou opiniões e informe a fonte quando "
+        "a informação for relevante. "
+        "Não revele nem solicite dados pessoais desnecessários."
+        + contexto
     )
 
+    contents = []
+    for mensagem in historico_pesquisa:
+        texto = ""
+        for parte in mensagem.get("parts", []):
+            if isinstance(parte, dict):
+                texto += parte.get("text", "")
+            elif isinstance(parte, str):
+                texto += parte
+
+        if texto:
+            role = mensagem.get("role", "user")
+            contents.append({
+                "role": "model" if role == "model" else "user",
+                "parts": [{"text": texto[-1200:]}]
+            })
+
     payload = {
-        "system_instruction": {
-            "parts": [
-                {
-                    "text": (
-                        mensagens[0]["content"]
-                        + "\n\nPESQUISA EXTERNA:\n"
-                        + "Esta pergunta depende de informação externa. "
-                        + "Use a Pesquisa Google para verificar os fatos antes "
-                        + "de responder. Não invente. Seja objetivo e informe "
-                        + "as fontes encontradas quando houver."
-                    )
-                }
-            ]
-        },
-        "contents": [
-            {
-                "role": (
-                    "model"
-                    if mensagem["role"] == "assistant"
-                    else "user"
-                ),
-                "parts": [{"text": mensagem["content"]}]
-            }
-            for mensagem in mensagens[1:]
-        ],
-        "tools": [
-            {
-                "google_search": {}
-            }
-        ]
+        "system_instruction": {"parts": [{"text": sistema}]},
+        "contents": contents,
+        "tools": [{"google_search": {}}]
     }
 
     response = requests.post(
@@ -209,7 +212,10 @@ def gerar_resposta_pesquisa(
             f"{response.text}"
         )
 
-    data = response.json()
+    try:
+        data = response.json()
+    except ValueError as erro:
+        raise RuntimeError("Pesquisa Gemini retornou JSON inválido.") from erro
 
     try:
         resposta = data["candidates"][0]["content"]["parts"][0]["text"].strip()
@@ -222,26 +228,18 @@ def gerar_resposta_pesquisa(
         raise RuntimeError("Pesquisa Gemini retornou resposta vazia.")
 
     fontes = []
-    grounding = data.get("candidates", [{}])[0].get(
-        "groundingMetadata",
-        {}
-    )
+    vistos = set()
+    grounding = data.get("candidates", [{}])[0].get("groundingMetadata", {})
 
     for chunk in grounding.get("groundingChunks", []):
         web = chunk.get("web", {})
         uri = web.get("uri")
-        titulo = web.get("title")
+        titulo = web.get("title") or uri
+        if uri and uri not in vistos:
+            vistos.add(uri)
+            fontes.append({"titulo": titulo, "url": uri})
 
-        if uri and uri not in [fonte["url"] for fonte in fontes]:
-            fontes.append({
-                "titulo": titulo or uri,
-                "url": uri
-            })
-
-    return {
-        "resposta": resposta,
-        "fontes": fontes
-    }
+    return {"resposta": resposta, "fontes": fontes}
 
 
 def verificar_ia_local():
