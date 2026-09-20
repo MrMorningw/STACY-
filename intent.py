@@ -46,7 +46,7 @@ def interpretar(mensagem):
             "acao": "sair"
         }
 
-    if normalizado in [
+    if normalizado_sem_acentos in [
         "memoria",
         "mostre minha memoria",
         "mostra minha memoria",
