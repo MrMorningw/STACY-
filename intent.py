@@ -112,15 +112,18 @@ def interpretar(mensagem):
     consulta = normalizado.rstrip("?!.,;: ")
     consulta_flexivel = normalizado_sem_acentos.rstrip("?!.,;: ")
 
-    # Remove conectores conversacionais no início sem exigir uma regra
-    # específica para cada pergunta. Ex.: "otimo, quais são meus projetos?"
+    # Remove conectores conversacionais no início sem depender da pontuação
+    # usada pelo usuário. Ex.: "otimo. wuais sao meus projetos?"
+    # vira apenas a consulta estrutural antes do reconhecimento da intenção.
     prefixos_conversacionais = (
-        "otimo ", "ótimo ", "certo ", "ok ", "beleza ",
-        "entao ", "então "
+        "otimo", "certo", "ok", "beleza", "entao"
     )
-    consulta_sem_prefixo = consulta
+    consulta_sem_prefixo = consulta_flexivel
     for prefixo in prefixos_conversacionais:
-        if consulta_sem_prefixo.startswith(prefixo):
+        if consulta_sem_prefixo == prefixo:
+            consulta_sem_prefixo = ""
+            break
+        if consulta_sem_prefixo.startswith(prefixo + " "):
             consulta_sem_prefixo = consulta_sem_prefixo[len(prefixo):].strip()
             break
 
