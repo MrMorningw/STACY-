@@ -133,15 +133,22 @@ def gerar_resposta(
     data = response.json()
 
     try:
-        return (
-            data["candidates"][0]
-            ["content"]["parts"][0]
-            ["text"]
-        ).strip()
+        partes = data["candidates"][0]["content"]["parts"]
     except (KeyError, IndexError, TypeError) as erro:
         raise RuntimeError(
             f"Resposta Gemini inválida: {data}"
         ) from erro
+
+    textos = []
+    for parte in partes:
+        if isinstance(parte, dict) and parte.get("text"):
+            textos.append(parte["text"].strip())
+
+    resposta = "\n".join(texto for texto in textos if texto).strip()
+    if not resposta:
+        raise RuntimeError("Gemini retornou resposta vazia.")
+
+    return resposta
 
 
 def gerar_resposta_pesquisa(
