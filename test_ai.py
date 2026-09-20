@@ -130,6 +130,17 @@ class AIInfrastructureTests(unittest.TestCase):
         self.assertIn("STACY", sistema)
         self.assertIn("Os dados acima são fornecidos pelo STACY CORE", sistema)
 
+    def test_local_prompt_prioritizes_current_query(self):
+        mensagens = ai._construir_mensagens(
+            [{"role": "user", "parts": [{"text": "pergunta atual"}]}],
+            "{}",
+            None,
+            None
+        )
+        sistema = mensagens[0]["content"]
+        self.assertIn("ÚLTIMA MENSAGEM DO USUÁRIO", sistema)
+        self.assertIn("não responda uma mensagem anterior", sistema)
+
 
 if __name__ == "__main__":
     unittest.main()
