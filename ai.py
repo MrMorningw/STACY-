@@ -203,13 +203,13 @@ def gerar_resposta_pesquisa(
     response = requests.post(
         url,
         json=payload,
-        timeout=config.TIMEOUT_API
+        timeout=config.RESEARCH_API_TIMEOUT
     )
 
     if response.status_code != 200:
+        detalhe = response.text[:500]
         raise RuntimeError(
-            f"Pesquisa Gemini retornou {response.status_code}: "
-            f"{response.text}"
+            f"Pesquisa Gemini HTTP {response.status_code}: {detalhe}"
         )
 
     try:
