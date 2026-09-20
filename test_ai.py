@@ -56,6 +56,32 @@ class AIInfrastructureTests(unittest.TestCase):
         self.assertEqual(payload["tools"], [{"google_search": {}}])
         self.assertNotIn("MEMÓRIA PERSISTENTE", payload["system_instruction"]["parts"][0]["text"])
 
+    @patch("ai.requests.post")
+    def test_web_research_requires_sources(self, mock_post):
+        class Response:
+            status_code = 200
+            text = "ok"
+
+            def json(self):
+                return {
+                    "candidates": [{
+                        "content": {
+                            "parts": [{"text": "Resposta sem fonte."}]
+                        }
+                    }]
+                }
+
+        mock_post.return_value = Response()
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "fontes verificáveis"
+        ):
+            ai.gerar_resposta_pesquisa(
+                "chave",
+                [{"role": "user", "parts": [{"text": "fato?"}]}]
+            )
+
     def test_local_prompt_keeps_core_memory(self):
         mensagens = ai._construir_mensagens(
             [],
