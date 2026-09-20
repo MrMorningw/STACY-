@@ -131,6 +131,28 @@ class CoreRoutingTests(unittest.TestCase):
             )
         )
 
+    def test_explicit_research_bypasses_core_knowledge(self):
+        original = orchestrator.ai.gerar_resposta_pesquisa
+        try:
+            orchestrator.ai.gerar_resposta_pesquisa = lambda *args, **kwargs: {
+                "resposta": "Resultado pesquisado.",
+                "fontes": [
+                    {
+                        "titulo": "Fonte teste",
+                        "url": "https://example.com/fonte"
+                    }
+                ]
+            }
+            resultado = self.orquestrador.processar(
+                "pesquise quantas luas tem venus"
+            )
+        finally:
+            orchestrator.ai.gerar_resposta_pesquisa = original
+
+        self.assertEqual(resultado["tipo"], "pesquisa")
+        self.assertEqual(resultado["resposta"], "Resultado pesquisado.")
+        self.assertEqual(resultado["fontes"][0]["titulo"], "Fonte teste")
+
     def test_web_routing_does_not_use_question_mark_alone(self):
         self.assertFalse(
             self.orquestrador._deve_pesquisar_web(
