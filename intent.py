@@ -2,6 +2,13 @@ def interpretar(mensagem):
 
     texto = mensagem.strip()
     normalizado = texto.lower()
+    normalizado_sem_acentos = "".join(
+        caractere
+        for caractere in unicodedata.normalize("NFD", normalizado)
+        if unicodedata.category(caractere) != "Mn"
+    )
+    # Tolerância a erro de digitação comum: "saos" -> "sao".
+    normalizado_sem_acentos = normalizado_sem_acentos.replace("saos ", "sao ")
 
     if not texto:
         return None
@@ -67,22 +74,42 @@ def interpretar(mensagem):
     ]
 
     consulta = normalizado.rstrip("?")
+    consulta_flexivel = normalizado_sem_acentos.rstrip("?")
 
-    if consulta in consultas_usuario:
+    if consulta in consultas_usuario or consulta_flexivel in [
+        "qual e o meu nome",
+        "qual meu nome",
+        "como eu me chamo",
+        "voce sabe meu nome"
+    ]:
         return {
             "tipo": "memoria",
             "acao": "consultar",
             "categoria": "usuario"
         }
 
-    if consulta in consultas_projetos:
+    if consulta in consultas_projetos or consulta_flexivel in [
+        "quais sao meus projetos",
+        "quais meus projetos",
+        "quais projetos eu tenho",
+        "voce lembra meus projetos",
+        "quais sao os meus projetos",
+        "quais sao as minhas projetos"
+    ]:
         return {
             "tipo": "memoria",
             "acao": "consultar",
             "categoria": "projetos"
         }
 
-    if consulta in consultas_objetivos:
+    if consulta in consultas_objetivos or consulta_flexivel in [
+        "quais sao meus objetivos",
+        "quais meus objetivos",
+        "quais objetivos eu tenho",
+        "voce lembra meus objetivos",
+        "quais sao os meus objetivos",
+        "quais sao as minhas objetivos"
+    ]:
         return {
             "tipo": "memoria",
             "acao": "consultar",
@@ -659,7 +686,20 @@ def interpretar_tarefa(mensagem):
         "o que tenho para fazer"
     ]
 
-    if normalizado in consultas_listar:
+    normalizado_flexivel = "".join(
+        caractere
+        for caractere in unicodedata.normalize("NFD", normalizado)
+        if unicodedata.category(caractere) != "Mn"
+    ).replace("saos ", "sao ")
+
+    consultas_listar_flexiveis = [
+        "quais sao as minhas tarefas",
+        "quais sao minhas tarefas",
+        "quais tarefas eu tenho",
+        "minhas tarefas"
+    ]
+
+    if normalizado in consultas_listar or normalizado_flexivel in consultas_listar_flexiveis:
 
         return {
             "tipo": "tarefa",
