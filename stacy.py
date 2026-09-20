@@ -102,8 +102,20 @@ def main():
         if resposta:
 
             print(
-                f"\nSTACY: {resposta}\n"
+                f"\nSTACY: {resposta}"
             )
+
+            fontes = resultado.get("fontes", [])
+
+            if fontes:
+                print("\nFontes:")
+                for indice, fonte in enumerate(fontes[:5], start=1):
+                    print(
+                        f"{indice}. {fonte.get('titulo', 'Fonte')}: "
+                        f"{fonte.get('url', '')}"
+                    )
+
+            print()
 
 
 if __name__ == "__main__":
