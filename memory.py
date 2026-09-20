@@ -101,11 +101,35 @@ def mostrar_memoria(memoria):
             if valor:
                 apresentacao[categoria].append(valor)
 
-    return json.dumps(
-        apresentacao,
-        ensure_ascii=False,
-        indent=2
-    )
+    linhas = ["Estas são as informações que tenho guardadas, senhor:"]
+    total = 0
+
+    usuario = apresentacao["usuario"]
+    if usuario:
+        linhas.append("• Usuário:")
+        for chave, valor in usuario.items():
+            linhas.append(f"  - {chave}: {valor}")
+            total += 1
+
+    nomes = {
+        "preferencias": "Preferências",
+        "projetos": "Projetos",
+        "objetivos": "Objetivos",
+        "informacoes": "Informações"
+    }
+
+    for categoria, titulo in nomes.items():
+        valores = apresentacao[categoria]
+        if valores:
+            linhas.append(f"• {titulo}:")
+            for valor in valores:
+                linhas.append(f"  - {valor}")
+                total += 1
+
+    if total == 0:
+        return "Não há informações persistentes guardadas no momento, senhor."
+
+    return "\n".join(linhas)
 
 def buscar_memoria(categoria, memoria):
 
