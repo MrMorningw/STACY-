@@ -126,7 +126,8 @@ def classificar_rota(mensagem, intencao=None, comando=None, conhecimento=False):
         if any(verbo in texto for verbo in verbos_quantitativos):
             return ROTA_PESQUISA_EXTERNA
 
-    # 4) CORE: somente depois de excluir uma necessidade externa.
+    # 4) CORE: se o núcleo já possui um fato verificado, ele tem
+    # prioridade sobre padrões quantitativos genéricos.
     if conhecimento:
         return ROTA_CONHECIMENTO
 
