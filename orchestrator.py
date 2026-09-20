@@ -882,65 +882,56 @@ class StacyOrchestrator:
 
     def _deve_pesquisar_web(self, mensagem):
         texto = (mensagem or "").strip().lower()
-
         texto = unicodedata.normalize("NFD", texto)
         texto = "".join(
             caractere
             for caractere in texto
             if unicodedata.category(caractere) != "Mn"
         )
+        texto = " ".join(texto.split())
 
         if not texto:
             return False
 
-        gatilhos_explicitos = [
-            "pesquise",
-            "pesquisar",
-            "pesquisa na internet",
-            "procure na internet",
-            "procure no google",
-            "pesquisa no google",
-            "na internet",
-            "no google",
-            "fonte",
-            "fontes"
-        ]
-
+        # Consultas explícitas sempre usam pesquisa externa.
+        gatilhos_explicitos = (
+            "pesquise", "pesquisar", "pesquisa na internet",
+            "procure na internet", "procure no google",
+            "pesquisa no google", "na internet", "no google",
+            "fonte", "fontes"
+        )
         if any(gatilho in texto for gatilho in gatilhos_explicitos):
             return True
 
-        termos_temporais = [
-            "hoje",
-            "agora",
-            "atual",
-            "atualmente",
-            "ultimo",
-            "ultima",
-            "ultimos",
-            "ultimas",
-            "recentemente",
-            "noticia",
-            "noticias"
-        ]
-
-        if any(termo in texto for termo in termos_temporais):
+        # Informação temporal/currente exige fonte externa.
+        termos_temporais = (
+            "hoje", "agora", "atual", "atualmente", "ultimo",
+            "ultima", "ultimos", "ultimas", "recentemente",
+            "noticia", "noticias"
+        )
+        if any(
+            f" {termo} " in f" {texto} "
+            for termo in termos_temporais
+        ):
             return True
 
-        iniciadores = [
-            "quem ",
-            "qual ",
-            "quais ",
-            "quando ",
-            "onde ",
-            "quanto ",
-            "quantos ",
-            "quantas ",
-            "por que ",
-            "porque ",
-            "como "
-        ]
+        # Perguntas factuais comuns. Não usamos '?' sozinho: isso evita
+        # transformar qualquer conversa em consulta Google e gastar quota.
+        iniciadores_factuais = (
+            "quem ", "qual ", "quais ", "quando ", "onde ",
+            "quanto ", "quantos ", "quantas ", "por que ", "porque "
+        )
+        if texto.startswith(iniciadores_factuais):
+            return True
 
-        return texto.startswith(tuple(iniciadores)) or "?" in mensagem
+        # Perguntas de vida/biologia e fatos objetivos que não começam
+        # pelos iniciadores acima.
+        padroes_factuais = (
+            "quantos anos vive", "quanto tempo vive", "quanto tempo vivem",
+            "qual a idade de", "qual o tamanho de", "qual a populacao de",
+            "qual e a populacao de", "tem quantas luas", "possui quantas luas"
+        )
+        return any(padrao in texto for padrao in padroes_factuais)
 
     def _pesquisar_web(self, mensagem):
         self.historico.append({
@@ -948,40 +939,30 @@ class StacyOrchestrator:
             "parts": [{"text": mensagem}]
         })
 
-        contexto_memoria = json.dumps(
-            self.memoria,
-            ensure_ascii=False,
-            indent=2
-        )
-
-        contexto_entidade = None
-
-        if self.entidade_contextual is not None:
-            entidade = entity_store.obter_por_id(
-                self.entidades,
-                self.entidade_contextual["id"]
-            )
-
-            if entidade is not None:
-                contexto_entidade = json.dumps(
-                    entidade,
-                    ensure_ascii=False,
-                    indent=2
-                )
-
         contexto_conversa = json.dumps(
-            self.conversa.ultimas_mensagens(6),
+            self.conversa.ultimas_mensagens(4),
             ensure_ascii=False,
             indent=2
         )
 
-        resultado = ai.gerar_resposta_pesquisa(
-            self.api_key,
-            self.historico,
-            contexto_memoria,
-            contexto_entidade,
-            contexto_conversa
-        )
+        try:
+            resultado = ai.gerar_resposta_pesquisa(
+                self.api_key,
+                self.historico,
+                contexto_conversa
+            )
+        except Exception as erro:
+            # Pesquisa externa não cai na IA local: isso preserva a regra
+            # de não inventar fatos quando a fonte externa está indisponível.
+            return {
+                "tipo": "pesquisa_indisponivel",
+                "resposta": (
+                    "Não consegui consultar fontes externas agora, senhor. "
+                    "Não vou inventar uma resposta."
+                ),
+                "origem": "gemini_google",
+                "erro": str(erro)
+            }
 
         resposta = resultado["resposta"]
         fontes = resultado.get("fontes", [])
