@@ -26,7 +26,7 @@ class AIInfrastructureTests(unittest.TestCase):
         )
         sistema = mensagens[0]["content"]
         self.assertIn("STACY", sistema)
-        self.assertIn("dados fornecidos pelo STACY CORE", sistema)
+        self.assertIn("Os dados acima são fornecidos pelo STACY CORE", sistema)
 
 
 if __name__ == "__main__":
