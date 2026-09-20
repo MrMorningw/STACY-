@@ -1,0 +1,126 @@
+import time
+
+
+class ConversationState:
+
+    def __init__(self, limite=12):
+        self.limite = limite
+
+        self.ultima_mensagem = None
+        self.ultima_resposta = None
+        self.ultima_entidade_id = None
+        self.ultima_acao = None
+        self.ultima_intencao = None
+        self.intencao_pendente = None
+        self.ultima_atualizacao = None
+
+        self.historico = []
+
+    def registrar_mensagem(self, mensagem):
+
+        self.ultima_mensagem = mensagem
+        self.ultima_atualizacao = time.time()
+
+        self.historico.append({
+            "tipo": "usuario",
+            "conteudo": mensagem,
+            "timestamp": self.ultima_atualizacao
+        })
+
+        self._limitar_historico()
+
+    def registrar_resposta(self, resposta):
+
+        self.ultima_resposta = resposta
+        self.ultima_atualizacao = time.time()
+
+        self.historico.append({
+            "tipo": "stacy",
+            "conteudo": resposta,
+            "timestamp": self.ultima_atualizacao
+        })
+
+        self._limitar_historico()
+
+    def registrar_entidade(self, entidade_id):
+
+        self.ultima_entidade_id = entidade_id
+        self.ultima_atualizacao = time.time()
+
+    def registrar_acao(self, acao):
+
+        self.ultima_acao = acao
+        self.ultima_atualizacao = time.time()
+
+    def registrar_intencao(self, intencao):
+
+        self.ultima_intencao = intencao
+        self.ultima_atualizacao = time.time()
+
+    def registrar_intencao_pendente(self, intencao):
+        self.intencao_pendente = intencao
+
+    def obter_intencao_pendente(self):
+        return self.intencao_pendente
+
+    def limpar_intencao_pendente(self):
+        self.intencao_pendente = None
+
+    def obter_historico(self):
+
+        return list(self.historico)
+
+    def ultimas_mensagens(self, quantidade=6):
+
+        return self.historico[-quantidade:]
+
+    def _limitar_historico(self):
+
+        if len(self.historico) > self.limite:
+            self.historico = self.historico[-self.limite:]
+
+    def obter_ultima_mensagem(self):
+        return self.ultima_mensagem
+
+    def obter_ultima_resposta(self):
+        return self.ultima_resposta
+
+    def obter_ultima_entidade(self):
+        return self.ultima_entidade_id
+
+    def obter_ultima_acao(self):
+        return self.ultima_acao
+
+    def obter_ultima_intencao(self):
+        return self.ultima_intencao
+
+    def obter_contexto_atual(self):
+        return {
+            "ultima_mensagem": self.ultima_mensagem,
+            "ultima_resposta": self.ultima_resposta,
+            "ultima_entidade_id": self.ultima_entidade_id,
+            "ultima_acao": self.ultima_acao,
+            "ultima_intencao": self.ultima_intencao
+        }
+
+    def limpar(self):
+
+        self.ultima_mensagem = None
+        self.ultima_resposta = None
+        self.ultima_entidade_id = None
+        self.ultima_acao = None
+        self.ultima_intencao = None
+        self.intencao_pendente = None
+        self.ultima_atualizacao = None
+        self.historico = []
+
+    def resumo(self):
+
+        return {
+            "ultima_mensagem": self.ultima_mensagem,
+            "ultima_resposta": self.ultima_resposta,
+            "ultima_entidade_id": self.ultima_entidade_id,
+            "ultima_acao": self.ultima_acao,
+            "ultima_intencao": self.ultima_intencao,
+            "historico": self.ultimas_mensagens()
+        }

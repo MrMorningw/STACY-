@@ -1,0 +1,29 @@
+{
+    "entidades": [
+        {
+            "id": "P-A1",
+            "uuid": "UUID-1",
+            "categoria": "projetos",
+            "nome": "CSD",
+            "atributos": {
+                "objetivo_principal": "Transformar minha rotina",
+                "objetivos": [
+                    "disciplina",
+                    "inglês",
+                    "foco",
+                    "consistência",
+                    "continuidade",
+                    "evolução"
+                ]
+            },
+            "relacoes": [],
+            "historico": []
+        }
+    ],
+    "contexto": {
+        "id": "P-A1",
+        "uuid": "UUID-1",
+        "categoria": "projetos",
+        "nome": "CSD"
+    }
+}
