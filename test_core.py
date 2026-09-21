@@ -887,6 +887,21 @@ class TestContextContinuity(unittest.TestCase):
 
 
 class TestTaskConversationCorrections(unittest.TestCase):
+    def setUp(self):
+        self.memoria = {
+            "usuario": {"nome": "Danley"},
+            "preferencias": [],
+            "projetos": [],
+            "objetivos": [],
+            "informacoes": []
+        }
+        self.entidades = {"entidades": []}
+        self.orquestrador = orchestrator.StacyOrchestrator(
+            api_key=None,
+            memoria=self.memoria,
+            entidades=self.entidades
+        )
+
 
     def test_task_creation_corrects_cokega_and_removes_temporal_connector(self):
         resultado = intent.interpretar(
