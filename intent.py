@@ -494,7 +494,7 @@ def interpretar_tarefa(mensagem):
         return {"tipo": "tarefa", "acao": "remover", "referencia": "ultima"}
 
     normalizado_correcao = re.sub(
-        r"\s+da\s+(?:(?:ultima|última)\s+)?tarefa(?:\s+criada)?$",
+        r"\s+(?:da\s+)?(?:(?:ultima|última)\s+)?tarefa(?:\s+criada)?$",
         "",
         normalizado_original,
         flags=re.IGNORECASE
