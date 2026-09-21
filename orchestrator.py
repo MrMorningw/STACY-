@@ -533,6 +533,8 @@ class StacyOrchestrator:
 
         consulta_contextual = self._resolver_continuacao_pesquisa(mensagem)
         if consulta_contextual is not None:
+            # Uma continuação de pesquisa mantém a intenção externa mesmo
+            # quando a frase atual, isoladamente, parece conversacional.
             rota_previa = ROTA_PESQUISA_EXTERNA
 
         # Decisões de alta confiança do Cortex têm precedência para
@@ -575,6 +577,11 @@ class StacyOrchestrator:
             comando=comando,
             conhecimento=resposta_conhecimento is not None
         )
+
+        # Continuação de uma pesquisa anterior é uma decisão de contexto:
+        # a mensagem curta pode não conter, sozinha, nenhum gatilho factual.
+        if consulta_contextual is not None:
+            rota = ROTA_PESQUISA_EXTERNA
 
         # Atualiza a decisão com o resultado do CORE.
         self.ultima_decisao = cortex.analisar(
