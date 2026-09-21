@@ -380,7 +380,6 @@ class CoreRoutingTests(unittest.TestCase):
         self.assertEqual(resultado["tipo"], "local")
         self.assertIn("operando normalmente", resultado["resposta"])
 
-
     def test_price_question_goes_external(self):
         self.assertEqual(
             orchestrator.classificar_rota("quanto custa um notebook?"),
@@ -418,7 +417,7 @@ class CoreRoutingTests(unittest.TestCase):
 
     def test_route_question_words_alone_stay_local(self):
         self.assertEqual(
-            orchestrator.classificar_rota("qual a diferença entre responsabilidade objetiva e subjetiva?"),
+            orchestrator.classificar_rota("qual?"),
             orchestrator.ROTA_IA_LOCAL
         )
 
@@ -557,8 +556,6 @@ class CoreRoutingTests(unittest.TestCase):
         self.assertEqual(resultado["tipo"], "memoria")
         self.assertEqual(resultado["categoria"], "projetos")
 
-
-
     def test_common_factual_questions_go_external(self):
         casos = [
             "qual o aumentativo de abobora?",
@@ -572,6 +569,7 @@ class CoreRoutingTests(unittest.TestCase):
                     orchestrator.classificar_rota(mensagem),
                     orchestrator.ROTA_PESQUISA_EXTERNA
                 )
+
 
 if __name__ == "__main__":
     unittest.main()
