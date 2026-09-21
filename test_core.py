@@ -528,5 +528,20 @@ class CoreRoutingTests(unittest.TestCase):
         self.assertEqual(resultado["categoria"], "projetos")
 
 
+
+    def test_common_factual_questions_go_external(self):
+        casos = [
+            "qual o aumentativo de abobora?",
+            "qual o nome da estatua da liberdade?",
+            "me diga uma ave que comece com a letra T",
+        ]
+
+        for mensagem in casos:
+            with self.subTest(mensagem=mensagem):
+                self.assertEqual(
+                    orchestrator.classificar_rota(mensagem),
+                    orchestrator.ROTA_PESQUISA_EXTERNA
+                )
+
 if __name__ == "__main__":
     unittest.main()
