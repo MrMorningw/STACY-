@@ -61,6 +61,7 @@ def _corrigir_erros_tarefa(texto):
         "tareffa": "tarefa",
         "estudaf": "estudar",
         "estudr": "estudar",
+        "amanhaa": "amanha",
         "amanh": "amanha",
         "direto penal": "direito penal",
     }
@@ -260,7 +261,7 @@ def interpretar(mensagem):
     # TAREFAS
     # =========================
 
-    tarefa = interpretar_tarefa(mensagem)
+    tarefa = interpretar_tarefa(texto)
 
     if tarefa is not None:
         return tarefa
@@ -640,7 +641,7 @@ def extrair_data_hora_tarefa(texto):
         r"\s+às\s+(\d{1,2})(?:[:h](\d{2}))?\s*$",
         r"\s+as\s+(\d{1,2})(?:[:h](\d{2}))?\s*$",
         r"\s+(\d{1,2})h(\d{2})?\s*$",
-        r"\s+(\d{1,2})\s+horas?\s*$"
+        r"\s+(\d{1,2})(?:\s+horas?)?\s*$"
     ]
 
     for padrao in padroes_hora:
