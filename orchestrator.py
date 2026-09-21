@@ -823,7 +823,8 @@ class StacyOrchestrator:
         if not (inicio_continuacao or referencia):
             return None
 
-        return f"{anterior} | complemento: {mensagem.strip()}"
+        assunto = anterior.split(" | complemento:", 1)[0].strip()
+        return f"{assunto} | complemento: {mensagem.strip()}"
 
     def _resolver_consulta_conversa(self, mensagem):
         """Resolve perguntas sobre o histórico sem usar IA ou Web."""
@@ -882,8 +883,27 @@ class StacyOrchestrator:
             self.conversa.registrar_resposta(resposta)
 
         rota = resultado.get("rota")
-        if rota is not None:
-            self.conversa.registrar_rota(rota, resultado.get("consulta"))
+        if rota is None:
+            tipo = resultado.get("tipo")
+            if tipo in {"pesquisa", "pesquisa_indisponivel"}:
+                rota = ROTA_PESQUISA_EXTERNA
+            elif tipo in {
+                "tarefa_criada", "tarefa_atualizada", "tarefas",
+                "tarefa_concluida", "tarefa_nao_encontrada",
+                "tarefa_ambigua", "confirmacao", "tarefa_removida",
+                "acao_executada", "acao_candidata", "acao_cancelada"
+            }:
+                rota = ROTA_INTERNA
+            elif tipo == "conhecimento_verificado":
+                rota = ROTA_CONHECIMENTO
+            else:
+                rota = ROTA_IA_LOCAL
+
+        consulta = resultado.get("consulta")
+        if consulta is not None:
+            self.conversa.registrar_rota(rota, consulta)
+        else:
+            self.conversa.registrar_rota(rota)
 
         tarefa = resultado.get("tarefa")
         if isinstance(tarefa, dict):
