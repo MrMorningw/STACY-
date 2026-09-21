@@ -507,6 +507,21 @@ class StacyOrchestrator:
         comando = command.identificar_comando(mensagem)
         intencao = intent.interpretar(mensagem)
 
+        # A identidade da STACY pertence ao próprio sistema, não à memória
+        # do usuário nem à pesquisa externa.
+        if (
+            isinstance(intencao, dict)
+            and intencao.get("tipo") == "identidade"
+            and intencao.get("alvo") == "stacy"
+        ):
+            return {
+                "tipo": "local",
+                "resposta": (
+                    "Sou a STACY, senhor. Sua assistente pessoal."
+                ),
+                "rota": ROTA_INTERNA
+            }
+
         # Continuidade operacional: se a mensagem fornece apenas data/hora,
         # aplica a alteração à última tarefa criada, sem exigir que o usuário
         # repita o título.
