@@ -1,5 +1,6 @@
 import requests
 import config
+import response_guard
 from urllib.parse import urlparse
 
 
@@ -149,10 +150,7 @@ def gerar_resposta(
             textos.append(parte["text"].strip())
 
     resposta = "\n".join(texto for texto in textos if texto).strip()
-    if not resposta:
-        raise RuntimeError("Gemini retornou resposta vazia.")
-
-    return resposta
+    return response_guard.validar_resposta(resposta, historico[-1]["parts"][0]["text"] if historico and historico[-1].get("parts") else None)
 
 
 def gerar_resposta_pesquisa(
@@ -248,8 +246,7 @@ def gerar_resposta_pesquisa(
             textos.append(parte["text"].strip())
 
     resposta = "\n".join(texto for texto in textos if texto).strip()
-    if not resposta:
-        raise RuntimeError("Pesquisa Gemini retornou resposta vazia.")
+    resposta = response_guard.validar_resposta(resposta, historico_pesquisa[-1]["parts"][0]["text"] if historico_pesquisa and historico_pesquisa[-1].get("parts") else None)
 
     fontes = []
     vistos = set()
@@ -276,6 +273,7 @@ def gerar_resposta_pesquisa(
                 "url": uri
             })
 
+    fontes = response_guard.validar_fontes(fontes)
     if not fontes:
         raise RuntimeError(
             "Pesquisa Gemini não retornou fontes verificáveis."
@@ -406,7 +404,7 @@ def gerar_resposta_local(
             f"Resposta da IA local inválida: {data}"
         ) from erro
 
-    if not resposta:
-        raise RuntimeError("IA local retornou resposta vazia.")
-
-    return resposta
+    return response_guard.validar_resposta(
+        resposta,
+        historico_local[-1]["parts"][0]["text"] if historico_local and historico_local[-1].get("parts") else None
+    )
