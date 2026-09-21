@@ -111,7 +111,7 @@ def interpretar(mensagem):
     ]
 
     if corresponde_frase(
-        consulta_flexivel,
+        normalizado_sem_acentos.rstrip("?!. ,;: "),
         consultas_stacy,
         limiar=0.84
     ):
