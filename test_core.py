@@ -617,10 +617,6 @@ class CoreRoutingTests(unittest.TestCase):
         self.assertTrue(self.orquestrador.ultima_decisao["needs_web"])
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class TestContextContinuity(unittest.TestCase):
 
     def setUp(self):
@@ -724,7 +720,6 @@ class TestContextContinuity(unittest.TestCase):
             self.assertIn("mais de uma tarefa", resultado["resposta"])
         finally:
             orchestrator.tasks.buscar = original
-
 
 if __name__ == "__main__":
     unittest.main()
