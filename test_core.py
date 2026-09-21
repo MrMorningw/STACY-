@@ -3,6 +3,7 @@ import unittest
 import intent
 import orchestrator
 import cortex
+import entity_resolver
 
 
 class CoreRoutingTests(unittest.TestCase):
