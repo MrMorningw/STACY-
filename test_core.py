@@ -171,6 +171,36 @@ class CoreRoutingTests(unittest.TestCase):
             orchestrator.ROTA_PESQUISA_EXTERNA
         )
 
+    def test_last_question_is_resolved_from_conversation_history(self):
+        self.orquestrador.processar("Qual é a capital do Brasil?")
+        self.orquestrador.processar("Qual foi a última pergunta que eu fiz?")
+        resultado = self.orquestrador.processar("Qual foi a última pergunta que eu fiz?")
+        self.assertEqual(resultado["tipo"], "local")
+        self.assertIn("Qual foi a última pergunta que eu fiz?", resultado["resposta"])
+
+    def test_first_question_is_resolved_from_conversation_history(self):
+        self.orquestrador.processar("Qual é a capital do Brasil?")
+        self.orquestrador.processar("Qual é a cor de uma abóbora?")
+        resultado = self.orquestrador.processar(
+            "Qual foi a primeira pergunta nesta conversa?"
+        )
+        self.assertEqual(resultado["tipo"], "local")
+        self.assertIn("Qual é a capital do Brasil?", resultado["resposta"])
+
+    def test_generic_color_question_goes_external(self):
+        self.assertEqual(
+            orchestrator.classificar_rota("qual a cor de uma abobora?"),
+            orchestrator.ROTA_PESQUISA_EXTERNA
+        )
+
+    def test_generic_difference_question_goes_external(self):
+        self.assertEqual(
+            orchestrator.classificar_rota(
+                "qual a diferenca entre responsabilidade civil objetiva e subjetiva?"
+            ),
+            orchestrator.ROTA_PESQUISA_EXTERNA
+        )
+
     def test_ai_response_is_added_once_to_history(self):
         original_health = orchestrator.ai.verificar_ia_local
         original_local = orchestrator.ai.gerar_resposta_local
