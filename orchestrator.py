@@ -225,28 +225,21 @@ def classificar_rota(mensagem, intencao=None, comando=None, conhecimento=False):
     if any(padrao in texto for padrao in padroes_traducao):
         return ROTA_PESQUISA_EXTERNA
 
-    # 6) PESQUISA IMPLÍCITA: perguntas factuais comuns que um modelo local
-    # pequeno não deve responder por palpite. O CORE pode atender fatos
-    # previamente verificados; os demais seguem para pesquisa externa.
-    # Perguntas factuais genéricas também entram aqui. Isso evita que
-    # formulações novas, como "qual a cor de X?" ou "qual a diferença entre
-    # X e Y?", caiam acidentalmente na IA local e recebam um palpite.
+    # Perguntas conceituais, explicativas e triviais não exigem Web por
+    # padrão. Elas seguem para a IA local e, se esta estiver indisponível,
+    # para o Gemini comum. A Web fica reservada a atualidade, fatos que
+    # exigem verificação e pedidos explícitos de pesquisa/fontes.
+    # Isso evita transformar "qual a cor de um gato preto?" ou
+    # "o que é responsabilidade civil?" em pesquisas externas desnecessárias.
     padroes_factuais_genericos = (
-        "qual a cor de ", "qual e a cor de ",
-        "qual a cor do ", "qual e a cor do ",
-        "qual a diferenca entre ", "qual e a diferenca entre ",
-        "qual a funcao de ", "qual e a funcao de ",
-        "qual a definicao de ", "qual e a definicao de ",
-        "o que e ", "o que sao ", "o que significa ",
-        "como funciona ", "onde fica ", "quando foi ", "quem foi ",
-        "me diga uma ", "me diga um ", "diga uma ", "diga um "
+        "onde fica ", "quando foi ", "quem foi ",
     )
     if any(padrao in texto for padrao in padroes_factuais_genericos):
         return ROTA_PESQUISA_EXTERNA
 
-    # 6) PESQUISA IMPLÍCITA: perguntas factuais comuns que um modelo local
-    # pequeno não deve responder por palpite. O CORE pode atender fatos
-    # previamente verificados; os demais seguem para pesquisa externa.
+    # Perguntas de explicação, definição, comparação e conhecimento geral
+    # permanecem na IA local, salvo quando o usuário pedir pesquisa/fonte ou
+    # houver marcador de atualidade tratado acima.
     padroes_fato_comum = (
         "qual o nome ",
         "qual e o nome ",
@@ -1037,13 +1030,14 @@ class StacyOrchestrator:
         rota = resultado.get("rota")
         if rota is None:
             tipo = resultado.get("tipo")
-            if tipo in {"pesquisa", "pesquisa_indisponivel"}:
+            if tipo in {"pesquisa", "pesquisa_fallback", "pesquisa_indisponivel"}:
                 rota = ROTA_PESQUISA_EXTERNA
             elif tipo in {
-                "tarefa_criada", "tarefa_atualizada", "tarefas",
-                "tarefa_concluida", "tarefa_nao_encontrada",
+                "local", "tarefa_ultima", "tarefa_criada", "tarefa_atualizada",
+                "tarefas", "tarefa_concluida", "tarefa_nao_encontrada",
                 "tarefa_ambigua", "confirmacao", "tarefa_removida",
-                "acao_executada", "acao_candidata", "acao_cancelada"
+                "erro_tarefa", "acao_executada", "acao_candidata",
+                "acao_ja_existente", "acao_cancelada", "erro_acao"
             }:
                 rota = ROTA_INTERNA
             elif tipo == "conhecimento_verificado":
