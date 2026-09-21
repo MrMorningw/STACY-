@@ -706,6 +706,79 @@ class TestContextContinuity(unittest.TestCase):
         finally:
             orchestrator.ai.gerar_resposta_pesquisa = original
 
+    def test_local_ai_does_not_receive_external_research_turns(self):
+        original_pesquisa = orchestrator.ai.gerar_resposta_pesquisa
+        original_health = orchestrator.ai.verificar_ia_local
+        original_local = orchestrator.ai.gerar_resposta_local
+        capturado = []
+
+        try:
+            orchestrator.ai.gerar_resposta_pesquisa = lambda *args, **kwargs: {
+                "resposta": "Resposta externa sobre responsabilidade objetiva.",
+                "fontes": []
+            }
+            orchestrator.ai.verificar_ia_local = lambda: True
+
+            def local_mock(historico, *args, **kwargs):
+                capturado.append(historico)
+                return "Resposta local."
+
+            orchestrator.ai.gerar_resposta_local = local_mock
+
+            self.orquestrador.processar(
+                "pesquise sobre responsabilidade objetiva"
+            )
+            resultado = self.orquestrador.processar(
+                "me ajude a organizar meus estudos"
+            )
+
+            self.assertEqual(resultado["tipo"], "ai")
+            textos = [
+                parte["text"]
+                for mensagem in capturado[-1]
+                for parte in mensagem.get("parts", [])
+                if isinstance(parte, dict) and "text" in parte
+            ]
+            self.assertFalse(
+                any("responsabilidade objetiva" in texto.lower() for texto in textos)
+            )
+            self.assertIn("organizar meus estudos", textos[-1].lower())
+        finally:
+            orchestrator.ai.gerar_resposta_pesquisa = original_pesquisa
+            orchestrator.ai.verificar_ia_local = original_health
+            orchestrator.ai.gerar_resposta_local = original_local
+
+    def test_research_adapter_preserves_history_for_external_followup(self):
+        original = orchestrator.ai.gerar_resposta_pesquisa
+        consultas = []
+
+        try:
+            def pesquisa_mock(api_key, historico):
+                consultas.append(historico)
+                return {
+                    "resposta": "Resultado pesquisado.",
+                    "fontes": []
+                }
+
+            orchestrator.ai.gerar_resposta_pesquisa = pesquisa_mock
+            self.orquestrador.processar(
+                "pesquise sobre responsabilidade objetiva"
+            )
+            self.orquestrador.processar(
+                "e na responsabilidade do empregador?"
+            )
+
+            textos = [
+                parte["text"]
+                for mensagem in consultas[-1]
+                for parte in mensagem.get("parts", [])
+                if isinstance(parte, dict) and "text" in parte
+            ]
+            self.assertIn("pesquise sobre responsabilidade objetiva", textos)
+            self.assertIn("e na responsabilidade do empregador?", textos)
+        finally:
+            orchestrator.ai.gerar_resposta_pesquisa = original
+
     def test_ambiguous_task_target_asks_instead_of_guessing(self):
         original = orchestrator.tasks.buscar
         try:
