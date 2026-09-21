@@ -1514,9 +1514,82 @@ class StacyOrchestrator:
                 "tarefa": tarefa
             }
 
+        if acao == "corrigir_titulo":
+            tarefa = self.conversa.obter_ultima_tarefa()
+            if not isinstance(tarefa, dict) or not tarefa.get("id"):
+                return {
+                    "tipo": "tarefa_nao_encontrada",
+                    "resposta": "Não encontrei uma tarefa criada recentemente, senhor."
+                }
+
+            antigo = intencao.get("antigo")
+            novo = (intencao.get("novo") or "").strip()
+            titulo_atual = tarefa.get("titulo", "")
+
+            if not novo:
+                return None
+
+            if antigo:
+                titulo_novo = re.sub(
+                    r"(?<!\w)" + re.escape(antigo) + r"(?!\w)",
+                    novo,
+                    titulo_atual,
+                    count=1,
+                    flags=re.IGNORECASE
+                )
+            else:
+                titulo_novo = novo
+
+            if titulo_novo == titulo_atual:
+                return {
+                    "tipo": "tarefa_atualizada",
+                    "resposta": f"O título já está como '{titulo_atual}', senhor.",
+                    "tarefa": tarefa
+                }
+
+            atualizado = tasks.atualizar(
+                tarefa["id"],
+                titulo=titulo_novo
+            )
+
+            if atualizado is None:
+                return {
+                    "tipo": "erro_tarefa",
+                    "resposta": "Não consegui atualizar o nome da tarefa, senhor."
+                }
+
+            return {
+                "tipo": "tarefa_atualizada",
+                "resposta": f"Nome da tarefa atualizado, senhor: '{atualizado['titulo']}'.",
+                "tarefa": atualizado
+            }
+
         if acao in ["concluir", "remover"]:
 
             termo = intencao.get("termo")
+
+            if acao == "remover" and intencao.get("referencia") == "ultima":
+                tarefa = self.conversa.obter_ultima_tarefa()
+                if not isinstance(tarefa, dict) or not tarefa.get("id"):
+                    return {
+                        "tipo": "tarefa_nao_encontrada",
+                        "resposta": "Não encontrei uma tarefa criada recentemente, senhor."
+                    }
+
+                self.acao_pendente = {
+                    "tipo": "remover_tarefa",
+                    "tarefa_id": tarefa["id"],
+                    "tarefa": tarefa
+                }
+
+                return {
+                    "tipo": "confirmacao",
+                    "resposta": (
+                        f"Senhor, confirma a remoção da tarefa "
+                        f"'{tarefa['titulo']}'? Esta ação não poderá ser desfeita."
+                    ),
+                    "tarefa": tarefa
+                }
 
             if not termo:
                 return None
