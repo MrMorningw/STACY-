@@ -375,10 +375,13 @@ def extrair_data_hora_tarefa(texto):
     agora = datetime.now()
 
     padroes_hora = [
+        r"\s+às\s+(\d{1,2})(?:[:h](\d{2}))?\s+horas?(?=\s|$)",
         r"\s+às\s+(\d{1,2})(?:[:h](\d{2}))?(?=\s|$)",
+        r"\s+as\s+(\d{1,2})(?:[:h](\d{2}))?\s+horas?(?=\s|$)",
         r"\s+as\s+(\d{1,2})(?:[:h](\d{2}))?(?=\s|$)",
         r"\s+(\d{1,2})h(\d{2})?(?=\s|$)",
-        r"\s+(\d{1,2})\s+horas?(?=\s|$)"
+        r"\s+(\d{1,2})\s+horas?(?=\s|$)",
+        r"\s+(\d{1,2})(?!\s+horas?)(?=\s|$)"
     ]
 
     for padrao in padroes_hora:
