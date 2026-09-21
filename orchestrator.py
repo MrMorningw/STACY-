@@ -543,6 +543,13 @@ class StacyOrchestrator:
         if continuacao_tarefa is not None:
             intencao = continuacao_tarefa
 
+        # Intenções de tarefa já reconhecidas pelo parser são operações
+        # determinísticas. Execute-as imediatamente, antes de Cortex, IA,
+        # conhecimento ou resolução contextual poderem alterar a leitura.
+        resultado_tarefa = self._processar_tarefa(intencao)
+        if resultado_tarefa is not None:
+            return resultado_tarefa
+
         # O modelo local faz a interpretação semântica quando o CORE
         # ainda não identificou uma operação. O Cortex continua sendo apenas
         # coordenador/validador; a IA não recebe autoridade para executar.
@@ -741,13 +748,6 @@ class StacyOrchestrator:
             # receber a mensagem atual intacta para preservar a continuidade
             # sem reescrever a fala do usuário.
             return self._pesquisar_web(mensagem)
-
-        # Tarefas estruturadas têm precedência sobre resolução contextual.
-        # Isso impede que uma correção/remoção de tarefa seja confundida com
-        # uma consulta conversacional genérica antes de chegar ao CORE.
-        resultado_tarefa = self._processar_tarefa(intencao)
-        if resultado_tarefa is not None:
-            return resultado_tarefa
 
         # Rotas internas continuam pelo CORE abaixo, onde memória, tarefas,
         # entidades e ações são executadas sem passar por modelos.
