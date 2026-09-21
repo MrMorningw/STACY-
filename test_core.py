@@ -504,8 +504,10 @@ class CoreRoutingTests(unittest.TestCase):
         finally:
             orchestrator.ai.gerar_resposta_pesquisa = original
 
-        self.assertEqual(resultado["tipo"], "pesquisa_indisponivel")
-        self.assertIn("Não vou inventar", resultado["resposta"])
+        self.assertEqual(resultado["tipo"], "pesquisa_fallback")
+        self.assertEqual(resultado["origem"], "gemini_fallback")
+        self.assertEqual(resultado["fontes"], [])
+        self.assertIn("Resposta", resultado["resposta"])
 
     def test_memory_recall_is_human_readable(self):
         resultado = self.orquestrador.processar("o que você guardou de mim?")
