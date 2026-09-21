@@ -105,7 +105,7 @@ def interpretar_contexto(
     # continua disponível como fallback para consultas explícitas de entidade,
     # mas não deve substituir uma referência conversacional já resolvida.
     entidade_contextual = contexto_atual
-    if entidade_contextual is None:
+    if entidade_contextual is None and entity_resolver.detectar_referencia(mensagem) is None:
         entidade_contextual = obter_entidade_contextual(
             entity_store,
             entidades
