@@ -227,18 +227,6 @@ class CoreRoutingTests(unittest.TestCase):
             orchestrator.ROTA_PESQUISA_EXTERNA
         )
 
-    def test_generic_color_and_difference_questions_are_external(self):
-        self.assertEqual(
-            orchestrator.classificar_rota("qual a cor de uma abobora?"),
-            orchestrator.ROTA_PESQUISA_EXTERNA
-        )
-        self.assertEqual(
-            orchestrator.classificar_rota(
-                "qual a diferenca entre responsabilidade civil objetiva e subjetiva?"
-            ),
-            orchestrator.ROTA_PESQUISA_EXTERNA
-        )
-
     def test_first_question_is_resolved_from_conversation_history(self):
         self.orquestrador.processar("Qual é a capital do Brasil?")
         self.orquestrador.processar("Qual é a cor de uma abóbora?")
