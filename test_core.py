@@ -178,6 +178,27 @@ class CoreRoutingTests(unittest.TestCase):
             orchestrator.ROTA_PESQUISA_EXTERNA
         )
 
+    def test_conceptual_question_stays_local(self):
+        self.assertEqual(
+            orchestrator.classificar_rota(
+                "o que é responsabilidade civil?",
+                conhecimento=False,
+            ),
+            orchestrator.ROTA_IA_LOCAL
+        )
+
+    def test_trivial_color_question_uses_core_knowledge(self):
+        resultado = self.orquestrador.processar("qual a cor de um gato preto?")
+        self.assertEqual(resultado["tipo"], "conhecimento_verificado")
+        self.assertIn("preta", resultado["resposta"])
+
+    def test_local_result_is_registered_as_internal(self):
+        self.orquestrador.processar("como voce esta?")
+        self.assertEqual(
+            self.orquestrador.conversa.ultima_rota,
+            orchestrator.ROTA_INTERNA
+        )
+
     def test_last_question_is_resolved_from_conversation_history(self):
         self.orquestrador.processar("Qual é a capital do Brasil?")
         self.orquestrador.processar("Qual foi a última pergunta que eu fiz?")
