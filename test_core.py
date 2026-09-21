@@ -878,6 +878,52 @@ class TestContextContinuity(unittest.TestCase):
         self.assertEqual(resultado["tipo"], "local")
         self.assertIn("STACY", resultado["resposta"])
 
+    def test_conversation_entity_does_not_become_persistent_context(self):
+        entidade = {
+            "id": "P-A1",
+            "uuid": "uuid-p-a1",
+            "categoria": "projetos",
+            "nome": "STACY",
+            "atributos": {},
+            "relacoes": [],
+            "historico": []
+        }
+        self.orquestrador.entidades["entidades"].append(entidade)
+
+        self.orquestrador.processar("o que voce sabe sobre STACY?")
+
+        self.assertNotIn(
+            "contexto",
+            self.orquestrador.entidades
+        )
+        self.assertEqual(
+            self.orquestrador.entidade_contextual["id"],
+            "P-A1"
+        )
+
+    def test_explicit_persistent_context_remains_available(self):
+        entidade = {
+            "id": "P-A1",
+            "uuid": "uuid-p-a1",
+            "categoria": "projetos",
+            "nome": "STACY",
+            "atributos": {},
+            "relacoes": [],
+            "historico": []
+        }
+        self.orquestrador.entidades["entidades"].append(entidade)
+
+        contexto = orchestrator.entity_store.definir_contexto_persistente(
+            self.orquestrador.entidades,
+            "P-A1"
+        )
+
+        self.assertEqual(contexto["id"], "P-A1")
+        self.assertEqual(
+            self.orquestrador.entidades["contexto"]["id"],
+            "P-A1"
+        )
+
     def test_entity_resolver_can_disable_persistent_fallback(self):
         dados = {
             "entidades": [{
