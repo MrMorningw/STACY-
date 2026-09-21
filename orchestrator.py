@@ -522,6 +522,53 @@ class StacyOrchestrator:
         # O roteador decide a origem antes de qualquer IA.
         # A classificação interna é prioritária para impedir que dados pessoais
         # ou tarefas sejam enviados à pesquisa externa por engano.
+        #
+        # Antes da classificação factual, porém, consultas de entidade que já
+        # possuem um referente na conversa devem passar pelo resolvedor local.
+        # Ex.: depois de "STACY", "qual o nome dela?" é uma consulta de contexto,
+        # não uma nova pesquisa na Web.
+        entidade_contextual_conversa = None
+        entidade_conversa_id = self.conversa.obter_ultima_entidade()
+
+        if entidade_conversa_id:
+            entidade_contextual_conversa = entity_store.obter_por_id(
+                self.entidades,
+                entidade_conversa_id
+            )
+
+        if entidade_contextual_conversa is not None:
+            contexto_previo = context.interpretar_contexto(
+                mensagem,
+                entity_store,
+                self.entidades,
+                contexto_atual=entidade_contextual_conversa
+            )
+
+            if contexto_previo is not None:
+                resultado_previo = context.resolver_consulta(
+                    contexto_previo
+                )
+
+                if (
+                    resultado_previo is not None
+                    and resultado_previo.get("status") == "encontrada"
+                ):
+                    resposta_previa = self._formatar_contexto(
+                        contexto_previo,
+                        resultado_previo
+                    )
+
+                    if resposta_previa is not None:
+                        self._atualizar_contexto(
+                            contexto_previo["entidade"]
+                        )
+                        return {
+                            "tipo": "local",
+                            "resposta": resposta_previa,
+                            "contexto": contexto_previo,
+                            "resultado": resultado_previo
+                        }
+
         comando = command.identificar_comando(mensagem)
         intencao = intent.interpretar(mensagem)
 
