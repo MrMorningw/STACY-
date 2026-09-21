@@ -556,7 +556,45 @@ class StacyOrchestrator:
             conhecimento=False,
             decisao_ia=decisao_ia
         )
-        self.ultima_decisao = decisao
+        # Converte somente decisões estruturadas do intérprete em intenções
+        # executáveis. O modelo nunca executa diretamente.
+        if (
+            isinstance(decisao, dict)
+            and decisao.get("ferramenta") in {"tasks", "memory"}
+        ):
+            argumentos_ia = decisao.get("argumentos", {})
+            if isinstance(argumentos_ia, dict):
+                if decisao.get("ferramenta") == "tasks":
+                    dados_tarefa = {
+                        chave: valor
+                        for chave, valor in argumentos_ia.items()
+                        if chave in {"acao", "titulo", "data", "hora", "termo", "tarefa_id"}
+                        and valor not in (None, "")
+                    }
+                    if dados_tarefa.get("acao"):
+                        intencao = {
+                            "tipo": "tarefa",
+                            **dados_tarefa
+                        }
+                elif decisao.get("ferramenta") == "memory":
+                    dados_memoria = {
+                        chave: valor
+                        for chave, valor in argumentos_ia.items()
+                        if chave in {"acao", "categoria", "valor", "conteudo"}
+                        and valor not in (None, "")
+                    }
+                    if dados_memoria.get("acao"):
+                        intencao = {
+                            "tipo": "memoria",
+                            **dados_memoria
+                        }
+
+        self.ultima_decisao = cortex.analisar(
+            mensagem,
+            intencao=intencao,
+            comando=comando,
+            conhecimento=False
+        )
 
         rota_previa = classificar_rota(
             mensagem,
