@@ -536,6 +536,17 @@ class StacyOrchestrator:
                 "rota": ROTA_INTERNA
             }
 
+        # Memória estruturada é responsabilidade exclusiva do CORE.
+        # Execute consultas de memória imediatamente após a interpretação,
+        # antes do Cortex poder classificá-las como perguntas factuais.
+        if (
+            isinstance(intencao, dict)
+            and intencao.get("tipo") == "memoria"
+        ):
+            resultado_memoria = self._processar_intencao(intencao)
+            if resultado_memoria is not None:
+                return resultado_memoria
+
         # Continuidade operacional: se a mensagem fornece apenas data/hora,
         # aplica a alteração à última tarefa criada, sem exigir que o usuário
         # repita o título.
@@ -679,12 +690,15 @@ class StacyOrchestrator:
             # quando a frase atual, isoladamente, parece conversacional.
             rota_previa = ROTA_PESQUISA_EXTERNA
 
-        # Decisões de alta confiança do Cortex têm precedência para
-        # pesquisa explícita e operações internas estruturadas.
-        if decisao["needs_memory"] or decisao["needs_action"]:
-            rota_previa = ROTA_INTERNA
-        elif decisao["needs_web"]:
-            rota_previa = ROTA_PESQUISA_EXTERNA
+        # A rota interna já determinada pelo CORE é soberana.
+        # Uma pergunta interna como "quais sao meus objetivos?" contém
+        # palavras interrogativas, mas isso não autoriza o Cortex a desviá-la
+        # para a Web.
+        if rota_previa != ROTA_INTERNA:
+            if decisao["needs_memory"] or decisao["needs_action"]:
+                rota_previa = ROTA_INTERNA
+            elif decisao["needs_web"]:
+                rota_previa = ROTA_PESQUISA_EXTERNA
 
         resposta_conhecimento = None
         if rota_previa != ROTA_INTERNA:
@@ -774,17 +788,6 @@ class StacyOrchestrator:
                 self.conversa.registrar_entidade(
                     entidade["id"]
                 )
-
-        # Consultas simples de memória devem ser resolvidas pelo CORE
-        # antes de contexto/IA, evitando que o modelo invente dados.
-        if (
-            isinstance(intencao, dict)
-            and intencao.get("tipo") == "memoria"
-            and intencao.get("acao") == "consultar"
-        ):
-            resultado_memoria = self._processar_intencao(intencao)
-            if resultado_memoria is not None:
-                return resultado_memoria
 
         entidade_atual = None
 
@@ -1752,20 +1755,49 @@ class StacyOrchestrator:
                 self.api_key,
                 historico_pesquisa
             )
-        except Exception as erro:
-            # Pesquisa externa não cai na IA local: isso preserva a regra
-            # de não inventar fatos quando a fonte externa está indisponível.
-            return {
-                "tipo": "pesquisa_indisponivel",
-                "rota": ROTA_PESQUISA_EXTERNA,
-                "consulta": mensagem,
-                "resposta": (
-                    "Não consegui consultar fontes externas agora, senhor. "
-                    "Não vou inventar uma resposta."
-                ),
-                "origem": "gemini_google",
-                "erro": str(erro)
-            }
+        except Exception as erro_pesquisa:
+            # A pesquisa com Google Search é a primeira tentativa. Se o
+            # grounding falhar (por quota, indisponibilidade ou outro erro
+            # transitório), ainda tentamos o Gemini normal como fallback.
+            # Esse fallback NÃO é apresentado como pesquisa verificada e
+            # NÃO recebe memória persistente do usuário.
+            try:
+                fallback_historico = [{
+                    "role": "user",
+                    "parts": [{"text": mensagem}]
+                }]
+                resposta_fallback = ai.gerar_resposta(
+                    self.api_key,
+                    fallback_historico,
+                    "{}",
+                    None,
+                    None
+                )
+                return {
+                    "tipo": "pesquisa_fallback",
+                    "rota": ROTA_PESQUISA_EXTERNA,
+                    "consulta": mensagem,
+                    "resposta": resposta_fallback,
+                    "origem": "gemini_fallback",
+                    "fontes": [],
+                    "erro_pesquisa": str(erro_pesquisa)
+                }
+            except Exception as erro_gemini:
+                return {
+                    "tipo": "pesquisa_indisponivel",
+                    "rota": ROTA_PESQUISA_EXTERNA,
+                    "consulta": mensagem,
+                    "resposta": (
+                        "Não consegui consultar fontes externas agora, senhor. "
+                        "Também não foi possível obter o fallback do Gemini. "
+                        "Não vou inventar uma resposta."
+                    ),
+                    "origem": "gemini_google",
+                    "erro": (
+                        f"Pesquisa: {erro_pesquisa}; "
+                        f"Fallback: {erro_gemini}"
+                    )
+                }
 
         resposta = resultado["resposta"]
         fontes = resultado.get("fontes", [])
