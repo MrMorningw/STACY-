@@ -27,7 +27,8 @@ class ConversationState:
         self.historico.append({
             "tipo": "usuario",
             "conteudo": mensagem,
-            "timestamp": self.ultima_atualizacao
+            "timestamp": self.ultima_atualizacao,
+            "rota": None
         })
 
         self._limitar_historico()
@@ -40,7 +41,8 @@ class ConversationState:
         self.historico.append({
             "tipo": "stacy",
             "conteudo": resposta,
-            "timestamp": self.ultima_atualizacao
+            "timestamp": self.ultima_atualizacao,
+            "rota": None
         })
 
         self._limitar_historico()
@@ -60,6 +62,19 @@ class ConversationState:
         if consulta:
             self.ultima_consulta = consulta
         self.ultima_atualizacao = time.time()
+
+        # A rota pertence ao turno inteiro. Marcamos a última mensagem do
+        # usuário e a resposta correspondente para que cada consumidor possa
+        # filtrar seu próprio contexto sem depender de outro componente.
+        encontrados = 0
+        for item in reversed(self.historico):
+            if item.get("rota") is not None:
+                continue
+            if item.get("tipo") in {"usuario", "stacy"}:
+                item["rota"] = rota
+                encontrados += 1
+                if encontrados == 2:
+                    break
 
     def registrar_tarefa(self, tarefa):
         self.ultima_tarefa = tarefa
