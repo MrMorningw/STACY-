@@ -878,6 +878,42 @@ class TestContextContinuity(unittest.TestCase):
         self.assertEqual(resultado["tipo"], "local")
         self.assertIn("STACY", resultado["resposta"])
 
+    def test_topic_change_clears_stale_conversational_entity(self):
+        entidade = {
+            "id": "P-A1",
+            "uuid": "uuid-p-a1",
+            "categoria": "projetos",
+            "nome": "STACY",
+            "atributos": {},
+            "relacoes": [],
+            "historico": []
+        }
+        self.orquestrador.entidades["entidades"].append(entidade)
+
+        self.orquestrador.processar("o que voce sabe sobre STACY?")
+
+        original = orchestrator.ai.gerar_resposta_pesquisa
+        try:
+            orchestrator.ai.gerar_resposta_pesquisa = lambda *args, **kwargs: {
+                "resposta": "A capital da França é Paris.",
+                "fontes": [{"titulo": "Fonte teste", "url": "https://example.com"}]
+            }
+            self.orquestrador.processar("qual a capital da França?")
+        finally:
+            orchestrator.ai.gerar_resposta_pesquisa = original
+
+        self.assertIsNone(
+            self.orquestrador.conversa.obter_ultima_entidade()
+        )
+
+        self.orquestrador._usar_ai = lambda mensagem: {
+            "tipo": "ai",
+            "resposta": "Não tenho um referente suficiente.",
+            "origem": "teste"
+        }
+        resultado = self.orquestrador.processar("e qual o nome dela?")
+        self.assertEqual(resultado["tipo"], "ai")
+
     def test_conversation_entity_does_not_become_persistent_context(self):
         entidade = {
             "id": "P-A1",
