@@ -770,10 +770,19 @@ class StacyOrchestrator:
         # Rotas internas continuam pelo CORE abaixo, onde memória, tarefas,
         # entidades e ações são executadas sem passar por modelos.
 
+        entidade_contextual_conversa = None
+        entidade_conversa_id = self.conversa.obter_ultima_entidade()
+
+        if entidade_conversa_id:
+            entidade_contextual_conversa = entity_store.obter_por_id(
+                self.entidades,
+                entidade_conversa_id
+            )
+
         entidade_detectada = entity_resolver.resolver(
             mensagem,
             self.entidades,
-            self.entidade_contextual
+            entidade_contextual_conversa
         )
 
         if (
@@ -840,7 +849,8 @@ class StacyOrchestrator:
         contexto = context.interpretar_contexto(
             mensagem,
             entity_store,
-            self.entidades
+            self.entidades,
+            contexto_atual=entidade_contextual_conversa
         )
 
         if contexto is not None:
