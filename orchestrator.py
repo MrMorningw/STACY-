@@ -1767,10 +1767,7 @@ class StacyOrchestrator:
             # Esse fallback NÃO é apresentado como pesquisa verificada e
             # NÃO recebe memória persistente do usuário.
             try:
-                fallback_historico = [{
-                    "role": "user",
-                    "parts": [{"text": mensagem}]
-                }]
+                fallback_historico = historico_pesquisa
                 resposta_fallback = ai.gerar_resposta(
                     self.api_key,
                     fallback_historico,
