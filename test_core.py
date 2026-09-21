@@ -885,5 +885,85 @@ class TestContextContinuity(unittest.TestCase):
         self.assertNotIn("tarefa para Stacy", resultado["resposta"])
 
 
+
+class TestTaskConversationCorrections(unittest.TestCase):
+
+    def test_task_creation_corrects_cokega_and_removes_temporal_connector(self):
+        resultado = intent.interpretar(
+            "crie uma tarefa para ir visitar meu cokega as 16 horas de amanha"
+        )
+        self.assertEqual(resultado["tipo"], "tarefa")
+        self.assertEqual(resultado["acao"], "criar")
+        self.assertEqual(resultado["titulo"], "ir visitar meu colega")
+        self.assertEqual(resultado["hora"], "16:00")
+        self.assertIsNotNone(resultado["data"])
+
+    def test_user_name_is_not_classified_as_stacy_identity(self):
+        for mensagem in ("qual meu nome?", "e o meu nome?"):
+            with self.subTest(mensagem=mensagem):
+                resultado = intent.interpretar(mensagem)
+                self.assertEqual(resultado["tipo"], "memoria")
+                self.assertEqual(resultado["categoria"], "usuario")
+
+    def test_delete_last_task_is_internal_reference(self):
+        resultado = intent.interpretar("exclua a ultima tarefa criada")
+        self.assertEqual(resultado["tipo"], "tarefa")
+        self.assertEqual(resultado["acao"], "remover")
+        self.assertEqual(resultado["referencia"], "ultima")
+
+    def test_delete_her_is_internal_reference(self):
+        resultado = intent.interpretar("exclua ela")
+        self.assertEqual(resultado["tipo"], "tarefa")
+        self.assertEqual(resultado["acao"], "remover")
+        self.assertEqual(resultado["referencia"], "ultima")
+
+    def test_correct_last_task_title_by_replacement(self):
+        resultado = intent.interpretar(
+            "arrume o nome de cokega para colega da tarefa criada"
+        )
+        self.assertEqual(resultado["tipo"], "tarefa")
+        self.assertEqual(resultado["acao"], "corrigir_titulo")
+        self.assertEqual(resultado["referencia"], "ultima")
+        self.assertEqual(resultado["antigo"], "cokega")
+        self.assertEqual(resultado["novo"], "colega")
+
+    def test_delete_last_task_asks_confirmation_instead_of_web(self):
+        self.orquestrador.conversa.registrar_tarefa({
+            "id": "T-1",
+            "titulo": "ir visitar meu colega",
+            "status": "pendente"
+        })
+        resultado = self.orquestrador.processar(
+            "exclua a ultima tarefa criada"
+        )
+        self.assertEqual(resultado["tipo"], "confirmacao")
+        self.assertIn("ir visitar meu colega", resultado["resposta"])
+        self.assertEqual(resultado["rota"], orchestrator.ROTA_INTERNA)
+
+    def test_correct_last_task_title_executes_locally(self):
+        original = orchestrator.tasks.atualizar
+        try:
+            self.orquestrador.conversa.registrar_tarefa({
+                "id": "T-1",
+                "titulo": "ir visitar meu cokega",
+                "status": "pendente"
+            })
+            atualizado = {
+                "id": "T-1",
+                "titulo": "ir visitar meu colega",
+                "status": "pendente"
+            }
+            orchestrator.tasks.atualizar = lambda *args, **kwargs: atualizado
+            resultado = self.orquestrador.processar(
+                "arrume o nome de cokega para colega da tarefa criada"
+            )
+        finally:
+            orchestrator.tasks.atualizar = original
+
+        self.assertEqual(resultado["tipo"], "tarefa_atualizada")
+        self.assertIn("ir visitar meu colega", resultado["resposta"])
+
+
+
 if __name__ == "__main__":
     unittest.main()
