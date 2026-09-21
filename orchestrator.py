@@ -782,7 +782,11 @@ class StacyOrchestrator:
         entidade_detectada = entity_resolver.resolver(
             mensagem,
             self.entidades,
-            entidade_contextual_conversa
+            entidade_contextual_conversa,
+            usar_contexto_persistente=(
+                entidade_contextual_conversa is None
+                and entity_resolver.detectar_referencia(mensagem) is None
+            )
         )
 
         if (
