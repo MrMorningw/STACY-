@@ -46,8 +46,8 @@ def remover_prefixo_conversacional(texto):
         "que bom", "otimo", "ótimo", "perfeito", "certo", "ok",
         "beleza", "entao", "então", "show", "legal", "entendi"
     )
-    padrao = r"^\\s*(?:" + "|".join(re.escape(p) for p in prefixos) + r")"
-    padrao += r"(?:\\s*[,;:.!?-]\\s*|\\s+)(.+)$"
+    padrao = r"^\s*(?:" + "|".join(re.escape(p) for p in prefixos) + r")"
+    padrao += r"(?:\s*[,;:.!?-]\s*|\s+)(.+)$"
     resultado = re.match(padrao, texto, flags=re.IGNORECASE)
     if resultado:
         return resultado.group(1).strip()
@@ -639,7 +639,8 @@ def extrair_data_hora_tarefa(texto):
     padroes_hora = [
         r"\s+às\s+(\d{1,2})(?:[:h](\d{2}))?\s*$",
         r"\s+as\s+(\d{1,2})(?:[:h](\d{2}))?\s*$",
-        r"\s+(\d{1,2})h(\d{2})?\s*$"
+        r"\s+(\d{1,2})h(\d{2})?\s*$",
+        r"\s+(\d{1,2})\s+horas?\s*$"
     ]
 
     for padrao in padroes_hora:
