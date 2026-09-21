@@ -225,21 +225,25 @@ def classificar_rota(mensagem, intencao=None, comando=None, conhecimento=False):
     if any(padrao in texto for padrao in padroes_traducao):
         return ROTA_PESQUISA_EXTERNA
 
-    # Perguntas conceituais, explicativas e triviais não exigem Web por
-    # padrão. Elas seguem para a IA local e, se esta estiver indisponível,
-    # para o Gemini comum. A Web fica reservada a atualidade, fatos que
-    # exigem verificação e pedidos explícitos de pesquisa/fontes.
-    # Isso evita transformar "qual a cor de um gato preto?" ou
-    # "o que é responsabilidade civil?" em pesquisas externas desnecessárias.
-    padroes_factuais_genericos = (
-        "onde fica ", "quando foi ", "quem foi ",
+    # Alguns fatos simples são verificáveis externamente, mas não devem
+    # impedir uma resposta determinística do CORE quando ela já existir.
+    # Ex.: "qual a cor de uma abobora?" pesquisa; "qual a cor de um gato
+    # preto?" pode ser respondida pelo conhecimento verificado do CORE.
+    padroes_fato_externo_simples = (
+        "qual a cor de ",
+        "qual e a cor de ",
+        "qual a diferenca entre ",
+        "qual e a diferenca entre ",
+        "onde fica ",
+        "quando foi ",
+        "quem foi ",
     )
-    if any(padrao in texto for padrao in padroes_factuais_genericos):
+    if any(padrao in texto for padrao in padroes_fato_externo_simples):
         return ROTA_PESQUISA_EXTERNA
 
-    # Perguntas de explicação, definição, comparação e conhecimento geral
-    # permanecem na IA local, salvo quando o usuário pedir pesquisa/fonte ou
-    # houver marcador de atualidade tratado acima.
+    # Perguntas conceituais, explicativas e triviais sem um padrão factual
+    # específico permanecem na IA local, salvo quando o usuário pedir
+    # pesquisa/fonte ou houver marcador de atualidade tratado acima.
     padroes_fato_comum = (
         "qual o nome ",
         "qual e o nome ",
