@@ -1048,13 +1048,12 @@ class StacyOrchestrator:
         ):
             return True
 
-        contexto = context.interpretar_contexto(
-            mensagem,
-            entity_store,
-            self.entidades,
-            contexto_atual=entidade
-        )
-        return contexto is not None
+        # O contexto semântico genérico não decide a continuidade.
+        # Consultas factuais sobre outro assunto podem parecer relacionadas
+        # ao referente atual e isso manteria uma entidade obsoleta viva.
+        # Referência explícita, nome da entidade e marcadores de continuidade
+        # já cobrem as formas válidas de continuidade.
+        return False
 
     def _resolver_continuacao_pesquisa(self, mensagem):
         """Liga perguntas curtas ao assunto da última pesquisa sem adivinhar fatos."""
