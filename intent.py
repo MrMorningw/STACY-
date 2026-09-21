@@ -64,6 +64,7 @@ def _corrigir_erros_tarefa(texto):
         "estudr": "estudar",
         "amanhaa": "amanha",
         "amanh": "amanha",
+        "cokega": "colega",
         "direto penal": "direito penal",
     }
     resultado = texto
@@ -427,6 +428,7 @@ def extrair_data_hora_tarefa(texto):
             count=1,
             flags=re.IGNORECASE
         ).strip()
+        restante = re.sub(r"\\bde\\s*$", "", restante, flags=re.IGNORECASE).strip()
 
     if data is None:
         resultado = re.search(r"\b(\d{4}-\d{2}-\d{2})\b", restante)
@@ -454,6 +456,38 @@ def interpretar_tarefa(mensagem):
         "adicione essa tarefa", "adicionar essa tarefa",
         "anote essa tarefa", "anotar essa tarefa"
     )
+
+    referencias_ultima = (
+        "exclua a ultima tarefa criada", "exclua a ultima tarefa",
+        "exclua a última tarefa criada", "exclua a última tarefa",
+        "delete a ultima tarefa criada", "delete a ultima tarefa",
+        "delete a última tarefa criada", "delete a última tarefa",
+        "apague a ultima tarefa criada", "apague a ultima tarefa",
+        "apague a última tarefa criada", "apague a última tarefa",
+        "remova a ultima tarefa criada", "remova a ultima tarefa",
+        "remova a última tarefa criada", "remova a última tarefa",
+        "exclua ela", "apague ela", "remova ela", "delete ela"
+    )
+    if normalizado in referencias_ultima:
+        return {"tipo": "tarefa", "acao": "remover", "referencia": "ultima"}
+
+    padrao_correcao_titulo = re.match(
+        r"^(?:arrume|corrija|corrigir|altere|altera|mude|mudar|troque|trocar|atualize|atualizar)"
+        r"\s+o\s+nome(?:\s+de\s+(.+?))?\s+para\s+(.+?)"
+        r"(?:\s+da\s+(?:ultima|última)\s+tarefa(?:\s+criada)?)?$",
+        normalizado,
+        flags=re.IGNORECASE
+    )
+    if padrao_correcao_titulo:
+        antigo = padrao_correcao_titulo.group(1)
+        novo = padrao_correcao_titulo.group(2).strip()
+        return {
+            "tipo": "tarefa",
+            "acao": "corrigir_titulo",
+            "referencia": "ultima",
+            "antigo": antigo.strip() if antigo else None,
+            "novo": novo
+        }
     for referencia in referencias_tarefa:
         if normalizado == referencia or normalizado.startswith(referencia + " "):
             return {"tipo": "tarefa", "acao": "referencia", "referencia": "ultima"}
