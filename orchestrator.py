@@ -1069,10 +1069,10 @@ class StacyOrchestrator:
         # Uma referência pronominal sem entidade conversacional ativa não
         # deve ressuscitar uma pesquisa de outro assunto. Nesse caso, deixe
         # a mensagem seguir para a IA local, que poderá pedir esclarecimento.
-        if (
-            entity_resolver.detectar_referencia(mensagem) is not None
-            and not self.conversa.obter_ultima_entidade()
-        ):
+        if entity_resolver.detectar_referencia(mensagem) is not None:
+            # Referência sem referente ativo não pode continuar pesquisa.
+            if not self.conversa.obter_ultima_entidade():
+                return None
             return None
 
         if not texto or len(texto.split()) > 14:
