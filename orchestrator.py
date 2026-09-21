@@ -138,7 +138,12 @@ def classificar_rota(mensagem, intencao=None, comando=None, conhecimento=False):
         "qual e a temperatura de", "qual a distancia de",
         "qual e a distancia de", "qual a massa de",
         "qual e a massa de", "qual a velocidade de",
-        "qual e a velocidade de", "tem quantas luas",
+        "qual e a velocidade de", "qual o preco de",
+        "qual e o preco de", "quanto custa", "quanto vale",
+        "qual o valor de", "qual e o valor de", "qual a data de",
+        "qual e a data de", "em que ano", "qual a altura de",
+        "qual e a altura de", "qual a profundidade de",
+        "qual e a profundidade de", "tem quantas luas",
         "possui quantas luas"
     )
     if any(padrao in texto for padrao in padroes_factuais):
@@ -156,6 +161,12 @@ def classificar_rota(mensagem, intencao=None, comando=None, conhecimento=False):
         "quanto tempo ",
         "quantos ",
         "quantas ",
+        "quanto custa ",
+        "quanto vale ",
+        "qual o preco de ",
+        "qual e o preco de ",
+        "qual o valor de ",
+        "qual e o valor de ",
     )
     verbos_quantitativos = (
         " vive", " vivem", " teve", " tinham", " tem",
