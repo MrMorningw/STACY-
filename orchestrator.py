@@ -569,6 +569,12 @@ class StacyOrchestrator:
                             "resultado": resultado_previo
                         }
 
+        # Uma mensagem sem referente, nome da entidade ou marcador de
+        # continuidade encerra o contexto conversacional temporário. A memória
+        # persistente permanece intacta.
+        if not self._deve_preservar_entidade_conversacional(mensagem):
+            self.conversa.limpar_entidade()
+
         comando = command.identificar_comando(mensagem)
         intencao = intent.interpretar(mensagem)
 
@@ -1598,45 +1604,3 @@ class StacyOrchestrator:
 
             tarefas = tasks.listar(
                 data=data
-            )
-
-            if not tarefas:
-
-                if data:
-                    return {
-                        "tipo": "tarefas",
-                        "resposta": (
-                            f"O senhor não possui "
-                            f"tarefas pendentes para {data}."
-                        ),
-                        "tarefas": []
-                    }
-
-                return {
-                    "tipo": "tarefas",
-                    "resposta": (
-                        "O senhor não possui "
-                        "tarefas pendentes."
-                    ),
-                    "tarefas": []
-                }
-
-            linhas = [
-                "Estas são suas tarefas pendentes, senhor:"
-            ]
-
-            for tarefa in tarefas:
-
-                linha = (
-                    f"• {tarefa['titulo']}"
-                )
-
-                if tarefa.get("data"):
-                    linha += (
-                        f" — {tarefa['data']}"
-                    )
-
-                if tarefa.get("hora"):
-                    linha += (
-                        f" às {tarefa['hora']}"
-                    )
