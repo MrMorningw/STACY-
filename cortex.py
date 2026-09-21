@@ -77,7 +77,7 @@ def _validar_decisao_ia(decisao, mensagem):
         "modo": modos[modo_bruto],
         "objetivo": str(decisao.get("motivo") or modo_bruto),
         "ferramenta": capacidades[capacidade],
-        "argumentos": {"consulta": str(decisao.get("consulta") or mensagem.strip())},
+        "argumentos": (decisao.get("dados") if isinstance(decisao.get("dados"), dict) else {}) | {"consulta": str(decisao.get("consulta") or mensagem.strip())},
         "needs_web": modo_bruto == MODO_PESQUISA or capacidade == "web",
         "needs_memory": modo_bruto == MODO_MEMORIA or capacidade == "memory",
         "needs_action": modo_bruto == MODO_ACAO or capacidade == "tasks",
