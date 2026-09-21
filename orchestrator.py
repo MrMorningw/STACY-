@@ -237,6 +237,8 @@ def classificar_rota(mensagem, intencao=None, comando=None, conhecimento=False):
     padroes_fato_externo_simples = (
         "qual a cor de ",
         "qual e a cor de ",
+        "qual a cor do ",
+        "qual e a cor do ",
         "qual a diferenca entre ",
         "qual e a diferenca entre ",
         "onde fica ",
