@@ -819,6 +819,27 @@ class TestContextContinuity(unittest.TestCase):
         self.assertEqual(resultado["tipo"], "tarefa")
         self.assertEqual(resultado["acao"], "listar")
 
+    def test_conversational_prefix_is_removed_before_routing(self):
+        resultado = intent.interpretar("que bom. quais sao minhas tarefas?")
+        self.assertEqual(resultado["tipo"], "tarefa")
+        self.assertEqual(resultado["acao"], "listar")
+
+    def test_task_creation_extracts_hour_written_as_horas(self):
+        resultado = intent.interpretar(
+            "crie uma tarefa estudar direito amanhã 18 horas"
+        )
+        self.assertEqual(resultado["tipo"], "tarefa")
+        self.assertEqual(resultado["acao"], "criar")
+        self.assertEqual(resultado["titulo"], "estudar direito")
+        self.assertEqual(resultado["hora"], "18:00")
+
+    def test_task_typo_and_hour_are_normalized_together(self):
+        resultado = intent.interpretar(
+            "crie uma tarafe para estudaf amanha 18 horas direto penal"
+        )
+        self.assertEqual(resultado["titulo"], "estudar direito penal")
+        self.assertEqual(resultado["hora"], "18:00")
+
     def test_conversational_prefix_does_not_break_task_list(self):
         resultado = intent.interpretar("que bom. quais sao minhas tarefas?")
         self.assertEqual(resultado["tipo"], "tarefa")
