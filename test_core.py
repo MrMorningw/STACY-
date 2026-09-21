@@ -267,7 +267,7 @@ class CoreRoutingTests(unittest.TestCase):
         self.assertTrue(chamadas)
         textos = [
             parte["text"]
-            for mensagem in chamadas[0]
+            for mensagem in chamadas[-1]
             for parte in mensagem.get("parts", [])
             if isinstance(parte, dict) and "text" in parte
         ]
