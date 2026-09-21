@@ -5,11 +5,12 @@ import unicodedata
 def _normalizar(texto):
     texto = (texto or "").strip().lower()
     texto = unicodedata.normalize("NFD", texto)
-    return "".join(
+    texto = "".join(
         caractere
         for caractere in texto
         if unicodedata.category(caractere) != "Mn"
     )
+    return " ".join(texto.split())
 
 
 def _tem_pistas_abacate(texto):
@@ -33,7 +34,6 @@ CONHECIMENTO_VERIFICADO = [
     (
         re.compile(
             r"quantos dentes tem um ser humano adulto|"
-            r"quantos dentes tem um ser humani adulto|"
             r"quantos dentes tem um adulto",
             re.I
         ),
@@ -54,10 +54,6 @@ def consultar(mensagem):
 
     if not texto:
         return None
-
-    texto = texto.replace("wuantos", "quantos")
-    texto = texto.replace("wuantas", "quantas")
-    texto = texto.replace("wual", "qual")
 
     for padrao, resposta in CONHECIMENTO_VERIFICADO:
         if padrao.search(texto):
