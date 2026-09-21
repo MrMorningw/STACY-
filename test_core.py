@@ -854,6 +854,90 @@ class TestContextContinuity(unittest.TestCase):
         finally:
             orchestrator.tasks.buscar = original
 
+    def test_conversation_entity_resolves_pronoun(self):
+        entidade = {
+            "id": "P-A1",
+            "uuid": "uuid-p-a1",
+            "categoria": "projetos",
+            "nome": "STACY",
+            "atributos": {"objetivo": "assistente pessoal"},
+            "relacoes": [],
+            "historico": []
+        }
+        self.orquestrador.entidades["entidades"].append(entidade)
+
+        resultado = self.orquestrador.processar(
+            "o que voce sabe sobre STACY?"
+        )
+        self.assertEqual(resultado["tipo"], "local")
+
+        resultado = self.orquestrador.processar(
+            "e qual o nome dela?"
+        )
+        self.assertEqual(resultado["tipo"], "local")
+        self.assertIn("STACY", resultado["resposta"])
+
+    def test_unresolved_pronoun_does_not_use_persistent_entity(self):
+        entidade = {
+            "id": "P-A1",
+            "uuid": "uuid-p-a1",
+            "categoria": "projetos",
+            "nome": "STACY",
+            "atributos": {},
+            "relacoes": [],
+            "historico": []
+        }
+        self.orquestrador.entidades["entidades"].append(entidade)
+        self.orquestrador.entidades["contexto"] = {
+            "id": "P-A1",
+            "uuid": "uuid-p-a1",
+            "categoria": "projetos",
+            "nome": "STACY"
+        }
+
+        resultado = self.orquestrador.processar("ele")
+        self.assertEqual(resultado["tipo"], "ai")
+
+    def test_local_ai_receives_contextual_followup(self):
+        original_health = orchestrator.ai.verificar_ia_local
+        original_local = orchestrator.ai.gerar_resposta_local
+        capturado = []
+
+        try:
+            orchestrator.ai.verificar_ia_local = lambda: True
+
+            def local_mock(historico, *args, **kwargs):
+                capturado.append(historico)
+                return "Resposta contextual."
+
+            orchestrator.ai.gerar_resposta_local = local_mock
+
+            self.orquestrador.processar(
+                "explique responsabilidade civil objetiva"
+            )
+            resultado = self.orquestrador.processar(
+                "e como funciona na pratica?"
+            )
+
+            self.assertEqual(resultado["tipo"], "ai")
+            textos = [
+                parte["text"]
+                for mensagem in capturado[-1]
+                for parte in mensagem.get("parts", [])
+                if isinstance(parte, dict) and "text" in parte
+            ]
+            self.assertIn(
+                "explique responsabilidade civil objetiva",
+                textos
+            )
+            self.assertIn(
+                "e como funciona na pratica?",
+                textos
+            )
+        finally:
+            orchestrator.ai.verificar_ia_local = original_health
+            orchestrator.ai.gerar_resposta_local = original_local
+
     def test_stacy_identity_is_not_user_memory(self):
         resultado = self.orquestrador.processar("qual o seu nomee?")
         self.assertEqual(resultado["tipo"], "local")
