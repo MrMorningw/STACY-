@@ -507,6 +507,13 @@ class StacyOrchestrator:
         comando = command.identificar_comando(mensagem)
         intencao = intent.interpretar(mensagem)
 
+        # Continuidade operacional: se a mensagem fornece apenas data/hora,
+        # aplica a alteração à última tarefa criada, sem exigir que o usuário
+        # repita o título.
+        continuacao_tarefa = self._resolver_continuacao_tarefa(mensagem)
+        if continuacao_tarefa is not None:
+            intencao = continuacao_tarefa
+
         # O Cortex produz a decisão estruturada antes da execução.
         # Ele não responde nem inventa fatos; apenas identifica o caminho.
         decisao = cortex.analisar(
@@ -523,6 +530,10 @@ class StacyOrchestrator:
             comando=comando,
             conhecimento=False
         )
+
+        consulta_contextual = self._resolver_continuacao_pesquisa(mensagem)
+        if consulta_contextual is not None:
+            rota_previa = ROTA_PESQUISA_EXTERNA
 
         # Decisões de alta confiança do Cortex têm precedência para
         # pesquisa explícita e operações internas estruturadas.
@@ -582,7 +593,8 @@ class StacyOrchestrator:
             }
 
         if rota == ROTA_PESQUISA_EXTERNA:
-            return self._pesquisar_web(mensagem)
+            consulta = consulta_contextual or mensagem
+            return self._pesquisar_web(consulta)
 
         # Rotas internas continuam pelo CORE abaixo, onde memória, tarefas,
         # entidades e ações são executadas sem passar por modelos.
@@ -745,6 +757,74 @@ class StacyOrchestrator:
 
         return self._usar_ai(mensagem)
 
+    def _resolver_continuacao_tarefa(self, mensagem):
+        """Converte uma continuação de data/hora em atualização da última tarefa."""
+        tarefa = self.conversa.obter_ultima_tarefa()
+        if not isinstance(tarefa, dict):
+            return None
+
+        texto = mensagem.strip()
+        normalizado = _normalizar_rota(texto)
+        if normalizado.startswith("e "):
+            normalizado = normalizado[2:].strip()
+            texto = texto.strip()[2:].strip()
+
+        restante, data, hora = intent.extrair_data_hora_tarefa(texto)
+
+        # A mensagem precisa representar uma alteração, não uma nova tarefa.
+        restante_normalizado = _normalizar_rota(restante)
+        restante_normalizado = restante_normalizado.replace("  ", " ").strip()
+        if not data and not hora:
+            return None
+
+        if restante_normalizado not in {
+            "", "coloque", "colocar", "mude", "mudar",
+            "altere", "alterar", "passe", "passar",
+            "coloque para", "mude para", "mudar para",
+            "altere para", "alterar para", "passe para", "passar para",
+            "a tarefa", "a tarefa para"
+        }:
+            return None
+
+        return {
+            "tipo": "tarefa",
+            "acao": "atualizar",
+            "tarefa_id": tarefa.get("id"),
+            "data": data,
+            "hora": hora
+        }
+
+    def _resolver_continuacao_pesquisa(self, mensagem):
+        """Liga perguntas curtas ao assunto da última pesquisa sem adivinhar fatos."""
+        anterior = self.conversa.ultima_consulta
+        if not anterior or self.conversa.ultima_rota != ROTA_PESQUISA_EXTERNA:
+            return None
+
+        texto = _normalizar_rota(mensagem)
+        if not texto or len(texto.split()) > 14:
+            return None
+
+        inicio_continuacao = (
+            texto.startswith("e ")
+            or texto.startswith("mas ")
+            or texto.startswith("nesse ")
+            or texto.startswith("neste ")
+            or texto.startswith("nesta ")
+            or texto.startswith("sobre ")
+            or texto.startswith("no caso ")
+            or texto.startswith("na ")
+            or texto.startswith("no ")
+        )
+        referencia = any(
+            _contem_termo(texto, termo)
+            for termo in ("isso", "isso", "ele", "ela", "dele", "dela", "sua", "seu")
+        )
+
+        if not (inicio_continuacao or referencia):
+            return None
+
+        return f"{anterior} | complemento: {mensagem.strip()}"
+
     def _resolver_consulta_conversa(self, mensagem):
         """Resolve perguntas sobre o histórico sem usar IA ou Web."""
         texto = _normalizar_rota(mensagem)
@@ -800,6 +880,14 @@ class StacyOrchestrator:
 
         if resposta is not None:
             self.conversa.registrar_resposta(resposta)
+
+        rota = resultado.get("rota")
+        if rota is not None:
+            self.conversa.registrar_rota(rota, resultado.get("consulta"))
+
+        tarefa = resultado.get("tarefa")
+        if isinstance(tarefa, dict):
+            self.conversa.registrar_tarefa(tarefa)
 
         if resultado.get("entidade") is not None:
             entidade = resultado.get("entidade")
@@ -1234,6 +1322,32 @@ class StacyOrchestrator:
                 "tarefas": tarefas
             }
 
+        if acao == "atualizar":
+            tarefa_id = intencao.get("tarefa_id")
+            data = intencao.get("data")
+            hora = intencao.get("hora")
+
+            if not tarefa_id or (data is None and hora is None):
+                return None
+
+            tarefa = tasks.atualizar(
+                tarefa_id,
+                data=data,
+                hora=hora
+            )
+
+            if tarefa is None:
+                return {
+                    "tipo": "erro_tarefa",
+                    "resposta": "Não consegui atualizar a tarefa, senhor."
+                }
+
+            return {
+                "tipo": "tarefa_atualizada",
+                "resposta": f"Atualizada, senhor: '{tarefa['titulo']}'.",
+                "tarefa": tarefa
+            }
+
         if acao in ["concluir", "remover"]:
 
             termo = intencao.get("termo")
@@ -1359,6 +1473,8 @@ class StacyOrchestrator:
             # de não inventar fatos quando a fonte externa está indisponível.
             return {
                 "tipo": "pesquisa_indisponivel",
+                "rota": ROTA_PESQUISA_EXTERNA,
+                "consulta": mensagem,
                 "resposta": (
                     "Não consegui consultar fontes externas agora, senhor. "
                     "Não vou inventar uma resposta."
@@ -1378,6 +1494,8 @@ class StacyOrchestrator:
         return {
             "tipo": "pesquisa",
             "resposta": resposta,
+            "rota": ROTA_PESQUISA_EXTERNA,
+            "consulta": mensagem,
             "origem": "gemini_google",
             "fontes": fontes
         }
