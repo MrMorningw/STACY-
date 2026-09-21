@@ -140,11 +140,6 @@ def interpretar(mensagem):
     ):
         return {"tipo": "identidade", "alvo": "stacy"}
 
-    consultas_usuario = [
-        "qual é o meu nome", "qual meu nome", "como eu me chamo",
-        "você sabe meu nome", "e o meu nome", "e meu nome"
-    ]
-
     consultas_projetos = [
         "quais são meus projetos", "quais meus projetos",
         "quais projetos eu tenho", "você lembra meus projetos"
