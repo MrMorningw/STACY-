@@ -4,7 +4,10 @@ import os
 import entity
 
 
-ARQUIVO_ENTIDADES = "entities.json"
+ARQUIVO_ENTIDADES = os.path.join(
+    os.path.dirname(__file__),
+    "entities.json"
+)
 
 
 def criar_estrutura():
