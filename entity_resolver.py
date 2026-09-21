@@ -104,7 +104,8 @@ def buscar_por_nome(
 def resolver_referencia(
     texto,
     dados,
-    contexto_atual=None
+    contexto_atual=None,
+    usar_contexto_persistente=True
 ):
     referencia = detectar_referencia(
         texto
@@ -114,7 +115,7 @@ def resolver_referencia(
 
         return None
 
-    if contexto_atual is None:
+    if contexto_atual is None and usar_contexto_persistente:
 
         contexto_atual = (
             entity_store.obter_contexto_persistente(
@@ -153,7 +154,8 @@ def resolver_referencia(
 def resolver(
     texto,
     dados,
-    contexto_atual=None
+    contexto_atual=None,
+    usar_contexto_persistente=True
 ):
     por_nome = buscar_por_nome(
         texto,
@@ -170,7 +172,8 @@ def resolver(
     por_referencia = resolver_referencia(
         texto,
         dados,
-        contexto_atual
+        contexto_atual,
+        usar_contexto_persistente=usar_contexto_persistente
     )
 
     if por_referencia is not None:
