@@ -742,6 +742,13 @@ class StacyOrchestrator:
             # sem reescrever a fala do usuário.
             return self._pesquisar_web(mensagem)
 
+        # Tarefas estruturadas têm precedência sobre resolução contextual.
+        # Isso impede que uma correção/remoção de tarefa seja confundida com
+        # uma consulta conversacional genérica antes de chegar ao CORE.
+        resultado_tarefa = self._processar_tarefa(intencao)
+        if resultado_tarefa is not None:
+            return resultado_tarefa
+
         # Rotas internas continuam pelo CORE abaixo, onde memória, tarefas,
         # entidades e ações são executadas sem passar por modelos.
 
@@ -778,13 +785,6 @@ class StacyOrchestrator:
             resultado_memoria = self._processar_intencao(intencao)
             if resultado_memoria is not None:
                 return resultado_memoria
-
-        resultado_tarefa = self._processar_tarefa(
-            intencao
-        )
-
-        if resultado_tarefa is not None:
-            return resultado_tarefa
 
         entidade_atual = None
 
