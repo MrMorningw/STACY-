@@ -11,13 +11,27 @@ def normalizar_flexivel(texto):
 
 
 def corresponde_frase(texto, candidatos, limiar=0.93):
+    """Compara uma intenção sem exigir ortografia perfeita."""
     alvo = normalizar_flexivel(texto)
+
     for candidato in candidatos:
         candidato_normalizado = normalizar_flexivel(candidato)
+
         if alvo == candidato_normalizado:
             return True
-        if len(alvo) >= 8 and SequenceMatcher(None, alvo, candidato_normalizado).ratio() >= limiar:
+
+        if len(alvo) < 8:
+            continue
+
+        similaridade = SequenceMatcher(
+            None,
+            alvo,
+            candidato_normalizado
+        ).ratio()
+
+        if similaridade >= limiar:
             return True
+
     return False
 
 def interpretar(mensagem):
@@ -81,6 +95,30 @@ def interpretar(mensagem):
             "esquecer",
             texto[9:].strip()
         )
+
+    # =========================
+    # IDENTIDADE DA STACY
+    # =========================
+    # "seu nome" não significa "meu nome". Essa distinção impede que uma
+    # pergunta dirigida à STACY seja confundida com uma consulta da memória
+    # do usuário.
+    consultas_stacy = [
+        "qual seu nome",
+        "qual o seu nome",
+        "como voce se chama",
+        "quem e voce",
+        "qual e o seu nome",
+    ]
+
+    if corresponde_frase(
+        consulta_flexivel,
+        consultas_stacy,
+        limiar=0.84
+    ):
+        return {
+            "tipo": "identidade",
+            "alvo": "stacy"
+        }
 
     # =========================
     # CONSULTA DE MEMÓRIA
@@ -759,7 +797,11 @@ def interpretar_tarefa(mensagem):
         "minhas tarefas"
     ]
 
-    if corresponde_frase(normalizado, consultas_listar + consultas_listar_flexiveis):
+    if corresponde_frase(
+        normalizado,
+        consultas_listar + consultas_listar_flexiveis,
+        limiar=0.88
+    ):
 
         return {
             "tipo": "tarefa",
