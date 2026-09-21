@@ -63,7 +63,7 @@ def _normalizar_rota(texto):
             if similaridade > melhor_similaridade:
                 melhor_similaridade = similaridade
                 melhor = candidato
-        if melhor_similaridade >= 0.82:
+        if melhor_similaridade >= 0.80:
             tokens.append(melhor)
         else:
             tokens.append(token)
