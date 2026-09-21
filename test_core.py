@@ -619,3 +619,112 @@ class CoreRoutingTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestContextContinuity(unittest.TestCase):
+
+    def setUp(self):
+        memoria = {
+            "usuario": {"nome": "Danley"},
+            "projetos": [],
+            "objetivos": [],
+            "preferencias": []
+        }
+        entidades = []
+        self.orquestrador = orchestrator.StacyOrchestrator(
+            "teste",
+            memoria,
+            entidades
+        )
+
+    def test_conversation_state_keeps_structured_continuity(self):
+        self.orquestrador.conversa.registrar_rota(
+            orchestrator.ROTA_PESQUISA_EXTERNA,
+            "capital do Brasil"
+        )
+        self.assertEqual(
+            self.orquestrador.conversa.ultima_consulta,
+            "capital do Brasil"
+        )
+        self.assertEqual(
+            self.orquestrador.conversa.ultima_rota,
+            orchestrator.ROTA_PESQUISA_EXTERNA
+        )
+
+    def test_task_time_followup_updates_last_task(self):
+        original_criar = orchestrator.tasks.criar
+        original_atualizar = orchestrator.tasks.atualizar
+        try:
+            tarefa = {
+                "id": "T-1",
+                "titulo": "estudar responsabilidade civil",
+                "data": "2026-09-22",
+                "hora": None,
+                "status": "pendente"
+            }
+            orchestrator.tasks.criar = lambda *args, **kwargs: tarefa.copy()
+            atualizado = tarefa.copy()
+            atualizado["hora"] = "19:00"
+            orchestrator.tasks.atualizar = lambda *args, **kwargs: atualizado
+
+            resultado = self.orquestrador.processar(
+                "crie uma tarefa estudar responsabilidade civil amanhã"
+            )
+            self.assertEqual(resultado["tipo"], "tarefa_criada")
+
+            resultado = self.orquestrador.processar("e coloque para 19h")
+            self.assertEqual(resultado["tipo"], "tarefa_atualizada")
+            self.assertEqual(resultado["tarefa"]["hora"], "19:00")
+        finally:
+            orchestrator.tasks.criar = original_criar
+            orchestrator.tasks.atualizar = original_atualizar
+
+    def test_research_followup_includes_previous_subject(self):
+        original = orchestrator.ai.gerar_resposta_pesquisa
+        consultas = []
+        try:
+            def pesquisa_mock(api_key, historico):
+                consultas.append(historico)
+                return {
+                    "resposta": "Resultado pesquisado.",
+                    "fontes": []
+                }
+
+            orchestrator.ai.gerar_resposta_pesquisa = pesquisa_mock
+            self.orquestrador.processar(
+                "pesquise sobre responsabilidade objetiva"
+            )
+            resultado = self.orquestrador.processar(
+                "e na responsabilidade do empregador?"
+            )
+            self.assertEqual(resultado["tipo"], "pesquisa")
+            textos = [
+                p["text"]
+                for m in consultas[-1]
+                for p in m.get("parts", [])
+                if isinstance(p, dict) and "text" in p
+            ]
+            self.assertTrue(
+                any("responsabilidade objetiva" in t.lower() for t in textos)
+            )
+        finally:
+            orchestrator.ai.gerar_resposta_pesquisa = original
+
+    def test_ambiguous_task_target_asks_instead_of_guessing(self):
+        original = orchestrator.tasks.buscar
+        try:
+            orchestrator.tasks.buscar = lambda *args, **kwargs: [
+                {"id": "1", "titulo": "estudar direito"},
+                {"id": "2", "titulo": "estudar direito tributário"}
+            ]
+            resultado = self.orquestrador.processar(
+                "conclua a tarefa estudar direito"
+            )
+            self.assertEqual(resultado["tipo"], "tarefa_ambigua")
+            self.assertIn("mais de uma tarefa", resultado["resposta"])
+        finally:
+            orchestrator.tasks.buscar = original
+
+
+if __name__ == "__main__":
+    unittest.main()
