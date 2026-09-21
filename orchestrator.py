@@ -1632,7 +1632,8 @@ class StacyOrchestrator:
                         f"Senhor, confirma a remoção da tarefa "
                         f"'{tarefa['titulo']}'? Esta ação não poderá ser desfeita."
                     ),
-                    "tarefa": tarefa
+                    "tarefa": tarefa,
+                    "rota": ROTA_INTERNA
                 }
 
             if not termo:
