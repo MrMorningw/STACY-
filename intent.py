@@ -476,9 +476,6 @@ def interpretar_tarefa(mensagem):
         "qual foi a ultima tarefa criada",
         "qual foi a última tarefa criada"
     )
-    if normalizado in consultas_ultima_tarefa or corresponde_frase(normalizado, consultas_ultima_tarefa, limiar=0.88):
-        return {"tipo": "tarefa", "acao": "ultima"}
-
     referencias_ultima = (
         "exclua a ultima tarefa criada", "exclua a ultima tarefa",
         "exclua a última tarefa criada", "exclua a última tarefa",
@@ -492,6 +489,9 @@ def interpretar_tarefa(mensagem):
     )
     if normalizado in referencias_ultima or corresponde_frase(normalizado, referencias_ultima, limiar=0.88):
         return {"tipo": "tarefa", "acao": "remover", "referencia": "ultima"}
+
+    if normalizado in consultas_ultima_tarefa or corresponde_frase(normalizado, consultas_ultima_tarefa, limiar=0.88):
+        return {"tipo": "tarefa", "acao": "ultima"}
 
     normalizado_correcao = re.sub(
         r"\s+(?:da\s+)?(?:(?:ultima|última)\s+)?tarefa(?:\s+criada)?$",
