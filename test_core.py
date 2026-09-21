@@ -952,6 +952,10 @@ class TestContextContinuity(unittest.TestCase):
             orchestrator.ai.verificar_ia_local = lambda: False
             orchestrator.ai.gerar_resposta = lambda *args, **kwargs: "Resposta do Gemini."
             self.orquestrador.api_key = "chave"
+            self.orquestrador._usar_ai = orchestrator.StacyOrchestrator._usar_ai.__get__(
+                self.orquestrador,
+                orchestrator.StacyOrchestrator
+            )
             resultado = self.orquestrador.processar("explique responsabilidade civil")
         finally:
             orchestrator.ai.verificar_ia_local = original_verificar
