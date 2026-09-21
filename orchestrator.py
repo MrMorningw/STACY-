@@ -12,6 +12,7 @@ import action
 import conversation
 import tasks
 import knowledge
+import cortex
 
 
 
@@ -285,6 +286,7 @@ class StacyOrchestrator:
         self.entidades = entidades
         self.historico = []
         self.acao_pendente = None
+        self.ultima_decisao = None
         self.conversa = conversation.ConversationState()
 
         self.entidade_contextual = (
@@ -505,12 +507,29 @@ class StacyOrchestrator:
         comando = command.identificar_comando(mensagem)
         intencao = intent.interpretar(mensagem)
 
+        # O Cortex produz a decisão estruturada antes da execução.
+        # Ele não responde nem inventa fatos; apenas identifica o caminho.
+        decisao = cortex.analisar(
+            mensagem,
+            intencao=intencao,
+            comando=comando,
+            conhecimento=False
+        )
+        self.ultima_decisao = decisao
+
         rota_previa = classificar_rota(
             mensagem,
             intencao=intencao,
             comando=comando,
             conhecimento=False
         )
+
+        # Decisões de alta confiança do Cortex têm precedência para
+        # pesquisa explícita e operações internas estruturadas.
+        if decisao["needs_memory"] or decisao["needs_action"]:
+            rota_previa = ROTA_INTERNA
+        elif decisao["needs_web"]:
+            rota_previa = ROTA_PESQUISA_EXTERNA
 
         resposta_conhecimento = None
         if rota_previa != ROTA_INTERNA:
@@ -540,6 +559,14 @@ class StacyOrchestrator:
                     )
 
         rota = classificar_rota(
+            mensagem,
+            intencao=intencao,
+            comando=comando,
+            conhecimento=resposta_conhecimento is not None
+        )
+
+        # Atualiza a decisão com o resultado do CORE.
+        self.ultima_decisao = cortex.analisar(
             mensagem,
             intencao=intencao,
             comando=comando,
