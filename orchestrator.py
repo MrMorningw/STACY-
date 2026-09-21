@@ -159,6 +159,7 @@ def classificar_rota(mensagem, intencao=None, comando=None, conhecimento=False):
     # possuem resposta verificada no CORE.
     padroes_quantitativos = (
         "quanto tempo ",
+        "quantos anos ",
         "quantos ",
         "quantas ",
         "quanto custa ",
@@ -171,7 +172,8 @@ def classificar_rota(mensagem, intencao=None, comando=None, conhecimento=False):
     verbos_quantitativos = (
         " vive", " vivem", " teve", " tinham", " tem",
         " possui", "possuem", " existem", " sao", " são",
-        " ha", " há"
+        " ha", " há", " precisa", " devem", " deve",
+        " precisa ter", " tem que", " deve ter"
     )
     if any(padrao in texto for padrao in padroes_quantitativos):
         if any(verbo in texto for verbo in verbos_quantitativos):
@@ -1158,14 +1160,40 @@ class StacyOrchestrator:
             "parts": [{"text": mensagem}]
         })
 
-        # Pesquisa externa recebe somente a consulta atual.
-        # Memória persistente e conversa pessoal não são enviadas ao provedor.
-        historico_pesquisa = [
-            {
+        # A pesquisa externa recebe a consulta atual e, quando necessário,
+        # uma mensagem anterior do usuário para resolver referências como
+        # "sua classificação", "ele" ou "isso". Memória persistente não é
+        # enviada ao provedor.
+        historico_conversa = self.conversa.ultimas_mensagens(4)
+        historico_pesquisa = []
+
+        for item in historico_conversa:
+            if not isinstance(item, dict):
+                continue
+
+            conteudo = item.get("conteudo", "").strip()
+            tipo = item.get("tipo")
+
+            if not conteudo or tipo not in {"usuario", "stacy"}:
+                continue
+
+            role = "model" if tipo == "stacy" else "user"
+            historico_pesquisa.append({
+                "role": role,
+                "parts": [{"text": conteudo}]
+            })
+
+        # A mensagem atual já está registrada no ConversationState e deve
+        # permanecer explicitamente como a última consulta.
+        if (
+            not historico_pesquisa
+            or historico_pesquisa[-1].get("role") != "user"
+            or historico_pesquisa[-1]["parts"][0].get("text") != mensagem
+        ):
+            historico_pesquisa.append({
                 "role": "user",
                 "parts": [{"text": mensagem}]
-            }
-        ]
+            })
 
         try:
             resultado = ai.gerar_resposta_pesquisa(
