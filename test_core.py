@@ -819,5 +819,50 @@ class TestContextContinuity(unittest.TestCase):
         self.assertEqual(resultado["tipo"], "tarefa")
         self.assertEqual(resultado["acao"], "listar")
 
+    def test_conversational_prefix_does_not_break_task_list(self):
+        resultado = intent.interpretar("que bom. quais sao minhas tarefas?")
+        self.assertEqual(resultado["tipo"], "tarefa")
+        self.assertEqual(resultado["acao"], "listar")
+
+    def test_conversational_prefix_does_not_break_task_creation(self):
+        resultado = intent.interpretar(
+            "otimo. crie uma tarefa estudar responsabilidade civil amanhã às 18h"
+        )
+        self.assertEqual(resultado["tipo"], "tarefa")
+        self.assertEqual(resultado["acao"], "criar")
+        self.assertEqual(resultado["titulo"], "estudar responsabilidade civil")
+        self.assertEqual(resultado["hora"], "18:00")
+
+    def test_task_creation_tolerates_command_typos(self):
+        resultado = intent.interpretar(
+            "crie uma tarafe para estudaf amanha 18 horas direto penal"
+        )
+        self.assertEqual(resultado["tipo"], "tarefa")
+        self.assertEqual(resultado["acao"], "criar")
+        self.assertEqual(resultado["titulo"], "estudar direito penal")
+        self.assertEqual(resultado["hora"], "18:00")
+
+    def test_goals_alias_is_internal_objectives_query(self):
+        resultado = intent.interpretar("e minhas metas?")
+        self.assertEqual(resultado["tipo"], "memoria")
+        self.assertEqual(resultado["categoria"], "objetivos")
+
+    def test_ambiguous_task_reference_does_not_become_literal_title(self):
+        resultado = intent.interpretar("crie essa tarefa stacy")
+        self.assertEqual(resultado["tipo"], "tarefa")
+        self.assertEqual(resultado["acao"], "referencia")
+
+    def test_ambiguous_task_reference_uses_last_task_context(self):
+        self.orquestrador.conversa.registrar_tarefa({
+            "id": "T-1",
+            "titulo": "estudar direito",
+            "status": "pendente"
+        })
+        resultado = self.orquestrador.processar("crie essa tarefa stacy")
+        self.assertEqual(resultado["tipo"], "clarificacao")
+        self.assertIn("estudar direito", resultado["resposta"])
+        self.assertNotIn("tarefa para Stacy", resultado["resposta"])
+
+
 if __name__ == "__main__":
     unittest.main()
