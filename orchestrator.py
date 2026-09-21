@@ -1581,14 +1581,16 @@ class StacyOrchestrator:
 
             conteudo = item.get("conteudo", "").strip()
             tipo = item.get("tipo")
+            rota_item = item.get("rota")
 
             if not conteudo:
                 continue
 
-            if tipo == "usuario":
-                rota_item = classificar_rota(conteudo)
-                if rota_item == ROTA_PESQUISA_EXTERNA:
-                    continue
+            # Turnos de pesquisa externa pertencem exclusivamente ao
+            # subsistema Web/Gemini. Nunca os reutilize como memória de prompt
+            # da IA local, inclusive as respostas da STACY a esses turnos.
+            if rota_item == ROTA_PESQUISA_EXTERNA:
+                continue
 
             contexto_local.append(item)
 
@@ -1606,8 +1608,29 @@ class StacyOrchestrator:
                     "servidor local não está acessível"
                 )
 
+            historico_local = []
+            for item in self.conversa.ultimas_mensagens(12):
+                if not isinstance(item, dict):
+                    continue
+
+                if item.get("rota") == ROTA_PESQUISA_EXTERNA:
+                    continue
+
+                conteudo = item.get("conteudo", "").strip()
+                if not conteudo:
+                    continue
+
+                historico_local.append({
+                    "role": (
+                        "model"
+                        if item.get("tipo") == "stacy"
+                        else "user"
+                    ),
+                    "parts": [{"text": conteudo}]
+                })
+
             resposta = ai.gerar_resposta_local(
-                self.historico,
+                historico_local,
                 contexto_memoria,
                 contexto_entidade,
                 contexto_conversa
