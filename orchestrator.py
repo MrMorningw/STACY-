@@ -589,7 +589,8 @@ class StacyOrchestrator:
                 "tipo": "conhecimento_verificado",
                 "resposta": resposta_conhecimento,
                 "origem": "core",
-                "rota": rota
+                "rota": rota,
+                "consulta": mensagem
             }
 
         if rota == ROTA_PESQUISA_EXTERNA:
@@ -797,7 +798,10 @@ class StacyOrchestrator:
     def _resolver_continuacao_pesquisa(self, mensagem):
         """Liga perguntas curtas ao assunto da última pesquisa sem adivinhar fatos."""
         anterior = self.conversa.ultima_consulta
-        if not anterior or self.conversa.ultima_rota != ROTA_PESQUISA_EXTERNA:
+        if not anterior or self.conversa.ultima_rota not in {
+            ROTA_PESQUISA_EXTERNA,
+            ROTA_CONHECIMENTO
+        }:
             return None
 
         texto = _normalizar_rota(mensagem)
@@ -817,7 +821,7 @@ class StacyOrchestrator:
         )
         referencia = any(
             _contem_termo(texto, termo)
-            for termo in ("isso", "isso", "ele", "ela", "dele", "dela", "sua", "seu")
+            for termo in ("isso", "ele", "ela", "dele", "dela", "sua", "seu")
         )
 
         if not (inicio_continuacao or referencia):
