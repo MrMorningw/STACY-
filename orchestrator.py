@@ -594,8 +594,10 @@ class StacyOrchestrator:
             }
 
         if rota == ROTA_PESQUISA_EXTERNA:
-            consulta = consulta_contextual or mensagem
-            return self._pesquisar_web(consulta)
+            # O histórico já carrega a consulta anterior; a ferramenta deve
+            # receber a mensagem atual intacta para preservar a continuidade
+            # sem reescrever a fala do usuário.
+            return self._pesquisar_web(mensagem)
 
         # Rotas internas continuam pelo CORE abaixo, onde memória, tarefas,
         # entidades e ações são executadas sem passar por modelos.
