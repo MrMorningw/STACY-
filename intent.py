@@ -1,3 +1,4 @@
+import re
 import unicodedata
 from difflib import SequenceMatcher
 
@@ -67,8 +68,12 @@ def _corrigir_erros_tarefa(texto):
     }
     resultado = texto
     for errado, correto in substituicoes.items():
-        resultado = resultado.replace(errado, correto)
-        resultado = resultado.replace(errado.capitalize(), correto)
+        resultado = re.sub(
+            r"(?<!\w)" + re.escape(errado) + r"(?!\w)",
+            correto,
+            resultado,
+            flags=re.IGNORECASE
+        )
     return resultado
 
 
@@ -653,11 +658,9 @@ def extrair_data_hora_tarefa(texto):
 
         if resultado:
             horas = int(resultado.group(1))
-            minutos = (
-                int(resultado.group(2))
-                if resultado.group(2)
-                else 0
-            )
+            minutos = 0
+            if resultado.lastindex and resultado.lastindex >= 2 and resultado.group(2):
+                minutos = int(resultado.group(2))
 
             if 0 <= horas <= 23 and 0 <= minutos <= 59:
                 hora = f"{horas:02d}:{minutos:02d}"
