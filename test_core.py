@@ -496,18 +496,28 @@ class CoreRoutingTests(unittest.TestCase):
         self.assertEqual(resultado["tipo"], "pesquisa")
         self.assertIn("expectativa de vida", resultado["resposta"])
 
-    def test_web_research_failure_returns_clean_result(self):
-        original = orchestrator.ai.gerar_resposta_pesquisa
+    def test_web_research_failure_uses_gemini_fallback(self):
+        original_pesquisa = orchestrator.ai.gerar_resposta_pesquisa
+        original_gemini = orchestrator.ai.gerar_resposta
         try:
-            orchestrator.ai.gerar_resposta_pesquisa = lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("429 quota"))
-            resultado = self.orquestrador.processar("pesquise a população atual do Brasil")
+            orchestrator.ai.gerar_resposta_pesquisa = (
+                lambda *args, **kwargs:
+                (_ for _ in ()).throw(RuntimeError("429 quota"))
+            )
+            orchestrator.ai.gerar_resposta = (
+                lambda *args, **kwargs: "Resposta de fallback."
+            )
+            resultado = self.orquestrador.processar(
+                "pesquise a população atual do Brasil"
+            )
         finally:
-            orchestrator.ai.gerar_resposta_pesquisa = original
+            orchestrator.ai.gerar_resposta_pesquisa = original_pesquisa
+            orchestrator.ai.gerar_resposta = original_gemini
 
         self.assertEqual(resultado["tipo"], "pesquisa_fallback")
         self.assertEqual(resultado["origem"], "gemini_fallback")
         self.assertEqual(resultado["fontes"], [])
-        self.assertIn("Resposta", resultado["resposta"])
+        self.assertEqual(resultado["resposta"], "Resposta de fallback.")
 
     def test_memory_recall_is_human_readable(self):
         resultado = self.orquestrador.processar("o que você guardou de mim?")
