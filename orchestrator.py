@@ -155,6 +155,18 @@ def classificar_rota(mensagem, intencao=None, comando=None, conhecimento=False):
     # Perguntas sobre critérios/requisitos/classificação pedem fatos e
     # definições verificáveis. Elas devem sair para pesquisa externa quando
     # não forem atendidas pelo CORE, sem depender do assunto específico.
+    padroes_traducao = (
+        "como se diz ",
+        "como se fala ",
+        "como falar ",
+        "traduza ",
+        "traduz ",
+        "traducao de ",
+        "tradução de "
+    )
+    if any(padrao in texto for padrao in padroes_traducao):
+        return ROTA_PESQUISA_EXTERNA
+
     padroes_criterios = (
         "criterios para",
         "criterios de",
