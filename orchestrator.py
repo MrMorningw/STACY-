@@ -530,13 +530,31 @@ class StacyOrchestrator:
         if continuacao_tarefa is not None:
             intencao = continuacao_tarefa
 
-        # O Cortex produz a decisão estruturada antes da execução.
-        # Ele não responde nem inventa fatos; apenas identifica o caminho.
+        # O modelo local faz a interpretação semântica quando o CORE
+        # ainda não identificou uma operação. O Cortex continua sendo apenas
+        # coordenador/validador; a IA não recebe autoridade para executar.
+        decisao_ia = None
+        if intencao is None and comando is None:
+            contexto_router = json.dumps(
+                self.conversa.ultimas_mensagens(4),
+                ensure_ascii=False
+            )
+            try:
+                decisao_ia = ai.analisar_rota_local(
+                    mensagem,
+                    contexto_router
+                )
+            except Exception:
+                # Falha do intérprete não derruba a STACY. O Cortex
+                # determinístico continua como fallback.
+                decisao_ia = None
+
         decisao = cortex.analisar(
             mensagem,
             intencao=intencao,
             comando=comando,
-            conhecimento=False
+            conhecimento=False,
+            decisao_ia=decisao_ia
         )
         self.ultima_decisao = decisao
 
@@ -604,7 +622,8 @@ class StacyOrchestrator:
             mensagem,
             intencao=intencao,
             comando=comando,
-            conhecimento=resposta_conhecimento is not None
+            conhecimento=resposta_conhecimento is not None,
+            decisao_ia=decisao_ia
         )
 
         if rota == ROTA_CONHECIMENTO:
