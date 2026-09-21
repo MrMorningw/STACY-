@@ -208,13 +208,51 @@ def analisar(
             "motivo": "informacao_temporal",
         }
 
-    factual_prefixos = (
-        "qual ", "quem ", "quando ", "onde ",
-        "quanto ", "quantos ", "quantas ",
-        "o que e ", "o que sao ", "o que significa ",
-        "como funciona ", "me diga ", "diga ",
+    # Somente perguntas com estrutura factual clara entram em pesquisa
+    # implícita. Prefixos genéricos como "qual", "me diga" ou "como"
+    # não bastam: eles também aparecem em pedidos conceituais e conversa.
+    padroes_fatuais = (
+        "qual a capital de ", "qual a capital da ",
+        "qual e a capital de ", "qual e a capital da ",
+        "qual a populacao de ", "qual e a populacao de ",
+        "qual a idade de ", "qual e a idade de ",
+        "qual o tamanho de ", "qual e o tamanho de ",
+        "qual a temperatura de ", "qual e a temperatura de ",
+        "qual a distancia de ", "qual e a distancia de ",
+        "qual a massa de ", "qual e a massa de ",
+        "qual a velocidade de ", "qual e a velocidade de ",
+        "qual a data de ", "qual e a data de ",
+        "qual a altura de ", "qual e a altura de ",
+        "qual a profundidade de ", "qual e a profundidade de ",
+        "quanto tempo vive", "quanto tempo vivem",
+        "quantos anos vive", "quantos ", "quantas ",
+        "quanto custa ", "quanto vale ",
+        "qual o preco de ", "qual e o preco de ",
+        "qual o valor de ", "qual e o valor de ",
+        "qual a cor de ", "qual e a cor de ",
+        "qual a cor do ", "qual e a cor do ",
+        "qual a diferenca entre ", "qual e a diferenca entre ",
+        "quem foi ", "quem e ", "quem sao ",
+        "quando foi ", "quando aconteceu ",
+        "onde fica ",
+        "em que ano ",
+        "qual o nome de ", "qual e o nome de ",
+        "qual o significado de ", "qual e o significado de ",
+        "qual o aumentativo de ", "qual e o aumentativo de ",
+        "qual o diminutivo de ", "qual e o diminutivo de ",
+        "como se chama ",
+        "o que significa ",
     )
-    if texto.startswith(factual_prefixos):
+    padroes_criterios = (
+        "criterios para", "criterios de",
+        "requisitos para", "requisitos de",
+        "condicoes para", "condicoes de",
+        "como e classificado", "como sao classificados",
+        "como se classifica", "o que caracteriza",
+    )
+    if any(texto.startswith(padrao) for padrao in padroes_fatuais) or any(
+        _tem(texto, padrao) for padrao in padroes_criterios
+    ):
         return {
             "modo": MODO_PESQUISA,
             "objetivo": "verificar_fato",
