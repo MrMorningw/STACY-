@@ -219,6 +219,67 @@ class CoreRoutingTests(unittest.TestCase):
             orchestrator.ROTA_PESQUISA_EXTERNA
         )
 
+    def test_requirement_age_question_goes_external(self):
+        self.assertEqual(
+            orchestrator.classificar_rota(
+                "quantos anos precisa ter para entrar no STF do Brasil?"
+            ),
+            orchestrator.ROTA_PESQUISA_EXTERNA
+        )
+
+    def test_classification_criteria_question_goes_external(self):
+        self.assertEqual(
+            orchestrator.classificar_rota(
+                "quais os criterios para um corpo celeste ser considerado uma estrela?"
+            ),
+            orchestrator.ROTA_PESQUISA_EXTERNA
+        )
+
+    def test_web_research_preserves_context_for_followup(self):
+        chamadas = []
+
+        original = orchestrator.ai.gerar_resposta_pesquisa
+        try:
+            def pesquisa_mock(api_key, historico):
+                chamadas.append(historico)
+                return {
+                    "resposta": "Resultado pesquisado.",
+                    "fontes": [
+                        {
+                            "titulo": "Fonte de teste",
+                            "url": "https://example.com/fonte"
+                        }
+                    ]
+                }
+
+            orchestrator.ai.gerar_resposta_pesquisa = pesquisa_mock
+
+            self.orquestrador.processar(
+                "quais os criterios para um corpo celeste ser considerado uma estrela?"
+            )
+            resultado = self.orquestrador.processar(
+                "e quais os criterios para sua classificacao?"
+            )
+        finally:
+            orchestrator.ai.gerar_resposta_pesquisa = original
+
+        self.assertEqual(resultado["tipo"], "pesquisa")
+        self.assertTrue(chamadas)
+        textos = [
+            parte["text"]
+            for mensagem in chamadas[0]
+            for parte in mensagem.get("parts", [])
+            if isinstance(parte, dict) and "text" in parte
+        ]
+        self.assertIn(
+            "quais os criterios para um corpo celeste ser considerado uma estrela?",
+            textos
+        )
+        self.assertEqual(
+            textos[-1],
+            "e quais os criterios para sua classificacao?"
+        )
+
     def test_route_quantitative_lifespan_question_is_external(self):
         self.assertEqual(
             orchestrator.classificar_rota("quanto tempo patos vivem?"),
