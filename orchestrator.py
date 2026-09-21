@@ -557,10 +557,33 @@ class StacyOrchestrator:
             comando=comando,
             conhecimento=False
         )
+        palavras_roteamento = (
+            "crie", "criar", "adicione", "adicionar", "anote", "anotar",
+            "lembre", "lembrar", "guarde", "guardar", "memorize", "memorizar",
+            "esqueça", "esqueca", "apague", "apagar", "remova", "remover",
+            "delete", "exclua", "excluir", "conclua", "concluir",
+            "atualize", "atualizar", "corrija", "corrigir", "arrume", "arrumar",
+            "altere", "alterar", "mude", "mudar", "troque", "trocar",
+            "coloque", "colocar", "registre", "registrar", "faça", "faca"
+        )
+        texto_roteamento = _normalizar_rota(mensagem)
+        precisa_roteador_local = any(
+            texto_roteamento.startswith(palavra + " ")
+            or texto_roteamento == palavra
+            for palavra in palavras_roteamento
+        ) or any(
+            _contem_termo(texto_roteamento, referencia)
+            for referencia in (
+                "essa tarefa", "esta tarefa", "ultima tarefa",
+                "última tarefa", "exclua ela", "apague ela", "remova ela"
+            )
+        )
+
         if (
             intencao is None
             and comando is None
             and rota_inicial == ROTA_IA_LOCAL
+            and precisa_roteador_local
         ):
             contexto_router = json.dumps(
                 self.conversa.ultimas_mensagens(4),
