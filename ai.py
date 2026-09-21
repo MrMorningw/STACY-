@@ -178,7 +178,11 @@ def gerar_resposta_pesquisa(
         "Não invente, não chute e não complete lacunas por suposição. "
         "Se as fontes não forem suficientes, diga que não foi possível verificar. "
         "Diferencie fatos de estimativas ou opiniões e informe as fontes quando "
-        "forem relevantes. Não revele nem solicite dados pessoais desnecessários."
+        "forem relevantes. Não revele nem solicite dados pessoais desnecessários. "
+        "O histórico anterior existe para resolver referências da conversa, como "
+        "ele, ela, isso, sua classificação ou esse objeto. Identifique a referência "
+        "pelo contexto antes de responder. A última mensagem do usuário é o pedido "
+        "atual e tem prioridade."
     )
 
     contents = []
@@ -192,8 +196,12 @@ def gerar_resposta_pesquisa(
 
         texto = texto.strip()
         if texto:
+            role = mensagem.get("role", "user")
+            if role not in {"user", "model"}:
+                role = "user"
+
             contents.append({
-                "role": "user",
+                "role": role,
                 "parts": [{"text": texto[-2000:]}]
             })
 
