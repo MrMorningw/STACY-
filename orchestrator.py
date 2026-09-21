@@ -411,12 +411,24 @@ class StacyOrchestrator:
 
                 self.acao_pendente = None
 
-                if resultado["status"] == "executada":
+                status = resultado.get("status") if isinstance(resultado, dict) else None
+
+                if status == "executada":
 
                     entidade = entity_store.obter_por_id(
                         self.entidades,
-                        resultado["entidade_id"]
+                        resultado.get("entidade_id")
                     )
+
+                    if entidade is None:
+                        return {
+                            "tipo": "erro_acao",
+                            "resposta": (
+                                "A ação foi processada, mas a entidade "
+                                "não está mais disponível, senhor."
+                            ),
+                            "resultado": resultado
+                        }
 
                     return {
                         "tipo": "acao_executada",
@@ -429,20 +441,30 @@ class StacyOrchestrator:
                         "resultado": resultado
                     }
 
-                if resultado["status"] == "ja_existente":
+                if status == "ja_existente":
 
                     entidade = entity_store.obter_por_id(
                         self.entidades,
-                        resultado["entidade_id"]
+                        resultado.get("entidade_id")
                     )
+
+                    if entidade is None:
+                        return {
+                            "tipo": "erro_acao",
+                            "resposta": (
+                                "A informação já estava registrada, "
+                                "mas a entidade não está mais disponível, senhor."
+                            ),
+                            "resultado": resultado
+                        }
 
                     return {
                         "tipo": "acao_ja_existente",
                         "resposta": (
-                            f"Senhor, '{resultado['valor']}' "
+                            f"Senhor, '{resultado.get('valor')}' "
                             f"já estava registrado em "
-                            f"'{resultado['campo']}' "
-                            f"de {entidade['nome']}."
+                            f"'{resultado.get('campo')}' "
+                            f"de {entidade.get('nome', 'essa entidade')}."
                         ),
                         "resultado": resultado
                     }
@@ -858,9 +880,14 @@ class StacyOrchestrator:
             if not categoria or not valor:
                 return None
 
+            if categoria == "usuario" and intencao.get("chave"):
+                valor_memoria = f"{intencao['chave']}={valor}"
+            else:
+                valor_memoria = valor
+
             sucesso = memory.registrar_memoria(
                 categoria,
-                valor,
+                valor_memoria,
                 self.memoria
             )
 
