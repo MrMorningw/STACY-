@@ -55,6 +55,12 @@ class CoreRoutingTests(unittest.TestCase):
         self.assertEqual(resultado["tipo"], "local")
         self.assertIn("aprender ingles", resultado["resposta"])
 
+    def test_objectives_query_without_article_uses_core(self):
+        resultado = self.orquestrador.processar("quais sao meus objetivos?")
+        self.assertEqual(resultado["tipo"], "local")
+        self.assertIn("aprender ingles", resultado["resposta"])
+        self.assertEqual(resultado.get("categoria"), "objetivos")
+
     def test_objectives_query_does_not_collide_with_projects(self):
         resultado = intent.interpretar("quais sao os meus objetivos ?")
         self.assertEqual(resultado["tipo"], "memoria")
