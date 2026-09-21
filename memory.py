@@ -1,25 +1,42 @@
 import unicodedata
 import json
+import os
 import uuid
 
-ARQUIVO_MEMORIA = "memory.json"
+ARQUIVO_MEMORIA = os.path.join(
+    os.path.dirname(__file__),
+    "memory.json"
+)
 
 def gerar_id_memoria():
     return str(uuid.uuid4())
 
 def carregar_memoria():
+    estrutura = {
+        "usuario": {},
+        "preferencias": [],
+        "projetos": [],
+        "objetivos": [],
+        "informacoes": []
+    }
+
     try:
         with open(ARQUIVO_MEMORIA, "r", encoding="utf-8") as arquivo:
-            return json.load(arquivo)
+            dados = json.load(arquivo)
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return estrutura
 
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {
-            "usuario": {},
-            "preferencias": [],
-            "projetos": [],
-            "objetivos": [],
-            "informacoes": []
-        }
+    if not isinstance(dados, dict):
+        return estrutura
+
+    for chave, valor_padrao in estrutura.items():
+        valor = dados.get(chave, valor_padrao)
+        if chave == "usuario":
+            dados[chave] = valor if isinstance(valor, dict) else {}
+        else:
+            dados[chave] = valor if isinstance(valor, list) else []
+
+    return dados
 
 
 def salvar_memoria(memoria):
