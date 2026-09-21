@@ -764,6 +764,21 @@ def interpretar_tarefa(mensagem):
     #    texto = mensagem.strip()
     # =========================
 
+    # Referência semântica sem alvo explícito: não transforme "essa tarefa"
+    # em um título literal. O CORE pedirá esclarecimento usando o contexto.
+    referencias_tarefa = (
+        "crie essa tarefa", "criar essa tarefa",
+        "adicione essa tarefa", "adicionar essa tarefa",
+        "anote essa tarefa", "anotar essa tarefa"
+    )
+    for referencia in referencias_tarefa:
+        if normalizado == referencia or normalizado.startswith(referencia + " "):
+            return {
+                "tipo": "tarefa",
+                "acao": "referencia",
+                "referencia": "ultima"
+            }
+
     gatilhos_criar = [
         "crie uma tarefa ",
         "criar uma tarefa ",
