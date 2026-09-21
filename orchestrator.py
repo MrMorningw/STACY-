@@ -1321,8 +1321,30 @@ class StacyOrchestrator:
                     indent=2
                 )
 
+        # Não envie consultas externas anteriores para o modelo local.
+        # Modelos pequenos podem copiar o assunto anterior e responder a ele
+        # em vez da mensagem atual. A pesquisa externa já mantém seu próprio
+        # contexto no caminho _pesquisar_web.
+        contexto_local = []
+        for item in self.conversa.ultimas_mensagens(6):
+            if not isinstance(item, dict):
+                continue
+
+            conteudo = item.get("conteudo", "").strip()
+            tipo = item.get("tipo")
+
+            if not conteudo:
+                continue
+
+            if tipo == "usuario":
+                rota_item = classificar_rota(conteudo)
+                if rota_item == ROTA_PESQUISA_EXTERNA:
+                    continue
+
+            contexto_local.append(item)
+
         contexto_conversa = json.dumps(
-            self.conversa.ultimas_mensagens(6),
+            contexto_local[-6:],
             ensure_ascii=False,
             indent=2
         )
