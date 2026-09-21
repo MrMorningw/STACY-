@@ -36,7 +36,7 @@ def corresponde_frase(texto, candidatos, limiar=0.93):
     return False
 
 def remover_prefixo_conversacional(texto):
-    """Remove uma reação/conector inicial sem apagar o pedido seguinte."""
+    """Remove reações/conectores iniciais sem apagar o pedido seguinte."""
     import re
 
     texto = (texto or "").strip()
@@ -44,15 +44,22 @@ def remover_prefixo_conversacional(texto):
         return texto
 
     prefixos = (
-        "que bom", "otimo", "ótimo", "perfeito", "certo", "ok",
+        "que bom", "maravilha", "otimo", "ótimo", "perfeito", "certo", "ok",
         "beleza", "entao", "então", "show", "legal", "entendi"
     )
-    padrao = r"^\s*(?:" + "|".join(re.escape(p) for p in prefixos) + r")"
-    padrao += r"(?:\s*[,;:.!?-]\s*|\s+)(.+)$"
-    resultado = re.match(padrao, texto, flags=re.IGNORECASE)
-    if resultado:
-        return resultado.group(1).strip()
-    return texto
+
+    # Remove somente reações no início da mensagem. A operação seguinte
+    # permanece intacta para que a intenção real seja identificada.
+    while True:
+        padrao = r"^\s*(?:" + "|".join(re.escape(p) for p in prefixos) + r")"
+        padrao += r"(?:\s*[,;:.!?-]\s*|\s+)(.+)$"
+        resultado = re.match(padrao, texto, flags=re.IGNORECASE)
+        if not resultado:
+            return texto
+        novo_texto = resultado.group(1).strip()
+        if novo_texto == texto:
+            return texto
+        texto = novo_texto
 
 
 def _corrigir_erros_tarefa(texto):
