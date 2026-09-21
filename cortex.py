@@ -31,8 +31,68 @@ def _tem(texto, termo):
     return f" {termo} " in f" {texto} "
 
 
-def analisar(mensagem, intencao=None, comando=None, conhecimento=False):
-    """Produz uma decisão estruturada e conservadora."""
+def _validar_decisao_ia(decisao, mensagem):
+    """Converte a saída do modelo em uma decisão segura e mínima."""
+    if not isinstance(decisao, dict):
+        return None
+
+    modos = {
+        MODO_CONVERSA: "chat",
+        MODO_RESPOSTA: "answer",
+        MODO_PESQUISA: "research",
+        MODO_ACAO: "action",
+        MODO_MEMORIA: "memory",
+        MODO_CLARIFICAR: "clarify",
+    }
+    capacidades = {
+        "chat": "chat",
+        "knowledge": "knowledge",
+        "web": "web",
+        "tasks": "tasks",
+        "memory": "memory",
+        "core": "core",
+    }
+    modo_bruto = str(decisao.get("modo", "")).strip().lower()
+    capacidade = str(decisao.get("capacidade", "")).strip().lower()
+    if modo_bruto not in modos or capacidade not in capacidades:
+        return None
+    try:
+        confidence = float(decisao.get("confidence", 0.0))
+    except (TypeError, ValueError):
+        confidence = 0.0
+    confidence = max(0.0, min(1.0, confidence))
+    if confidence < 0.50:
+        return {
+            "modo": MODO_CLARIFICAR,
+            "objetivo": "pedir_esclarecimento",
+            "ferramenta": None,
+            "argumentos": {"consulta": mensagem.strip()},
+            "needs_web": False,
+            "needs_memory": False,
+            "needs_action": False,
+            "confidence": confidence,
+            "motivo": "roteador_ia_baixa_confianca",
+        }
+    return {
+        "modo": modos[modo_bruto],
+        "objetivo": str(decisao.get("motivo") or modo_bruto),
+        "ferramenta": capacidades[capacidade],
+        "argumentos": {"consulta": str(decisao.get("consulta") or mensagem.strip())},
+        "needs_web": modo_bruto == MODO_PESQUISA or capacidade == "web",
+        "needs_memory": modo_bruto == MODO_MEMORIA or capacidade == "memory",
+        "needs_action": modo_bruto == MODO_ACAO or capacidade == "tasks",
+        "confidence": confidence,
+        "motivo": "roteador_ia_local",
+    }
+
+def analisar(
+    mensagem,
+    intencao=None,
+    comando=None,
+    conhecimento=False,
+    decisao_ia=None
+):
+    """Coordena o roteamento; usa IA sem entregar a ela a execução."""
     texto = normalizar(mensagem)
 
     if not texto:
@@ -50,6 +110,18 @@ def analisar(mensagem, intencao=None, comando=None, conhecimento=False):
 
     tipo = intencao.get("tipo") if isinstance(intencao, dict) else None
     acao = intencao.get("acao") if isinstance(intencao, dict) else None
+
+    # Intenções determinísticas do CORE têm prioridade. A IA entra apenas
+    # quando não há uma operação interna já identificada.
+    if (
+        decisao_ia is not None
+        and not isinstance(intencao, dict)
+        and comando is None
+        and not conhecimento
+    ):
+        decisao_semantica = _validar_decisao_ia(decisao_ia, mensagem)
+        if decisao_semantica is not None:
+            return decisao_semantica
 
     if comando in {"memoria", "buscar", "memorize", "esquecer"}:
         return {
