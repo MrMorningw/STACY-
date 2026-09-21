@@ -52,6 +52,11 @@ class ConversationState:
         self.ultima_entidade_id = entidade_id
         self.ultima_atualizacao = time.time()
 
+    def limpar_entidade(self):
+        """Remove apenas o referente temporário da conversa."""
+        self.ultima_entidade_id = None
+        self.ultima_atualizacao = time.time()
+
     def registrar_acao(self, acao):
 
         self.ultima_acao = acao
