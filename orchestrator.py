@@ -214,6 +214,24 @@ def classificar_rota(mensagem, intencao=None, comando=None, conhecimento=False):
     # 6) PESQUISA IMPLÍCITA: perguntas factuais comuns que um modelo local
     # pequeno não deve responder por palpite. O CORE pode atender fatos
     # previamente verificados; os demais seguem para pesquisa externa.
+    # Perguntas factuais genéricas também entram aqui. Isso evita que
+    # formulações novas, como "qual a cor de X?" ou "qual a diferença entre
+    # X e Y?", caiam acidentalmente na IA local e recebam um palpite.
+    padroes_factuais_genericos = (
+        "qual a cor de ", "qual e a cor de ",
+        "qual a diferenca entre ", "qual e a diferenca entre ",
+        "qual a funcao de ", "qual e a funcao de ",
+        "qual a definicao de ", "qual e a definicao de ",
+        "o que e ", "o que sao ", "o que significa ",
+        "como funciona ", "onde fica ", "quando foi ", "quem foi ",
+        "me diga uma ", "me diga um ", "diga uma ", "diga um "
+    )
+    if any(padrao in texto for padrao in padroes_factuais_genericos):
+        return ROTA_PESQUISA_EXTERNA
+
+    # 6) PESQUISA IMPLÍCITA: perguntas factuais comuns que um modelo local
+    # pequeno não deve responder por palpite. O CORE pode atender fatos
+    # previamente verificados; os demais seguem para pesquisa externa.
     padroes_fato_comum = (
         "qual o nome ",
         "qual e o nome ",
@@ -475,6 +493,12 @@ class StacyOrchestrator:
             # normalmente, mas a confirmação anterior é descartada.
             self.acao_pendente = None
 
+        # Consultas sobre a própria conversa são determinísticas.
+        # Nunca devem depender de conhecimento externo ou de uma IA pequena.
+        consulta_conversa = self._resolver_consulta_conversa(mensagem)
+        if consulta_conversa is not None:
+            return consulta_conversa
+
         # O roteador decide a origem antes de qualquer IA.
         # A classificação interna é prioritária para impedir que dados pessoais
         # ou tarefas sejam enviados à pesquisa externa por engano.
@@ -693,6 +717,53 @@ class StacyOrchestrator:
             }
 
         return self._usar_ai(mensagem)
+
+    def _resolver_consulta_conversa(self, mensagem):
+        """Resolve perguntas sobre o histórico sem usar IA ou Web."""
+        texto = _normalizar_rota(mensagem)
+        ultimo = (
+            "qual foi a ultima coisa que eu perguntei",
+            "qual foi a ultima pergunta que eu fiz",
+            "qual foi minha ultima pergunta",
+            "qual foi a minha ultima pergunta",
+            "o que eu perguntei por ultimo",
+            "o que eu perguntei antes"
+        )
+        primeiro = (
+            "qual foi a primeira coisa que eu perguntei",
+            "qual foi a primeira pergunta que eu fiz",
+            "qual foi minha primeira pergunta",
+            "qual foi a minha primeira pergunta",
+            "qual foi a primeira pergunta nesta conversa",
+            "qual foi a primeira pergunta nessa conversa"
+        )
+        modo = None
+        if any(_contem_termo(texto, frase) for frase in ultimo):
+            modo = "ultima"
+        elif any(_contem_termo(texto, frase) for frase in primeiro):
+            modo = "primeira"
+        if modo is None:
+            return None
+        historico = self.conversa.obter_historico()
+        usuarios = [
+            item.get("conteudo", "").strip()
+            for item in historico[:-1]
+            if item.get("tipo") == "usuario"
+            and item.get("conteudo", "").strip()
+        ]
+        if not usuarios:
+            return {
+                "tipo": "local",
+                "resposta": "Ainda não tenho outra pergunta registrada nesta conversa.",
+                "rota": ROTA_INTERNA
+            }
+        pergunta = usuarios[-1] if modo == "ultima" else usuarios[0]
+        rotulo = "última" if modo == "ultima" else "primeira"
+        return {
+            "tipo": "local",
+            "resposta": f"A {rotulo} pergunta registrada foi: {pergunta}",
+            "rota": ROTA_INTERNA
+        }
 
     def _registrar_resultado_conversa(self, resultado):
         if not isinstance(resultado, dict):
