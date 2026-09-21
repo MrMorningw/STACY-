@@ -473,11 +473,16 @@ def interpretar_tarefa(mensagem):
     if normalizado in referencias_ultima:
         return {"tipo": "tarefa", "acao": "remover", "referencia": "ultima"}
 
+    normalizado_correcao = re.sub(
+        r"\s+da\s+(?:ultima|última)\s+tarefa(?:\s+criada)?$",
+        "",
+        normalizado_original,
+        flags=re.IGNORECASE
+    ).strip()
     padrao_correcao_titulo = re.match(
         r"^(?:arrume|corrija|corrigir|altere|altera|mude|mudar|troque|trocar|atualize|atualizar)"
-        r"\s+o\s+nome(?:\s+de\s+(.+?))?\s+para\s+(.+?)"
-        r"(?:\s+da\s+(?:ultima|última)\s+tarefa(?:\s+criada)?)?$",
-        normalizado_original,
+        r"\s+o\s+nome(?:\s+de\s+(.+?))?\s+para\s+(.+)$",
+        normalizado_correcao,
         flags=re.IGNORECASE
     )
     if padrao_correcao_titulo:
