@@ -877,6 +877,33 @@ class TestContextContinuity(unittest.TestCase):
         self.assertEqual(resultado["tipo"], "local")
         self.assertIn("STACY", resultado["resposta"])
 
+    def test_entity_resolver_can_disable_persistent_fallback(self):
+        dados = {
+            "entidades": [{
+                "id": "P-A1",
+                "uuid": "uuid-p-a1",
+                "categoria": "projetos",
+                "nome": "STACY",
+                "atributos": {},
+                "relacoes": [],
+                "historico": []
+            }],
+            "contexto": {
+                "id": "P-A1",
+                "uuid": "uuid-p-a1",
+                "categoria": "projetos",
+                "nome": "STACY"
+            }
+        }
+
+        resultado = entity_resolver.resolver(
+            "ele",
+            dados,
+            contexto_atual=None,
+            usar_contexto_persistente=False
+        )
+        self.assertIsNone(resultado)
+
     def test_unresolved_pronoun_does_not_use_persistent_entity(self):
         entidade = {
             "id": "P-A1",
