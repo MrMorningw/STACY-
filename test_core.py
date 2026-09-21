@@ -2,6 +2,7 @@ import unittest
 
 import intent
 import orchestrator
+import cortex
 
 
 class CoreRoutingTests(unittest.TestCase):
@@ -569,6 +570,51 @@ class CoreRoutingTests(unittest.TestCase):
                     orchestrator.classificar_rota(mensagem),
                     orchestrator.ROTA_PESQUISA_EXTERNA
                 )
+
+
+    def test_cortex_structures_task_request(self):
+        decisao = cortex.analisar(
+            "crie uma tarefa estudar direito amanhã",
+            intencao={"tipo": "tarefa", "acao": "criar", "titulo": "estudar direito"},
+        )
+        self.assertEqual(decisao["modo"], cortex.MODO_ACAO)
+        self.assertTrue(decisao["needs_action"])
+        self.assertEqual(decisao["ferramenta"], "tasks")
+        self.assertEqual(decisao["confidence"], 1.0)
+
+    def test_cortex_structures_memory_request(self):
+        decisao = cortex.analisar(
+            "quais sao meus objetivos",
+            intencao={"tipo": "memoria", "acao": "consultar", "categoria": "objetivos"},
+        )
+        self.assertEqual(decisao["modo"], cortex.MODO_MEMORIA)
+        self.assertTrue(decisao["needs_memory"])
+        self.assertFalse(decisao["needs_web"])
+
+    def test_cortex_structures_explicit_research(self):
+        decisao = cortex.analisar("pesquise a populacao atual do Brasil")
+        self.assertEqual(decisao["modo"], cortex.MODO_PESQUISA)
+        self.assertTrue(decisao["needs_web"])
+        self.assertEqual(decisao["ferramenta"], "web")
+
+    def test_cortex_does_not_use_local_ai_as_factual_authority(self):
+        decisao = cortex.analisar("qual a cor de uma abobora?")
+        self.assertEqual(decisao["modo"], cortex.MODO_PESQUISA)
+        self.assertTrue(decisao["needs_web"])
+
+    def test_cortex_keeps_open_conversation_local(self):
+        decisao = cortex.analisar("me ajuda a organizar meus estudos")
+        self.assertEqual(decisao["modo"], cortex.MODO_CONVERSA)
+        self.assertFalse(decisao["needs_web"])
+        self.assertFalse(decisao["needs_action"])
+
+    def test_orchestrator_exposes_structured_cortex_decision(self):
+        resultado = self.orquestrador.processar("qual a cor de uma abobora?")
+        self.assertEqual(
+            self.orquestrador.ultima_decisao["modo"],
+            cortex.MODO_PESQUISA
+        )
+        self.assertTrue(self.orquestrador.ultima_decisao["needs_web"])
 
 
 if __name__ == "__main__":
