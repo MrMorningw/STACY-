@@ -1018,6 +1018,37 @@ class TestTaskConversationCorrections(unittest.TestCase):
         self.assertIn("ir visitar meu colega", resultado["resposta"])
 
 
+    def test_conversational_prefix_maravilha_preserves_task(self):
+        resultado = intent.interpretar(
+            "maravilha. crie uma tarefa estudar direito amanhã"
+        )
+        self.assertEqual(resultado["tipo"], "tarefa")
+        self.assertEqual(resultado["acao"], "criar")
+        self.assertEqual(resultado["titulo"], "estudar direito")
+
+    def test_conversational_prefix_que_bom_preserves_memory_question(self):
+        resultado = intent.interpretar(
+            "que bom! quais sao meus objetivos?"
+        )
+        self.assertEqual(resultado["tipo"], "memoria")
+        self.assertEqual(resultado["acao"], "consultar")
+        self.assertEqual(resultado["categoria"], "objetivos")
+
+    def test_multiple_conversational_prefixes_preserve_task(self):
+        resultado = intent.interpretar(
+            "que bom, maravilha, crie uma tarefa estudar responsabilidade civil"
+        )
+        self.assertEqual(resultado["tipo"], "tarefa")
+        self.assertEqual(resultado["acao"], "criar")
+        self.assertEqual(resultado["titulo"], "estudar responsabilidade civil")
+
+    def test_conversational_prefix_preserves_research_request(self):
+        resultado = intent.interpretar(
+            "perfeito. pesquise sobre responsabilidade civil"
+        )
+        self.assertIsNone(resultado)
+
+
 
 if __name__ == "__main__":
     unittest.main()
