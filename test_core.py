@@ -895,6 +895,11 @@ class TestContextContinuity(unittest.TestCase):
             "nome": "STACY"
         }
 
+        self.orquestrador._usar_ai = lambda mensagem: {
+            "tipo": "ai",
+            "resposta": "Resposta de teste.",
+            "origem": "local"
+        }
         resultado = self.orquestrador.processar("ele")
         self.assertEqual(resultado["tipo"], "ai")
 
