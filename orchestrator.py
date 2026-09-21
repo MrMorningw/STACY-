@@ -211,7 +211,41 @@ def classificar_rota(mensagem, intencao=None, comando=None, conhecimento=False):
     if any(padrao in texto for padrao in padroes_traducao):
         return ROTA_PESQUISA_EXTERNA
 
-    # 6) IA LOCAL: conversa, estudo e raciocínio sem necessidade externa.
+    # 6) PESQUISA IMPLÍCITA: perguntas factuais comuns que um modelo local
+    # pequeno não deve responder por palpite. O CORE pode atender fatos
+    # previamente verificados; os demais seguem para pesquisa externa.
+    padroes_fato_comum = (
+        "qual o nome ",
+        "qual e o nome ",
+        "qual o aumentativo de ",
+        "qual e o aumentativo de ",
+        "qual o diminutivo de ",
+        "qual e o diminutivo de ",
+        "como se chama ",
+        "qual o significado de ",
+        "qual e o significado de ",
+    )
+    if any(padrao in texto for padrao in padroes_fato_comum):
+        return ROTA_PESQUISA_EXTERNA
+
+    # Pedidos por um exemplo factual também não devem ser respondidos
+    # por chute quando o CORE não possui o fato verificado.
+    padroes_exemplo_factual = (
+        "me diga uma ave ",
+        "me diga um animal ",
+        "me diga uma fruta ",
+        "me diga um pais ",
+        "me diga uma cidade ",
+        "diga uma ave ",
+        "diga um animal ",
+        "diga uma fruta ",
+        "diga um pais ",
+        "diga uma cidade ",
+    )
+    if any(padrao in texto for padrao in padroes_exemplo_factual):
+        return ROTA_PESQUISA_EXTERNA
+
+    # 7) IA LOCAL: conversa, estudo e raciocínio sem necessidade externa.
     return ROTA_IA_LOCAL
 
 
