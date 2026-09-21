@@ -48,7 +48,9 @@ def _normalizar_rota(texto):
         "quem", "quando", "onde", "capital", "populacao",
         "idade", "tamanho", "temperatura", "distancia",
         "massa", "velocidade", "vive", "vivem", "teve", "tinham",
-        "existem", "tem", "possui", "possuem", "sao", "ha"
+        "existem", "tem", "possui", "possuem", "sao", "ha",
+        "quais", "criterios", "classificacao", "requisitos",
+        "condicoes", "considerado", "precisa", "deve", "devem"
     )
     tokens = []
     for token in texto.split():
@@ -147,6 +149,26 @@ def classificar_rota(mensagem, intencao=None, comando=None, conhecimento=False):
         "possui quantas luas"
     )
     if any(padrao in texto for padrao in padroes_factuais):
+        return ROTA_PESQUISA_EXTERNA
+
+    # Perguntas sobre critérios/requisitos/classificação pedem fatos e
+    # definições verificáveis. Elas devem sair para pesquisa externa quando
+    # não forem atendidas pelo CORE, sem depender do assunto específico.
+    padroes_criterios = (
+        "criterios para",
+        "criterios de",
+        "requisitos para",
+        "requisitos de",
+        "condicoes para",
+        "condicoes de",
+        "criterios de classificacao",
+        "criterios para classificacao",
+        "como e classificado",
+        "como sao classificados",
+        "como se classifica",
+        "o que caracteriza"
+    )
+    if any(padrao in texto for padrao in padroes_criterios):
         return ROTA_PESQUISA_EXTERNA
 
     # CORE: um fato já verificado tem prioridade sobre qualquer
