@@ -1069,10 +1069,22 @@ class StacyOrchestrator:
         # Uma referência pronominal sem entidade conversacional ativa não
         # deve ressuscitar uma pesquisa de outro assunto. Nesse caso, deixe
         # a mensagem seguir para a IA local, que poderá pedir esclarecimento.
-        if entity_resolver.detectar_referencia(mensagem) is not None:
-            # Referência sem referente ativo não pode continuar pesquisa.
-            if not self.conversa.obter_ultima_entidade():
-                return None
+        # Pronomes sem referente ativo nunca podem herdar a última
+        # pesquisa externa. Isso inclui construções como "qual o nome dela?".
+        pronomes_sem_referente = (
+            " ele", " ela", " dele", " dela", " eles", " elas",
+            " deles", " delas", " esse", " essa", " isso", " aquele",
+            " aquela", " aquilo"
+        )
+        mensagem_normalizada = f" {_normalizar_rota(mensagem)} "
+        tem_referencia = (
+            entity_resolver.detectar_referencia(mensagem) is not None
+            or any(
+                _contem_termo(mensagem_normalizada.strip(), pronome.strip())
+                for pronome in pronomes_sem_referente
+            )
+        )
+        if tem_referencia and not self.conversa.obter_ultima_entidade():
             return None
 
         if not texto or len(texto.split()) > 14:
