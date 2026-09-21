@@ -556,6 +556,19 @@ class StacyOrchestrator:
             conhecimento=False,
             decisao_ia=decisao_ia
         )
+        if (
+            isinstance(decisao, dict)
+            and decisao.get("modo") == "clarify"
+        ):
+            return {
+                "tipo": "clarificacao",
+                "resposta": (
+                    "Preciso de um pouco mais de informação para entender "
+                    "o que o senhor deseja fazer."
+                ),
+                "rota": ROTA_IA_LOCAL
+            }
+
         # Converte somente decisões estruturadas do intérprete em intenções
         # executáveis. O modelo nunca executa diretamente.
         if (
