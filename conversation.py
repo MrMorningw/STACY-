@@ -11,6 +11,9 @@ class ConversationState:
         self.ultima_entidade_id = None
         self.ultima_acao = None
         self.ultima_intencao = None
+        self.ultima_rota = None
+        self.ultima_consulta = None
+        self.ultima_tarefa = None
         self.intencao_pendente = None
         self.ultima_atualizacao = None
 
@@ -51,6 +54,19 @@ class ConversationState:
 
         self.ultima_acao = acao
         self.ultima_atualizacao = time.time()
+
+    def registrar_rota(self, rota, consulta=None):
+        self.ultima_rota = rota
+        if consulta:
+            self.ultima_consulta = consulta
+        self.ultima_atualizacao = time.time()
+
+    def registrar_tarefa(self, tarefa):
+        self.ultima_tarefa = tarefa
+        self.ultima_atualizacao = time.time()
+
+    def obter_ultima_tarefa(self):
+        return self.ultima_tarefa
 
     def registrar_intencao(self, intencao):
 
@@ -100,7 +116,10 @@ class ConversationState:
             "ultima_resposta": self.ultima_resposta,
             "ultima_entidade_id": self.ultima_entidade_id,
             "ultima_acao": self.ultima_acao,
-            "ultima_intencao": self.ultima_intencao
+            "ultima_intencao": self.ultima_intencao,
+            "ultima_rota": self.ultima_rota,
+            "ultima_consulta": self.ultima_consulta,
+            "ultima_tarefa": self.ultima_tarefa
         }
 
     def limpar(self):
@@ -110,6 +129,9 @@ class ConversationState:
         self.ultima_entidade_id = None
         self.ultima_acao = None
         self.ultima_intencao = None
+        self.ultima_rota = None
+        self.ultima_consulta = None
+        self.ultima_tarefa = None
         self.intencao_pendente = None
         self.ultima_atualizacao = None
         self.historico = []
@@ -122,5 +144,8 @@ class ConversationState:
             "ultima_entidade_id": self.ultima_entidade_id,
             "ultima_acao": self.ultima_acao,
             "ultima_intencao": self.ultima_intencao,
+            "ultima_rota": self.ultima_rota,
+            "ultima_consulta": self.ultima_consulta,
+            "ultima_tarefa": self.ultima_tarefa,
             "historico": self.ultimas_mensagens()
         }
