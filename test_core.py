@@ -678,6 +678,24 @@ class CoreRoutingTests(unittest.TestCase):
         self.assertTrue(self.orquestrador.ultima_decisao["needs_web"])
 
 
+    def test_cortex_keeps_conceptual_qual_question_local(self):
+        decisao = cortex.analisar("qual e uma boa forma de estudar direito?")
+        self.assertEqual(decisao["modo"], cortex.MODO_CONVERSA)
+        self.assertEqual(decisao["ferramenta"], "local_ai")
+        self.assertFalse(decisao["needs_web"])
+
+    def test_cortex_keeps_conceptual_me_diga_question_local(self):
+        decisao = cortex.analisar("me diga como organizar meus estudos")
+        self.assertEqual(decisao["modo"], cortex.MODO_CONVERSA)
+        self.assertEqual(decisao["ferramenta"], "local_ai")
+        self.assertFalse(decisao["needs_web"])
+
+    def test_cortex_keeps_conceptual_o_que_e_question_local(self):
+        decisao = cortex.analisar("o que e responsabilidade civil?")
+        self.assertEqual(decisao["modo"], cortex.MODO_CONVERSA)
+        self.assertEqual(decisao["ferramenta"], "local_ai")
+        self.assertFalse(decisao["needs_web"])
+
 class TestContextContinuity(unittest.TestCase):
 
     def setUp(self):
