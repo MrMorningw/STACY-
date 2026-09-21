@@ -172,8 +172,8 @@ def remover(tarefa_id):
     return removida
 
 
-def atualizar(tarefa_id, data=None, hora=None):
-    """Atualiza somente os campos fornecidos de uma tarefa existente."""
+def atualizar(tarefa_id, titulo=None, data=None, hora=None):
+    """Atualiza os campos fornecidos de uma tarefa existente."""
     if not tarefa_id:
         return None
 
@@ -183,6 +183,8 @@ def atualizar(tarefa_id, data=None, hora=None):
         if tarefa.get("id") != tarefa_id:
             continue
 
+        if titulo is not None:
+            tarefa["titulo"] = titulo
         if data is not None:
             tarefa["data"] = data
         if hora is not None:
