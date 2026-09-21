@@ -428,7 +428,7 @@ def extrair_data_hora_tarefa(texto):
             count=1,
             flags=re.IGNORECASE
         ).strip()
-        restante = re.sub(r"\\bde\\s*$", "", restante, flags=re.IGNORECASE).strip()
+        restante = re.sub(r"\bde\s*$", "", restante, flags=re.IGNORECASE).strip()
 
     if data is None:
         resultado = re.search(r"\b(\d{4}-\d{2}-\d{2})\b", restante)
@@ -448,7 +448,9 @@ def extrair_data_hora_tarefa(texto):
 
 
 def interpretar_tarefa(mensagem):
-    texto = _corrigir_erros_tarefa(mensagem.strip())
+    texto_original = mensagem.strip()
+    normalizado_original = texto_original.lower().rstrip("?!.,;: ")
+    texto = _corrigir_erros_tarefa(texto_original)
     normalizado = texto.lower().rstrip("?!.,;: ")
 
     referencias_tarefa = (
@@ -475,7 +477,7 @@ def interpretar_tarefa(mensagem):
         r"^(?:arrume|corrija|corrigir|altere|altera|mude|mudar|troque|trocar|atualize|atualizar)"
         r"\s+o\s+nome(?:\s+de\s+(.+?))?\s+para\s+(.+?)"
         r"(?:\s+da\s+(?:ultima|última)\s+tarefa(?:\s+criada)?)?$",
-        normalizado,
+        normalizado_original,
         flags=re.IGNORECASE
     )
     if padrao_correcao_titulo:
