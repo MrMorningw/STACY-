@@ -980,6 +980,9 @@ class TestContextContinuity(unittest.TestCase):
             orchestrator.ai.gerar_resposta_pesquisa = falhar_pesquisa
             orchestrator.ai.gerar_resposta = fallback
             self.orquestrador.api_key = "chave"
+            self.orquestrador.conversa.registrar_mensagem(
+                "quem foi Joao Eunápio Borges?"
+            )
             self.orquestrador.conversa.registrar_rota(
                 orchestrator.ROTA_PESQUISA_EXTERNA,
                 "quem foi Joao Eunápio Borges?"
