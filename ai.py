@@ -166,7 +166,10 @@ def gerar_resposta_pesquisa(
         f"models/{config.MODELO}:generateContent"
     )
 
-    historico_pesquisa = historico[-1:] if historico else []
+    # A pesquisa recebe o contexto externo já preparado pelo orchestrator.
+    # Não reduza para apenas a última mensagem: referências como "isso",
+    # "ele" e "sua classificação" dependem do turno anterior.
+    historico_pesquisa = historico[-8:] if historico else []
 
     sistema = (
         "Você é STACY, assistente pessoal do senhor Danley. "
