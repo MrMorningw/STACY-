@@ -431,10 +431,13 @@ def analisar_rota_local(mensagem, contexto_conversa=None):
         "Apenas classifique a intenção e a capacidade necessária. "
         "Não execute ações, não grave memória, não pesquise e não responda. "
         "Retorne SOMENTE JSON válido com as chaves modo, capacidade, consulta, "
-        "confidence e motivo. modo deve ser chat, answer, research, action, "
-        "memory ou clarify. capacidade deve ser chat, knowledge, web, tasks, "
-        "memory ou core. Se houver dúvida real, use clarify. "
-        "Não invente dados. " + capacidades
+        "dados, confidence e motivo. dados deve ser um objeto vazio quando não "
+        "houver operação estruturada. Para tarefas, use dados com acao, titulo, "
+        "data e hora quando aplicável. Para memória, use acao, categoria e valor "
+        "quando aplicável. modo deve ser chat, answer, research, action, memory "
+        "ou clarify. capacidade deve ser chat, knowledge, web, tasks, memory ou "
+        "core. Se houver dúvida real ou faltar dado essencial para uma ação, use "
+        "clarify. Não invente dados. " + capacidades
     )
     if contexto:
         sistema += "\nContexto recente para resolver referências:\n" + contexto
