@@ -220,6 +220,7 @@ def classificar_rota(mensagem, intencao=None, comando=None, conhecimento=False):
     # X e Y?", caiam acidentalmente na IA local e recebam um palpite.
     padroes_factuais_genericos = (
         "qual a cor de ", "qual e a cor de ",
+        "qual a cor do ", "qual e a cor do ",
         "qual a diferenca entre ", "qual e a diferenca entre ",
         "qual a funcao de ", "qual e a funcao de ",
         "qual a definicao de ", "qual e a definicao de ",
