@@ -1034,7 +1034,6 @@ class StacyOrchestrator:
             if nome and _contem_termo(texto, nome):
                 return True
 
-        # Continuidade explícita da conversa/pesquisa mantém o referente.
         if (
             texto.startswith("e ")
             or texto.startswith("mas ")
@@ -1604,3 +1603,480 @@ class StacyOrchestrator:
 
             tarefas = tasks.listar(
                 data=data
+            )
+
+            if not tarefas:
+
+                if data:
+                    return {
+                        "tipo": "tarefas",
+                        "resposta": (
+                            f"O senhor não possui "
+                            f"tarefas pendentes para {data}."
+                        ),
+                        "tarefas": []
+                    }
+
+                return {
+                    "tipo": "tarefas",
+                    "resposta": (
+                        "O senhor não possui "
+                        "tarefas pendentes."
+                    ),
+                    "tarefas": []
+                }
+
+            linhas = [
+                "Estas são suas tarefas pendentes, senhor:"
+            ]
+
+            for tarefa in tarefas:
+
+                linha = (
+                    f"• {tarefa['titulo']}"
+                )
+
+                if tarefa.get("data"):
+                    linha += (
+                        f" — {tarefa['data']}"
+                    )
+
+                if tarefa.get("hora"):
+                    linha += (
+                        f" às {tarefa['hora']}"
+                    )
+
+                linhas.append(linha)
+
+            return {
+                "tipo": "tarefas",
+                "resposta": "\n".join(linhas),
+                "tarefas": tarefas
+            }
+
+        if acao == "atualizar":
+            tarefa_id = intencao.get("tarefa_id")
+            data = intencao.get("data")
+            hora = intencao.get("hora")
+
+            if not tarefa_id or (data is None and hora is None):
+                return None
+
+            tarefa = tasks.atualizar(
+                tarefa_id,
+                data=data,
+                hora=hora
+            )
+
+            if tarefa is None:
+                return {
+                    "tipo": "erro_tarefa",
+                    "resposta": "Não consegui atualizar a tarefa, senhor."
+                }
+
+            return {
+                "tipo": "tarefa_atualizada",
+                "resposta": f"Atualizada, senhor: '{tarefa['titulo']}'.",
+                "tarefa": tarefa
+            }
+
+        if acao == "corrigir_titulo":
+            tarefa = self.conversa.obter_ultima_tarefa()
+            if not isinstance(tarefa, dict) or not tarefa.get("id"):
+                return {
+                    "tipo": "tarefa_nao_encontrada",
+                    "resposta": "Não encontrei uma tarefa criada recentemente, senhor."
+                }
+
+            antigo = intencao.get("antigo")
+            novo = (intencao.get("novo") or "").strip()
+            titulo_atual = tarefa.get("titulo", "")
+
+            if not novo:
+                return None
+
+            if antigo:
+                titulo_novo = re.sub(
+                    r"(?<!\w)" + re.escape(antigo) + r"(?!\w)",
+                    novo,
+                    titulo_atual,
+                    count=1,
+                    flags=re.IGNORECASE
+                )
+            else:
+                titulo_novo = novo
+
+            if titulo_novo == titulo_atual:
+                return {
+                    "tipo": "tarefa_atualizada",
+                    "resposta": f"O título já está como '{titulo_atual}', senhor.",
+                    "tarefa": tarefa
+                }
+
+            atualizado = tasks.atualizar(
+                tarefa["id"],
+                titulo=titulo_novo
+            )
+
+            if atualizado is None:
+                return {
+                    "tipo": "erro_tarefa",
+                    "resposta": "Não consegui atualizar o nome da tarefa, senhor."
+                }
+
+            return {
+                "tipo": "tarefa_atualizada",
+                "resposta": f"Nome da tarefa atualizado, senhor: '{atualizado['titulo']}'.",
+                "tarefa": atualizado
+            }
+
+        if acao in ["concluir", "remover"]:
+
+            termo = intencao.get("termo")
+
+            if acao == "remover" and intencao.get("referencia") == "ultima":
+                tarefa = self.conversa.obter_ultima_tarefa()
+                if not isinstance(tarefa, dict) or not tarefa.get("id"):
+                    return {
+                        "tipo": "tarefa_nao_encontrada",
+                        "resposta": "Não encontrei uma tarefa criada recentemente, senhor."
+                    }
+
+                self.acao_pendente = {
+                    "tipo": "remover_tarefa",
+                    "tarefa_id": tarefa["id"],
+                    "tarefa": tarefa
+                }
+
+                return {
+                    "tipo": "confirmacao",
+                    "resposta": (
+                        f"Senhor, confirma a remoção da tarefa "
+                        f"'{tarefa['titulo']}'? Esta ação não poderá ser desfeita."
+                    ),
+                    "tarefa": tarefa,
+                    "rota": ROTA_INTERNA
+                }
+
+            if not termo:
+                return None
+
+            if acao == "concluir":
+                encontrados = tasks.buscar(
+                    termo,
+                    status="pendente"
+                )
+            else:
+                encontrados = tasks.buscar(
+                    termo
+                )
+
+            if not encontrados:
+
+                return {
+                    "tipo": "tarefa_nao_encontrada",
+                    "resposta": (
+                        f"Não encontrei uma tarefa "
+                        f"correspondente a '{termo}', senhor."
+                    )
+                }
+
+            if len(encontrados) > 1:
+
+                return {
+                    "tipo": "tarefa_ambigua",
+                    "resposta": (
+                        "Encontrei mais de uma tarefa "
+                        "correspondente. Poderia especificar "
+                        "qual delas deseja?"
+                    ),
+                    "tarefas": encontrados
+                }
+
+            tarefa = encontrados[0]
+
+            if acao == "concluir":
+
+                resultado = tasks.concluir(
+                    tarefa["id"]
+                )
+
+                return {
+                    "tipo": "tarefa_concluida",
+                    "resposta": (
+                        f"Concluída, senhor: "
+                        f"'{resultado['titulo']}'."
+                    ),
+                    "tarefa": resultado
+                }
+
+            self.acao_pendente = {
+                "tipo": "remover_tarefa",
+                "tarefa_id": tarefa["id"],
+                "tarefa": tarefa
+            }
+
+            return {
+                "tipo": "confirmacao",
+                "resposta": (
+                    f"Senhor, confirma a remoção da tarefa "
+                    f"'{tarefa['titulo']}'? "
+                    f"Esta ação não poderá ser desfeita."
+                ),
+                "tarefa": tarefa
+            }
+
+        return None
+
+    def _pesquisar_web(self, mensagem):
+        self.historico.append({
+            "role": "user",
+            "parts": [{"text": mensagem}]
+        })
+
+        # A pesquisa externa recebe a consulta atual e, quando necessário,
+        # uma mensagem anterior do usuário para resolver referências como
+        # "sua classificação", "ele" ou "isso". Memória persistente não é
+        # enviada ao provedor.
+        historico_conversa = self.conversa.ultimas_mensagens(4)
+        historico_pesquisa = []
+
+        for item in historico_conversa:
+            if not isinstance(item, dict):
+                continue
+
+            conteudo = item.get("conteudo", "").strip()
+            tipo = item.get("tipo")
+
+            if not conteudo or tipo not in {"usuario", "stacy"}:
+                continue
+
+            role = "model" if tipo == "stacy" else "user"
+            historico_pesquisa.append({
+                "role": role,
+                "parts": [{"text": conteudo}]
+            })
+
+        # A mensagem atual já está registrada no ConversationState e deve
+        # permanecer explicitamente como a última consulta.
+        if (
+            not historico_pesquisa
+            or historico_pesquisa[-1].get("role") != "user"
+            or historico_pesquisa[-1]["parts"][0].get("text") != mensagem
+        ):
+            historico_pesquisa.append({
+                "role": "user",
+                "parts": [{"text": mensagem}]
+            })
+
+        try:
+            resultado = ai.gerar_resposta_pesquisa(
+                self.api_key,
+                historico_pesquisa
+            )
+        except Exception as erro_pesquisa:
+            # A pesquisa com Google Search é a primeira tentativa. Se o
+            # grounding falhar (por quota, indisponibilidade ou outro erro
+            # transitório), ainda tentamos o Gemini normal como fallback.
+            # Esse fallback NÃO é apresentado como pesquisa verificada e
+            # NÃO recebe memória persistente do usuário.
+            try:
+                fallback_historico = historico_pesquisa
+                resposta_fallback = ai.gerar_resposta(
+                    self.api_key,
+                    fallback_historico,
+                    "{}",
+                    None,
+                    None
+                )
+                return {
+                    "tipo": "pesquisa_fallback",
+                    "rota": ROTA_PESQUISA_EXTERNA,
+                    "consulta": mensagem,
+                    "resposta": resposta_fallback,
+                    "origem": "gemini_fallback",
+                    "fontes": [],
+                    "erro_pesquisa": str(erro_pesquisa)
+                }
+            except Exception as erro_gemini:
+                return {
+                    "tipo": "pesquisa_indisponivel",
+                    "rota": ROTA_PESQUISA_EXTERNA,
+                    "consulta": mensagem,
+                    "resposta": (
+                        "Não consegui consultar fontes externas agora, senhor. "
+                        "Também não foi possível obter o fallback do Gemini. "
+                        "Não vou inventar uma resposta."
+                    ),
+                    "origem": "gemini_google",
+                    "erro": (
+                        f"Pesquisa: {erro_pesquisa}; "
+                        f"Fallback: {erro_gemini}"
+                    )
+                }
+
+        resposta = resultado["resposta"]
+        fontes = resultado.get("fontes", [])
+
+        self.historico.append({
+            "role": "model",
+            "parts": [{"text": resposta}]
+        })
+
+        return {
+            "tipo": "pesquisa",
+            "resposta": resposta,
+            "rota": ROTA_PESQUISA_EXTERNA,
+            "consulta": mensagem,
+            "origem": "gemini_google",
+            "fontes": fontes
+        }
+
+    def _usar_ai(
+        self,
+        mensagem
+    ):
+
+        self.historico.append({
+            "role": "user",
+            "parts": [
+                {
+                    "text": mensagem
+                }
+            ]
+        })
+
+        contexto_memoria = json.dumps(
+            self.memoria,
+            ensure_ascii=False,
+            indent=2
+        )
+
+        contexto_entidade = None
+
+        if self.entidade_contextual is not None:
+
+            entidade = entity_store.obter_por_id(
+                self.entidades,
+                self.entidade_contextual["id"]
+            )
+
+            if entidade is not None:
+
+                contexto_entidade = json.dumps(
+                    entidade,
+                    ensure_ascii=False,
+                    indent=2
+                )
+
+        # Não envie consultas externas anteriores para o modelo local.
+        # Modelos pequenos podem copiar o assunto anterior e responder a ele
+        # em vez da mensagem atual. A pesquisa externa já mantém seu próprio
+        # contexto no caminho _pesquisar_web.
+        contexto_local = []
+        for item in self.conversa.ultimas_mensagens(6):
+            if not isinstance(item, dict):
+                continue
+
+            conteudo = item.get("conteudo", "").strip()
+            tipo = item.get("tipo")
+            rota_item = item.get("rota")
+
+            if not conteudo:
+                continue
+
+            # Turnos de pesquisa externa pertencem exclusivamente ao
+            # subsistema Web/Gemini. Nunca os reutilize como memória de prompt
+            # da IA local, inclusive as respostas da STACY a esses turnos.
+            if rota_item == ROTA_PESQUISA_EXTERNA:
+                continue
+
+            contexto_local.append(item)
+
+        contexto_conversa = json.dumps(
+            contexto_local[-6:],
+            ensure_ascii=False,
+            indent=2
+        )
+
+        erros = []
+
+        try:
+            if not ai.verificar_ia_local():
+                raise RuntimeError(
+                    "servidor local não está acessível"
+                )
+
+            historico_local = []
+            for item in self.conversa.ultimas_mensagens(12):
+                if not isinstance(item, dict):
+                    continue
+
+                if item.get("rota") == ROTA_PESQUISA_EXTERNA:
+                    continue
+
+                conteudo = item.get("conteudo", "").strip()
+                if not conteudo:
+                    continue
+
+                historico_local.append({
+                    "role": (
+                        "model"
+                        if item.get("tipo") == "stacy"
+                        else "user"
+                    ),
+                    "parts": [{"text": conteudo}]
+                })
+
+            resposta = ai.gerar_resposta_local(
+                historico_local,
+                contexto_memoria,
+                contexto_entidade,
+                contexto_conversa
+            )
+
+            origem = "local"
+
+        except Exception as erro_local:
+
+            erros.append(f"IA local: {erro_local}")
+
+            print(
+                "[STACY] IA local indisponível; "
+                "tentando Gemini como fallback..."
+            )
+
+            try:
+                resposta = ai.gerar_resposta(
+                    self.api_key,
+                    self.historico,
+                    contexto_memoria,
+                    contexto_entidade,
+                    contexto_conversa
+                )
+
+                origem = "gemini"
+
+            except Exception as erro_gemini:
+
+                erros.append(f"Gemini: {erro_gemini}")
+
+                raise RuntimeError(
+                    "Não consegui obter uma resposta da IA agora, senhor. "
+                    "A IA local está indisponível e o Gemini não respondeu dentro do tempo esperado."
+                ) from erro_gemini
+
+        self.historico.append({
+            "role": "model",
+            "parts": [
+                {
+                    "text": resposta
+                }
+            ]
+        })
+
+        return {
+            "tipo": "ai",
+            "resposta": resposta,
+            "origem": origem
+        }
