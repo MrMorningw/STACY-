@@ -1379,6 +1379,26 @@ class StacyOrchestrator:
 
         acao = intencao.get("acao")
 
+        if acao == "ultima":
+            tarefa = self.conversa.obter_ultima_tarefa()
+            if isinstance(tarefa, dict) and tarefa.get("titulo"):
+                resposta = f"A última tarefa criada é '{tarefa['titulo']}'."
+                if tarefa.get("data"):
+                    resposta += f" Data: {tarefa['data']}."
+                if tarefa.get("hora"):
+                    resposta += f" Horário: {tarefa['hora']}."
+                return {
+                    "tipo": "tarefa_ultima",
+                    "resposta": resposta,
+                    "tarefa": tarefa,
+                    "rota": ROTA_INTERNA
+                }
+            return {
+                "tipo": "tarefa_nao_encontrada",
+                "resposta": "Não encontrei nenhuma tarefa criada recentemente, senhor.",
+                "rota": ROTA_INTERNA
+            }
+
         if acao == "referencia":
             tarefa = self.conversa.obter_ultima_tarefa()
             if isinstance(tarefa, dict) and tarefa.get("titulo"):
