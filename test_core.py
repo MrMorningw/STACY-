@@ -945,6 +945,59 @@ class TestContextContinuity(unittest.TestCase):
         self.assertNotIn("tarefa para Stacy", resultado["resposta"])
 
 
+    def test_local_ai_failure_falls_back_to_gemini(self):
+        original_verificar = orchestrator.ai.verificar_ia_local
+        original_gerar = orchestrator.ai.gerar_resposta
+        try:
+            orchestrator.ai.verificar_ia_local = lambda: False
+            orchestrator.ai.gerar_resposta = lambda *args, **kwargs: "Resposta do Gemini."
+            self.orquestrador.api_key = "chave"
+            resultado = self.orquestrador.processar("explique responsabilidade civil")
+        finally:
+            orchestrator.ai.verificar_ia_local = original_verificar
+            orchestrator.ai.gerar_resposta = original_gerar
+
+        self.assertEqual(resultado["tipo"], "ai")
+        self.assertEqual(resultado["origem"], "gemini")
+        self.assertEqual(resultado["resposta"], "Resposta do Gemini.")
+
+    def test_research_failure_keeps_conversation_context_in_fallback(self):
+        original_pesquisa = orchestrator.ai.gerar_resposta_pesquisa
+        original_gerar = orchestrator.ai.gerar_resposta
+        chamadas = []
+        try:
+            def falhar_pesquisa(*args, **kwargs):
+                raise RuntimeError("Google Search indisponível")
+
+            def fallback(*args, **kwargs):
+                chamadas.append(args[1])
+                return "Fallback contextual."
+
+            orchestrator.ai.gerar_resposta_pesquisa = falhar_pesquisa
+            orchestrator.ai.gerar_resposta = fallback
+            self.orquestrador.api_key = "chave"
+            self.orquestrador.conversa.registrar_rota(
+                orchestrator.ROTA_PESQUISA_EXTERNA,
+                "quem foi Joao Eunápio Borges?"
+            )
+            resultado = self.orquestrador.processar("e qual foi sua obra principal?")
+
+        finally:
+            orchestrator.ai.gerar_resposta_pesquisa = original_pesquisa
+            orchestrator.ai.gerar_resposta = original_gerar
+
+        self.assertEqual(resultado["tipo"], "pesquisa_fallback")
+        self.assertEqual(resultado["resposta"], "Fallback contextual.")
+        self.assertTrue(chamadas)
+        textos = [
+            parte.get("text", "")
+            for item in chamadas[0]
+            for parte in item.get("parts", [])
+            if isinstance(parte, dict)
+        ]
+        self.assertIn("quem foi Joao Eunápio Borges?", textos)
+        self.assertIn("e qual foi sua obra principal?", textos)
+
 
 class TestTaskConversationCorrections(unittest.TestCase):
     def setUp(self):
