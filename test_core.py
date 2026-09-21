@@ -290,6 +290,24 @@ class CoreRoutingTests(unittest.TestCase):
         self.assertIn("operando normalmente", resultado["resposta"])
 
 
+    def test_price_question_goes_external(self):
+        self.assertEqual(
+            orchestrator.classificar_rota("quanto custa um notebook?"),
+            orchestrator.ROTA_PESQUISA_EXTERNA
+        )
+
+    def test_value_question_goes_external(self):
+        self.assertEqual(
+            orchestrator.classificar_rota("qual o valor de uma ação hoje?"),
+            orchestrator.ROTA_PESQUISA_EXTERNA
+        )
+
+    def test_date_question_goes_external(self):
+        self.assertEqual(
+            orchestrator.classificar_rota("qual a data de fundação da ONU?"),
+            orchestrator.ROTA_PESQUISA_EXTERNA
+        )
+
     def test_route_normal_conversation_is_local_ai(self):
         self.assertEqual(
             orchestrator.classificar_rota("você está aí?"),
