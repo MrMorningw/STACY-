@@ -124,7 +124,13 @@ def classificar_rota(mensagem, intencao=None, comando=None, conhecimento=False):
     if any(_contem_termo(texto, gatilho) for gatilho in gatilhos_fontes):
         return ROTA_PESQUISA_EXTERNA
 
-    # 3) PESQUISA IMPLÍCITA: atualidade ou fatos externos verificáveis.
+    # 3) CONHECIMENTO VERIFICADO: depois de pesquisa explícita e das
+    # operações internas, uma resposta já confirmada pelo CORE tem prioridade
+    # sobre qualquer rota implícita de pesquisa.
+    if conhecimento:
+        return ROTA_CONHECIMENTO
+
+    # 4) PESQUISA IMPLÍCITA: atualidade ou fatos externos verificáveis.
     termos_temporais = (
         "hoje", "agora", "atual", "atualmente", "ultimo", "ultima",
         "ultimos", "ultimas", "recentemente", "noticia", "noticias"
@@ -185,7 +191,7 @@ def classificar_rota(mensagem, intencao=None, comando=None, conhecimento=False):
     if any(padrao in texto for padrao in padroes_criterios):
         return ROTA_PESQUISA_EXTERNA
 
-    # 4) PESQUISA IMPLÍCITA: perguntas quantitativas factuais que não
+    # 5) PESQUISA IMPLÍCITA: perguntas quantitativas factuais que não
     # possuem resposta verificada no CORE.
     padroes_quantitativos = (
         "quanto tempo ",
