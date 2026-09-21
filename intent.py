@@ -122,13 +122,13 @@ def interpretar(mensagem):
     if corresponde_frase(
         normalizado_sem_acentos.rstrip("?!. ,;: "),
         consultas_stacy,
-        limiar=0.84
+        limiar=0.90
     ):
         return {"tipo": "identidade", "alvo": "stacy"}
 
     consultas_usuario = [
         "qual é o meu nome", "qual meu nome", "como eu me chamo",
-        "você sabe meu nome"
+        "você sabe meu nome", "e o meu nome", "e meu nome"
     ]
 
     consultas_projetos = [
@@ -161,7 +161,7 @@ def interpretar(mensagem):
 
     if corresponde_frase(consulta_sem_prefixo, consultas_usuario + [
         "qual e o meu nome", "qual meu nome", "como eu me chamo",
-        "voce sabe meu nome"
+        "voce sabe meu nome", "e o meu nome", "e meu nome"
     ]):
         return {"tipo": "memoria", "acao": "consultar", "categoria": "usuario"}
 
