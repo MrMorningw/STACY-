@@ -546,7 +546,21 @@ class StacyOrchestrator:
         # ainda não identificou uma operação. O Cortex continua sendo apenas
         # coordenador/validador; a IA não recebe autoridade para executar.
         decisao_ia = None
-        if intencao is None and comando is None:
+        # Não acione o modelo local quando o roteador determinístico já sabe
+        # que a mensagem é interna ou exige pesquisa externa. Isso evita
+        # chamadas desnecessárias e, principalmente, evita esperar o timeout
+        # do llama-server em testes e em consultas que já têm rota definida.
+        rota_inicial = classificar_rota(
+            mensagem,
+            intencao=intencao,
+            comando=comando,
+            conhecimento=False
+        )
+        if (
+            intencao is None
+            and comando is None
+            and rota_inicial == ROTA_IA_LOCAL
+        ):
             contexto_router = json.dumps(
                 self.conversa.ultimas_mensagens(4),
                 ensure_ascii=False
