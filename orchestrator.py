@@ -1153,24 +1153,22 @@ class StacyOrchestrator:
         entidade
     ):
 
-        identificador = entidade.get(
-            "id"
-        )
-
-        if not identificador:
-
+        # Contexto conversacional é temporário. Não gravamos automaticamente
+        # a entidade atual em entities.json, porque isso transformaria um
+        # referente de uma conversa em memória persistente.
+        if not isinstance(entidade, dict):
             return
 
-        contexto = (
-            entity_store.definir_contexto_persistente(
-                self.entidades,
-                identificador
-            )
-        )
+        identificador = entidade.get("id")
+        if not identificador:
+            return
 
-        if contexto is not None:
-
-            self.entidade_contextual = contexto
+        self.entidade_contextual = {
+            "id": entidade.get("id"),
+            "uuid": entidade.get("uuid"),
+            "categoria": entidade.get("categoria"),
+            "nome": entidade.get("nome")
+        }
 
     def _formatar_contexto(
         self,
