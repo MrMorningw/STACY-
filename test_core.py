@@ -626,7 +626,7 @@ class TestContextContinuity(unittest.TestCase):
             "objetivos": [],
             "preferencias": []
         }
-        entidades = []
+        entidades = {"entidades": []}
         self.orquestrador = orchestrator.StacyOrchestrator(
             "teste",
             memoria,
