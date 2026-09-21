@@ -1135,6 +1135,14 @@ class StacyOrchestrator:
                 self.conversa.registrar_entidade(
                     entidade_id
                 )
+        elif rota in {
+            ROTA_PESQUISA_EXTERNA,
+            ROTA_CONHECIMENTO
+        }:
+            # Uma nova pergunta factual sem entidade explícita encerra o
+            # referente conversacional anterior. Isso impede que um pronome
+            # posterior reutilize uma entidade de outro assunto.
+            self.conversa.limpar_entidade()
 
         if resultado.get("acao") is not None:
             self.conversa.registrar_acao(
