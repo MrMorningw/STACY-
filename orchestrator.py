@@ -576,30 +576,6 @@ class StacyOrchestrator:
         if not self._deve_preservar_entidade_conversacional(mensagem):
             self.conversa.limpar_entidade()
 
-        # Uma referência pronominal sem referente ativo não é uma nova
-        # pesquisa factual. Depois de uma mudança de assunto, expressões como
-        # "qual o nome dela?" devem permanecer na IA para que STACY peça
-        # esclarecimento, em vez de ressuscitar a pesquisa anterior.
-        texto_referencia = f" {_normalizar_rota(mensagem)} "
-        pronomes_sem_referente = (
-            "ele", "ela", "dele", "dela", "eles", "elas",
-            "deles", "delas", "esse", "essa", "isso",
-            "aquele", "aquela", "aquilo"
-        )
-        tem_referencia_sem_entidade = (
-            not self.conversa.obter_ultima_entidade()
-            and (
-                entity_resolver.detectar_referencia(mensagem) is not None
-                or any(
-                    _contem_termo(texto_referencia, pronome)
-                    for pronome in pronomes_sem_referente
-                )
-            )
-        )
-
-        if tem_referencia_sem_entidade:
-            return self._usar_ai(mensagem)
-
         comando = command.identificar_comando(mensagem)
         intencao = intent.interpretar(mensagem)
 
@@ -642,6 +618,28 @@ class StacyOrchestrator:
         resultado_tarefa = self._processar_tarefa(intencao)
         if resultado_tarefa is not None:
             return resultado_tarefa
+
+        # Somente depois de comandos/tarefas determinísticos, tratamos uma
+        # referência sem referente ativo como conversa para esclarecimento.
+        # Assim, "crie essa tarefa" continua sendo processado pelo CORE,
+        # enquanto "qual o nome dela?" após mudança de assunto não ressuscita
+        # pesquisa externa anterior.
+        texto_referencia = f" {_normalizar_rota(mensagem)} "
+        pronomes_sem_referente = (
+            "ele", "ela", "dele", "dela", "eles", "elas",
+            "deles", "delas", "esse", "essa", "isso",
+            "aquele", "aquela", "aquilo"
+        )
+        tem_pronome_sem_entidade = (
+            not self.conversa.obter_ultima_entidade()
+            and any(
+                _contem_termo(texto_referencia, pronome)
+                for pronome in pronomes_sem_referente
+            )
+        )
+
+        if tem_pronome_sem_entidade:
+            return self._usar_ai(mensagem)
 
         # O modelo local faz a interpretação semântica quando o CORE
         # ainda não identificou uma operação. O Cortex continua sendo apenas
