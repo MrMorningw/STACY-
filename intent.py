@@ -114,6 +114,20 @@ def interpretar(mensagem):
     if normalizado.startswith("esquecer "):
         return interpretar_memoria("esquecer", texto[9:].strip())
 
+    consultas_usuario = [
+        "qual é o meu nome", "qual meu nome", "como eu me chamo",
+        "você sabe meu nome", "e o meu nome", "e meu nome"
+    ]
+
+    # Identificação do usuário tem precedência sobre a identidade da STACY.
+    # Isso evita que a comparação aproximada de "seu nome" capture
+    # erroneamente frases como "e o meu nome?".
+    if normalizado_sem_acentos.rstrip("?!. ,;: ") in {
+        "qual e o meu nome", "qual meu nome", "como eu me chamo",
+        "voce sabe meu nome", "e o meu nome", "e meu nome"
+    }:
+        return {"tipo": "memoria", "acao": "consultar", "categoria": "usuario"}
+
     consultas_stacy = [
         "qual seu nome", "qual o seu nome", "como voce se chama",
         "quem e voce", "qual e o seu nome",
@@ -458,6 +472,17 @@ def interpretar_tarefa(mensagem):
         "adicione essa tarefa", "adicionar essa tarefa",
         "anote essa tarefa", "anotar essa tarefa"
     )
+
+    consultas_ultima_tarefa = (
+        "qual a ultima tarefa criada",
+        "qual e a ultima tarefa criada",
+        "qual a última tarefa criada",
+        "qual é a última tarefa criada",
+        "qual foi a ultima tarefa criada",
+        "qual foi a última tarefa criada"
+    )
+    if normalizado in consultas_ultima_tarefa:
+        return {"tipo": "tarefa", "acao": "ultima"}
 
     referencias_ultima = (
         "exclua a ultima tarefa criada", "exclua a ultima tarefa",
