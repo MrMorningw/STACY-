@@ -185,12 +185,6 @@ def classificar_rota(mensagem, intencao=None, comando=None, conhecimento=False):
     if any(padrao in texto for padrao in padroes_criterios):
         return ROTA_PESQUISA_EXTERNA
 
-    # CORE: um fato já verificado tem prioridade sobre qualquer
-    # padrão implícito de pesquisa. A pesquisa explícita já foi tratada
-    # acima e continua tendo prioridade absoluta.
-    if conhecimento:
-        return ROTA_CONHECIMENTO
-
     # 4) PESQUISA IMPLÍCITA: perguntas quantitativas factuais que não
     # possuem resposta verificada no CORE.
     padroes_quantitativos = (
@@ -229,6 +223,11 @@ def classificar_rota(mensagem, intencao=None, comando=None, conhecimento=False):
     # impedir uma resposta determinística do CORE quando ela já existir.
     # Ex.: "qual a cor de uma abobora?" pesquisa; "qual a cor de um gato
     # preto?" pode ser respondida pelo conhecimento verificado do CORE.
+    # A pesquisa explícita já foi tratada acima; aqui, conhecimento verificado
+    # pelo CORE deve vencer somente os padrões implícitos.
+    if conhecimento:
+        return ROTA_CONHECIMENTO
+
     padroes_fato_externo_simples = (
         "qual a cor de ",
         "qual e a cor de ",
