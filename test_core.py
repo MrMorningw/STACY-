@@ -794,5 +794,30 @@ class TestContextContinuity(unittest.TestCase):
         finally:
             orchestrator.tasks.buscar = original
 
+    def test_stacy_identity_is_not_user_memory(self):
+        resultado = self.orquestrador.processar("qual o seu nomee?")
+        self.assertEqual(resultado["tipo"], "local")
+        self.assertIn("STACY", resultado["resposta"])
+        self.assertNotIn("Danley", resultado["resposta"])
+
+    def test_generic_color_question_does_not_fall_into_memory(self):
+        original = orchestrator.ai.gerar_resposta_pesquisa
+        try:
+            orchestrator.ai.gerar_resposta_pesquisa = lambda *args, **kwargs: {
+                "resposta": "O céu normalmente aparece azul durante o dia.",
+                "fontes": []
+            }
+            resultado = self.orquestrador.processar("qual a cor do céu?")
+        finally:
+            orchestrator.ai.gerar_resposta_pesquisa = original
+
+        self.assertEqual(resultado["tipo"], "pesquisa")
+        self.assertNotIn("Danley", resultado["resposta"])
+
+    def test_task_list_tolerates_small_spelling_errors(self):
+        resultado = intent.interpretar("e aa minhas tafefas?")
+        self.assertEqual(resultado["tipo"], "tarefa")
+        self.assertEqual(resultado["acao"], "listar")
+
 if __name__ == "__main__":
     unittest.main()
