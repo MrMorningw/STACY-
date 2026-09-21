@@ -66,15 +66,23 @@ class ConversationState:
         # A rota pertence ao turno inteiro. Marcamos a última mensagem do
         # usuário e a resposta correspondente para que cada consumidor possa
         # filtrar seu próprio contexto sem depender de outro componente.
-        encontrados = 0
-        for item in reversed(self.historico):
-            if item.get("rota") is not None:
-                continue
-            if item.get("tipo") in {"usuario", "stacy"}:
-                item["rota"] = rota
-                encontrados += 1
-                if encontrados == 2:
-                    break
+        indice_usuario = None
+        for indice in range(len(self.historico) - 1, -1, -1):
+            if self.historico[indice].get("tipo") == "usuario":
+                indice_usuario = indice
+                break
+
+        if indice_usuario is None:
+            return
+
+        self.historico[indice_usuario]["rota"] = rota
+
+        indice_resposta = indice_usuario + 1
+        if (
+            indice_resposta < len(self.historico)
+            and self.historico[indice_resposta].get("tipo") == "stacy"
+        ):
+            self.historico[indice_resposta]["rota"] = rota
 
     def registrar_tarefa(self, tarefa):
         self.ultima_tarefa = tarefa
