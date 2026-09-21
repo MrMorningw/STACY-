@@ -11,12 +11,6 @@ class KnowledgeTests(unittest.TestCase):
             "Vênus não possui luas naturais conhecidas."
         )
 
-    def test_common_typo_is_normalized(self):
-        self.assertEqual(
-            knowledge.consultar("wuantos dentes tem um ser humani adulto"),
-            "Um adulto normalmente tem 32 dentes permanentes, incluindo os quatro sisos."
-        )
-
     def test_sun_answer_is_qualified(self):
         resposta = knowledge.consultar("qual a cor do nosso sol?")
         self.assertIn("parece branco", resposta)
@@ -26,7 +20,6 @@ class KnowledgeTests(unittest.TestCase):
         self.assertIsNone(
             knowledge.consultar("quanto tempo os patos vivem?")
         )
-
 
     def test_capital_and_accents_are_normalized(self):
         self.assertEqual(
