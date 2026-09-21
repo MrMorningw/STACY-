@@ -134,6 +134,9 @@ def interpretar_contexto(
 
     else:
 
+        if contexto_atual is None and entity_resolver.detectar_referencia(mensagem) is not None:
+            return None
+
         entidade = (
             contexto_atual
             if contexto_atual is not None
