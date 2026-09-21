@@ -34,9 +34,46 @@ def corresponde_frase(texto, candidatos, limiar=0.93):
 
     return False
 
+def remover_prefixo_conversacional(texto):
+    """Remove uma reação/conector inicial sem apagar o pedido seguinte."""
+    import re
+
+    texto = (texto or "").strip()
+    if not texto:
+        return texto
+
+    prefixos = (
+        "que bom", "otimo", "ótimo", "perfeito", "certo", "ok",
+        "beleza", "entao", "então", "show", "legal", "entendi"
+    )
+    padrao = r"^\\s*(?:" + "|".join(re.escape(p) for p in prefixos) + r")"
+    padrao += r"(?:\\s*[,;:.!?-]\\s*|\\s+)(.+)$"
+    resultado = re.match(padrao, texto, flags=re.IGNORECASE)
+    if resultado:
+        return resultado.group(1).strip()
+    return texto
+
+
+def _corrigir_erros_tarefa(texto):
+    """Corrige somente erros ortográficos inequívocos no contexto de tarefas."""
+    substituicoes = {
+        "tarafe": "tarefa",
+        "tareffa": "tarefa",
+        "estudaf": "estudar",
+        "estudr": "estudar",
+        "amanh": "amanha",
+        "direto penal": "direito penal",
+    }
+    resultado = texto
+    for errado, correto in substituicoes.items():
+        resultado = resultado.replace(errado, correto)
+        resultado = resultado.replace(errado.capitalize(), correto)
+    return resultado
+
+
 def interpretar(mensagem):
 
-    texto = mensagem.strip()
+    texto = remover_prefixo_conversacional(mensagem)
     normalizado = texto.lower().rstrip("?!.,;: ")
     normalizado_sem_acentos = "".join(
         caractere
@@ -205,7 +242,13 @@ def interpretar(mensagem):
         "voce lembra meus objetivos",
         "quais sao os meus objetivos",
         "e os meus objetivos",
-        "e meus objetivos"
+        "e meus objetivos",
+        "quais sao minhas metas",
+        "quais sao as minhas metas",
+        "quais minhas metas",
+        "e minhas metas",
+        "e as minhas metas",
+        "minhas metas"
     ]):
         return {
             "tipo": "memoria",
@@ -714,7 +757,7 @@ def extrair_data_hora_tarefa(texto):
 
 def interpretar_tarefa(mensagem):
 
-    texto = mensagem.strip()
+    texto = _corrigir_erros_tarefa(mensagem.strip())
     normalizado = texto.lower().rstrip("?!.,;: ")
 
     # =========================
@@ -736,10 +779,20 @@ def interpretar_tarefa(mensagem):
     ]
 
     for gatilho in gatilhos_criar:
+        gatilho_limpo = gatilho.rstrip()
+        corresponde = normalizado.startswith(gatilho)
+        tamanho_prefixo = len(gatilho_limpo)
 
-        if normalizado.startswith(gatilho):
+        if not corresponde and len(normalizado) >= tamanho_prefixo:
+            prefixo_digitado = normalizado[:tamanho_prefixo]
+            corresponde = SequenceMatcher(
+                None,
+                prefixo_digitado,
+                gatilho_limpo
+            ).ratio() >= 0.84
 
-            titulo_bruto = texto[len(gatilho):].strip()
+        if corresponde:
+            titulo_bruto = texto[tamanho_prefixo:].strip()
 
             if not titulo_bruto:
                 return None
@@ -747,6 +800,10 @@ def interpretar_tarefa(mensagem):
             titulo, data, hora = extrair_data_hora_tarefa(
                 titulo_bruto
             )
+
+            titulo = titulo.strip()
+            if titulo.lower().startswith("para "):
+                titulo = titulo[5:].strip()
 
             if not titulo:
                 return None
