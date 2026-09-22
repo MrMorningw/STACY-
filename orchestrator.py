@@ -317,6 +317,12 @@ class StacyOrchestrator:
         )
 
     def processar(self, mensagem):
+        resultado = self._processar_interno(mensagem)
+
+        return self._registrar_resultado_conversa(
+            resultado
+        )
+
     def _processar_ctac_mepo(self, mensagem):
         texto = _normalizar_rota(mensagem)
         consultas_ctac = (
@@ -341,13 +347,6 @@ class StacyOrchestrator:
                 "mepos": mepo.listar(), "rota": ROTA_INTERNA
             }
         return None
-
-
-        resultado = self._processar_interno(mensagem)
-
-        return self._registrar_resultado_conversa(
-            resultado
-        )
 
     def _processar_interno(self, mensagem):
 
