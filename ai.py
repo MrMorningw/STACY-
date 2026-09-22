@@ -490,7 +490,8 @@ def gerar_resposta_hibrida(
     historico,
     contexto_memoria,
     contexto_entidade=None,
-    contexto_conversa=None
+    contexto_conversa=None,
+    historico_gemini=None
 ):
     """Política definitiva de geração: IA local primeiro, Gemini como fallback."""
     erros = []
@@ -522,7 +523,7 @@ def gerar_resposta_hibrida(
     try:
         resposta = gerar_resposta(
             api_key,
-            historico,
+            historico_gemini if historico_gemini is not None else historico,
             contexto_memoria,
             contexto_entidade,
             contexto_conversa
