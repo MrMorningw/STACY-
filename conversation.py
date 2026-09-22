@@ -66,10 +66,16 @@ class ConversationState:
         self.ultima_entidade_id = None
         self.ultima_atualizacao = time.time()
 
-    def registrar_acao(self, acao):
+    def registrar_acao(self, acao, aguardando_confirmacao=False):
 
-        self.ultima_acao = acao
+        self.ultima_acao = dict(acao) if isinstance(acao, dict) else acao
+        self.operacao_atual = dict(acao) if isinstance(acao, dict) else acao
         self.ultima_atualizacao = time.time()
+
+        if aguardando_confirmacao:
+            self.estado_operacional = "aguardando_confirmacao"
+        elif self.estado_operacional != "erro":
+            self.estado_operacional = "concluido"
 
     def registrar_acao_pendente(self, acao):
         self.registrar_acao(acao, aguardando_confirmacao=True)
