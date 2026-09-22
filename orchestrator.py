@@ -2160,13 +2160,34 @@ class StacyOrchestrator:
             indent=2
         )
 
+        # Converta apenas os turnos não externos para o histórico da IA local.
+        # O Gemini continua recebendo o histórico completo da sessão.
+        historico_local = []
+        for item in contexto_local:
+            tipo = item.get("tipo")
+            conteudo = item.get("conteudo", "").strip()
+            if not conteudo or tipo not in {"usuario", "stacy"}:
+                continue
+            historico_local.append({
+                "role": "user" if tipo == "usuario" else "model",
+                "parts": [{"text": conteudo}]
+            })
+
+        # Garanta que a consulta atual seja o último turno do histórico local.
+        if not historico_local or historico_local[-1]["parts"][0]["text"] != mensagem:
+            historico_local.append({
+                "role": "user",
+                "parts": [{"text": mensagem}]
+            })
+
         try:
             resultado_hibrido = ai.gerar_resposta_hibrida(
                 self.api_key,
-                self.historico,
+                historico_local,
                 contexto_memoria,
                 contexto_entidade,
-                contexto_conversa
+                contexto_conversa,
+                historico_gemini=self.historico
             )
             resposta = resultado_hibrido["resposta"]
             origem = resultado_hibrido["origem"]
