@@ -14,6 +14,8 @@ import conversation
 import tasks
 import knowledge
 import cortex
+import ctac
+import mepo
 
 
 
@@ -315,6 +317,31 @@ class StacyOrchestrator:
         )
 
     def processar(self, mensagem):
+    def _processar_ctac_mepo(self, mensagem):
+        texto = _normalizar_rota(mensagem)
+        consultas_ctac = (
+            "ctac", "o que e ctac", "o que e o ctac",
+            "status do ctac", "estado do ctac", "situacao do ctac",
+            "coerencia da trajetoria"
+        )
+        consultas_mepo = (
+            "mepos", "mepos atuais", "quais mepos", "quais sao os mepos",
+            "quais sao meus mepos", "qual meu mepo", "qual e meu mepo",
+            "qual o mepo atual", "qual e o mepo atual", "status dos mepos"
+        )
+        if texto in consultas_ctac or "status do ctac" in texto or "estado do ctac" in texto:
+            validacao = ctac.validar_coerencia()
+            return {
+                "tipo": "ctac", "resposta": ctac.formatar_estado(),
+                "estado_ctac": validacao, "rota": ROTA_INTERNA
+            }
+        if texto in consultas_mepo or "quais sao os mepos" in texto:
+            return {
+                "tipo": "mepos", "resposta": ctac.formatar_mepos(),
+                "mepos": mepo.listar(), "rota": ROTA_INTERNA
+            }
+        return None
+
 
         resultado = self._processar_interno(mensagem)
 
@@ -644,6 +671,11 @@ class StacyOrchestrator:
         resultado_tarefa = self._processar_tarefa(intencao)
         if resultado_tarefa is not None:
             return resultado_tarefa
+
+        # CTAC/MEPO é contexto interno da trajetória: não passa por IA/Web.
+        resultado_ctac = self._processar_ctac_mepo(mensagem)
+        if resultado_ctac is not None:
+            return resultado_ctac
 
         # Somente depois de comandos/tarefas determinísticos, tratamos uma
         # referência sem referente ativo como conversa para esclarecimento.
