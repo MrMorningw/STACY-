@@ -2036,45 +2036,22 @@ class StacyOrchestrator:
                 historico_pesquisa
             )
         except Exception as erro_pesquisa:
-            # A pesquisa com Google Search é a primeira tentativa. Se o
-            # grounding falhar (por quota, indisponibilidade ou outro erro
-            # transitório), ainda tentamos o Gemini normal como fallback.
-            # Esse fallback NÃO é apresentado como pesquisa verificada e
-            # NÃO recebe memória persistente do usuário.
-            try:
-                fallback_historico = historico_pesquisa
-                resposta_fallback = ai.gerar_resposta(
-                    self.api_key,
-                    fallback_historico,
-                    "{}",
-                    None,
-                    None
-                )
-                return {
-                    "tipo": "pesquisa_fallback",
-                    "rota": ROTA_PESQUISA_EXTERNA,
-                    "consulta": mensagem,
-                    "resposta": resposta_fallback,
-                    "origem": "gemini_fallback",
-                    "fontes": [],
-                    "erro_pesquisa": str(erro_pesquisa)
-                }
-            except Exception as erro_gemini:
-                return {
-                    "tipo": "pesquisa_indisponivel",
-                    "rota": ROTA_PESQUISA_EXTERNA,
-                    "consulta": mensagem,
-                    "resposta": (
-                        "Não consegui consultar fontes externas agora, senhor. "
-                        "Também não foi possível obter o fallback do Gemini. "
-                        "Não vou inventar uma resposta."
-                    ),
-                    "origem": "gemini_google",
-                    "erro": (
-                        f"Pesquisa: {erro_pesquisa}; "
-                        f"Fallback: {erro_gemini}"
-                    )
-                }
+            # Pesquisa externa exige verificação externa. Não substitua uma
+            # pesquisa malsucedida por uma resposta comum do Gemini, pois isso
+            # confundiria conhecimento não verificado com informação pesquisada.
+            return {
+                "tipo": "pesquisa_indisponivel",
+                "rota": ROTA_PESQUISA_EXTERNA,
+                "consulta": mensagem,
+                "resposta": (
+                    "Não consegui consultar fontes externas agora, senhor. "
+                    "A pesquisa não foi verificada; não vou apresentar "
+                    "uma resposta factual como se tivesse sido confirmada."
+                ),
+                "origem": "gemini_google",
+                "fontes": [],
+                "erro": str(erro_pesquisa)
+            }
 
         resposta = resultado["resposta"]
         fontes = resultado.get("fontes", [])
