@@ -395,11 +395,11 @@ class StacyOrchestrator:
 
             confirmacao = _normalizar_confirmacao(mensagem)
 
+            acao = self.acao_pendente
+
             if confirmacao in {
                 "sim", "s", "pode", "confirmo", "confirmado"
             }:
-
-                acao = self.acao_pendente
 
                 if acao.get("tipo") == "remover_tarefa":
                     resultado = tasks.remover(
