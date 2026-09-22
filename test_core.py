@@ -2,6 +2,8 @@ import unittest
 
 import intent
 import orchestrator
+import cortex
+import entity_resolver
 
 
 class CoreRoutingTests(unittest.TestCase):
@@ -53,6 +55,12 @@ class CoreRoutingTests(unittest.TestCase):
         resultado = self.orquestrador.processar("quais sao os meus objetivos ?")
         self.assertEqual(resultado["tipo"], "local")
         self.assertIn("aprender ingles", resultado["resposta"])
+
+    def test_objectives_query_without_article_uses_core(self):
+        resultado = self.orquestrador.processar("quais sao meus objetivos?")
+        self.assertEqual(resultado["tipo"], "local")
+        self.assertIn("aprender ingles", resultado["resposta"])
+        self.assertEqual(resultado.get("categoria"), "objetivos")
 
     def test_objectives_query_does_not_collide_with_projects(self):
         resultado = intent.interpretar("quais sao os meus objetivos ?")
@@ -167,6 +175,78 @@ class CoreRoutingTests(unittest.TestCase):
             orchestrator.classificar_rota(
                 "quanto tempo vivem os patos?",
                 conhecimento=False,
+            ),
+            orchestrator.ROTA_PESQUISA_EXTERNA
+        )
+
+    def test_conceptual_question_stays_local(self):
+        self.assertEqual(
+            orchestrator.classificar_rota(
+                "o que é responsabilidade civil?",
+                conhecimento=False,
+            ),
+            orchestrator.ROTA_IA_LOCAL
+        )
+
+    def test_trivial_color_question_uses_core_knowledge(self):
+        resultado = self.orquestrador.processar("qual a cor de um gato preto?")
+        self.assertEqual(resultado["tipo"], "conhecimento_verificado")
+        self.assertIn("preta", resultado["resposta"])
+
+    def test_local_result_is_registered_as_internal(self):
+        self.orquestrador.processar("como voce esta?")
+        self.assertEqual(
+            self.orquestrador.conversa.ultima_rota,
+            orchestrator.ROTA_INTERNA
+        )
+
+    def test_last_question_is_resolved_from_conversation_history(self):
+        self.orquestrador.processar("Qual é a capital do Brasil?")
+        self.orquestrador.processar("Qual foi a última pergunta que eu fiz?")
+        resultado = self.orquestrador.processar("Qual foi a última pergunta que eu fiz?")
+        self.assertEqual(resultado["tipo"], "local")
+        self.assertIn("Qual foi a última pergunta que eu fiz?", resultado["resposta"])
+
+    def test_generic_color_and_difference_questions_are_external(self):
+        self.assertEqual(
+            orchestrator.classificar_rota("qual a cor de uma abobora?"),
+            orchestrator.ROTA_PESQUISA_EXTERNA
+        )
+        self.assertEqual(
+            orchestrator.classificar_rota(
+                "qual a diferenca entre responsabilidade civil objetiva e subjetiva?"
+            ),
+            orchestrator.ROTA_PESQUISA_EXTERNA
+        )
+
+    def test_capital_fact_question_is_external_without_core_answer(self):
+        self.assertEqual(
+            orchestrator.classificar_rota(
+                "qual a capital de Portugal?",
+                conhecimento=False,
+            ),
+            orchestrator.ROTA_PESQUISA_EXTERNA
+        )
+
+    def test_first_question_is_resolved_from_conversation_history(self):
+        self.orquestrador.processar("Qual é a capital do Brasil?")
+        self.orquestrador.processar("Qual é a cor de uma abóbora?")
+        resultado = self.orquestrador.processar(
+            "Qual foi a primeira pergunta nesta conversa?"
+        )
+        self.assertEqual(resultado["tipo"], "local")
+        self.assertIn("Qual é a capital do Brasil?", resultado["resposta"])
+
+    def test_generic_color_question_goes_external(self):
+        self.assertEqual(
+            orchestrator.classificar_rota("qual a cor de uma abobora?"),
+            orchestrator.ROTA_PESQUISA_EXTERNA
+        )
+
+    def test_generic_difference_question_goes_external(self):
+        self.assertEqual(
+            orchestrator.classificar_rota(
+                "qual a diferenca entre responsabilidade civil objetiva e subjetiva?"
             ),
             orchestrator.ROTA_PESQUISA_EXTERNA
         )
@@ -350,7 +430,6 @@ class CoreRoutingTests(unittest.TestCase):
         self.assertEqual(resultado["tipo"], "local")
         self.assertIn("operando normalmente", resultado["resposta"])
 
-
     def test_price_question_goes_external(self):
         self.assertEqual(
             orchestrator.classificar_rota("quanto custa um notebook?"),
@@ -388,7 +467,7 @@ class CoreRoutingTests(unittest.TestCase):
 
     def test_route_question_words_alone_stay_local(self):
         self.assertEqual(
-            orchestrator.classificar_rota("qual a diferença entre responsabilidade objetiva e subjetiva?"),
+            orchestrator.classificar_rota("qual?"),
             orchestrator.ROTA_IA_LOCAL
         )
 
@@ -466,16 +545,28 @@ class CoreRoutingTests(unittest.TestCase):
         self.assertEqual(resultado["tipo"], "pesquisa")
         self.assertIn("expectativa de vida", resultado["resposta"])
 
-    def test_web_research_failure_returns_clean_result(self):
-        original = orchestrator.ai.gerar_resposta_pesquisa
+    def test_web_research_failure_uses_gemini_fallback(self):
+        original_pesquisa = orchestrator.ai.gerar_resposta_pesquisa
+        original_gemini = orchestrator.ai.gerar_resposta
         try:
-            orchestrator.ai.gerar_resposta_pesquisa = lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("429 quota"))
-            resultado = self.orquestrador.processar("pesquise a população atual do Brasil")
+            orchestrator.ai.gerar_resposta_pesquisa = (
+                lambda *args, **kwargs:
+                (_ for _ in ()).throw(RuntimeError("429 quota"))
+            )
+            orchestrator.ai.gerar_resposta = (
+                lambda *args, **kwargs: "Resposta de fallback."
+            )
+            resultado = self.orquestrador.processar(
+                "pesquise a população atual do Brasil"
+            )
         finally:
-            orchestrator.ai.gerar_resposta_pesquisa = original
+            orchestrator.ai.gerar_resposta_pesquisa = original_pesquisa
+            orchestrator.ai.gerar_resposta = original_gemini
 
-        self.assertEqual(resultado["tipo"], "pesquisa_indisponivel")
-        self.assertIn("Não vou inventar", resultado["resposta"])
+        self.assertEqual(resultado["tipo"], "pesquisa_fallback")
+        self.assertEqual(resultado["origem"], "gemini_fallback")
+        self.assertEqual(resultado["fontes"], [])
+        self.assertEqual(resultado["resposta"], "Resposta de fallback.")
 
     def test_user_memory_key_value_format_is_persisted(self):
         original_save = orchestrator.memory.salvar_memoria
@@ -504,7 +595,7 @@ class CoreRoutingTests(unittest.TestCase):
         self.assertEqual(resultado["tipo"], "erro_tarefa")
 
     def test_memory_recall_is_human_readable(self):
-        resultado = self.orquestrador.processar("o que você guardou de mim?")
+        resultado = self.orquestrador.processar("mostre minha memória")
         self.assertEqual(resultado["tipo"], "local")
         self.assertIn("STACY", resultado["resposta"])
         self.assertIn("aprender ingles", resultado["resposta"])
@@ -553,8 +644,6 @@ class CoreRoutingTests(unittest.TestCase):
         self.assertEqual(resultado["tipo"], "memoria")
         self.assertEqual(resultado["categoria"], "projetos")
 
-
-
     def test_common_factual_questions_go_external(self):
         casos = [
             "qual o aumentativo de abobora?",
@@ -568,6 +657,756 @@ class CoreRoutingTests(unittest.TestCase):
                     orchestrator.classificar_rota(mensagem),
                     orchestrator.ROTA_PESQUISA_EXTERNA
                 )
+
+
+    def test_cortex_structures_task_request(self):
+        decisao = cortex.analisar(
+            "crie uma tarefa estudar direito amanhã",
+            intencao={"tipo": "tarefa", "acao": "criar", "titulo": "estudar direito"},
+        )
+        self.assertEqual(decisao["modo"], cortex.MODO_ACAO)
+        self.assertTrue(decisao["needs_action"])
+        self.assertEqual(decisao["ferramenta"], "tasks")
+        self.assertEqual(decisao["confidence"], 1.0)
+
+    def test_cortex_structures_memory_request(self):
+        decisao = cortex.analisar(
+            "quais sao meus objetivos",
+            intencao={"tipo": "memoria", "acao": "consultar", "categoria": "objetivos"},
+        )
+        self.assertEqual(decisao["modo"], cortex.MODO_MEMORIA)
+        self.assertTrue(decisao["needs_memory"])
+        self.assertFalse(decisao["needs_web"])
+
+    def test_cortex_structures_explicit_research(self):
+        decisao = cortex.analisar("pesquise a populacao atual do Brasil")
+        self.assertEqual(decisao["modo"], cortex.MODO_PESQUISA)
+        self.assertTrue(decisao["needs_web"])
+        self.assertEqual(decisao["ferramenta"], "web")
+
+    def test_cortex_does_not_use_local_ai_as_factual_authority(self):
+        decisao = cortex.analisar("qual a cor de uma abobora?")
+        self.assertEqual(decisao["modo"], cortex.MODO_PESQUISA)
+        self.assertTrue(decisao["needs_web"])
+
+    def test_cortex_keeps_open_conversation_local(self):
+        decisao = cortex.analisar("me ajuda a organizar meus estudos")
+        self.assertEqual(decisao["modo"], cortex.MODO_CONVERSA)
+        self.assertFalse(decisao["needs_web"])
+        self.assertFalse(decisao["needs_action"])
+
+    def test_orchestrator_exposes_structured_cortex_decision(self):
+        resultado = self.orquestrador.processar("qual a cor de uma abobora?")
+        self.assertEqual(
+            self.orquestrador.ultima_decisao["modo"],
+            cortex.MODO_PESQUISA
+        )
+        self.assertTrue(self.orquestrador.ultima_decisao["needs_web"])
+
+
+    def test_cortex_keeps_conceptual_qual_question_local(self):
+        decisao = cortex.analisar("qual e uma boa forma de estudar direito?")
+        self.assertEqual(decisao["modo"], cortex.MODO_CONVERSA)
+        self.assertEqual(decisao["ferramenta"], "local_ai")
+        self.assertFalse(decisao["needs_web"])
+
+    def test_cortex_keeps_conceptual_me_diga_question_local(self):
+        decisao = cortex.analisar("me diga como organizar meus estudos")
+        self.assertEqual(decisao["modo"], cortex.MODO_CONVERSA)
+        self.assertEqual(decisao["ferramenta"], "local_ai")
+        self.assertFalse(decisao["needs_web"])
+
+    def test_cortex_keeps_conceptual_o_que_e_question_local(self):
+        decisao = cortex.analisar("o que e responsabilidade civil?")
+        self.assertEqual(decisao["modo"], cortex.MODO_CONVERSA)
+        self.assertEqual(decisao["ferramenta"], "local_ai")
+        self.assertFalse(decisao["needs_web"])
+
+class TestContextContinuity(unittest.TestCase):
+
+    def setUp(self):
+        memoria = {
+            "usuario": {"nome": "Danley"},
+            "projetos": [],
+            "objetivos": [],
+            "preferencias": []
+        }
+        entidades = {"entidades": []}
+        self.orquestrador = orchestrator.StacyOrchestrator(
+            "teste",
+            memoria,
+            entidades
+        )
+
+    def test_conversation_state_keeps_structured_continuity(self):
+        self.orquestrador.conversa.registrar_rota(
+            orchestrator.ROTA_PESQUISA_EXTERNA,
+            "capital do Brasil"
+        )
+        self.assertEqual(
+            self.orquestrador.conversa.ultima_consulta,
+            "capital do Brasil"
+        )
+        self.assertEqual(
+            self.orquestrador.conversa.ultima_rota,
+            orchestrator.ROTA_PESQUISA_EXTERNA
+        )
+
+    def test_task_time_followup_updates_last_task(self):
+        original_criar = orchestrator.tasks.criar
+        original_atualizar = orchestrator.tasks.atualizar
+        try:
+            tarefa = {
+                "id": "T-1",
+                "titulo": "estudar responsabilidade civil",
+                "data": "2026-09-22",
+                "hora": None,
+                "status": "pendente"
+            }
+            orchestrator.tasks.criar = lambda *args, **kwargs: tarefa.copy()
+            atualizado = tarefa.copy()
+            atualizado["hora"] = "19:00"
+            orchestrator.tasks.atualizar = lambda *args, **kwargs: atualizado
+
+            resultado = self.orquestrador.processar(
+                "crie uma tarefa estudar responsabilidade civil amanhã"
+            )
+            self.assertEqual(resultado["tipo"], "tarefa_criada")
+
+            resultado = self.orquestrador.processar("e coloque para 19h")
+            self.assertEqual(resultado["tipo"], "tarefa_atualizada")
+            self.assertEqual(resultado["tarefa"]["hora"], "19:00")
+        finally:
+            orchestrator.tasks.criar = original_criar
+            orchestrator.tasks.atualizar = original_atualizar
+
+    def test_research_followup_includes_previous_subject(self):
+        original = orchestrator.ai.gerar_resposta_pesquisa
+        consultas = []
+        try:
+            def pesquisa_mock(api_key, historico):
+                consultas.append(historico)
+                return {
+                    "resposta": "Resultado pesquisado.",
+                    "fontes": []
+                }
+
+            orchestrator.ai.gerar_resposta_pesquisa = pesquisa_mock
+            self.orquestrador.processar(
+                "pesquise sobre responsabilidade objetiva"
+            )
+            resultado = self.orquestrador.processar(
+                "e na responsabilidade do empregador?"
+            )
+            self.assertEqual(resultado["tipo"], "pesquisa")
+            textos = [
+                p["text"]
+                for m in consultas[-1]
+                for p in m.get("parts", [])
+                if isinstance(p, dict) and "text" in p
+            ]
+            self.assertTrue(
+                any("responsabilidade objetiva" in t.lower() for t in textos)
+            )
+        finally:
+            orchestrator.ai.gerar_resposta_pesquisa = original
+
+    def test_local_ai_does_not_receive_external_research_turns(self):
+        original_pesquisa = orchestrator.ai.gerar_resposta_pesquisa
+        original_health = orchestrator.ai.verificar_ia_local
+        original_local = orchestrator.ai.gerar_resposta_local
+        capturado = []
+
+        try:
+            orchestrator.ai.gerar_resposta_pesquisa = lambda *args, **kwargs: {
+                "resposta": "Resposta externa sobre responsabilidade objetiva.",
+                "fontes": []
+            }
+            orchestrator.ai.verificar_ia_local = lambda: True
+
+            def local_mock(historico, *args, **kwargs):
+                capturado.append(historico)
+                return "Resposta local."
+
+            orchestrator.ai.gerar_resposta_local = local_mock
+
+            self.orquestrador.processar(
+                "pesquise sobre responsabilidade objetiva"
+            )
+            resultado = self.orquestrador.processar(
+                "me ajude a organizar meus estudos"
+            )
+
+            self.assertEqual(resultado["tipo"], "ai")
+            textos = [
+                parte["text"]
+                for mensagem in capturado[-1]
+                for parte in mensagem.get("parts", [])
+                if isinstance(parte, dict) and "text" in parte
+            ]
+            self.assertFalse(
+                any("responsabilidade objetiva" in texto.lower() for texto in textos)
+            )
+            self.assertIn("organizar meus estudos", textos[-1].lower())
+        finally:
+            orchestrator.ai.gerar_resposta_pesquisa = original_pesquisa
+            orchestrator.ai.verificar_ia_local = original_health
+            orchestrator.ai.gerar_resposta_local = original_local
+
+    def test_research_adapter_preserves_history_for_external_followup(self):
+        original = orchestrator.ai.gerar_resposta_pesquisa
+        consultas = []
+
+        try:
+            def pesquisa_mock(api_key, historico):
+                consultas.append(historico)
+                return {
+                    "resposta": "Resultado pesquisado.",
+                    "fontes": []
+                }
+
+            orchestrator.ai.gerar_resposta_pesquisa = pesquisa_mock
+            self.orquestrador.processar(
+                "pesquise sobre responsabilidade objetiva"
+            )
+            self.orquestrador.processar(
+                "e na responsabilidade do empregador?"
+            )
+
+            textos = [
+                parte["text"]
+                for mensagem in consultas[-1]
+                for parte in mensagem.get("parts", [])
+                if isinstance(parte, dict) and "text" in parte
+            ]
+            self.assertIn("pesquise sobre responsabilidade objetiva", textos)
+            self.assertIn("e na responsabilidade do empregador?", textos)
+        finally:
+            orchestrator.ai.gerar_resposta_pesquisa = original
+
+    def test_ambiguous_task_target_asks_instead_of_guessing(self):
+        original = orchestrator.tasks.buscar
+        try:
+            orchestrator.tasks.buscar = lambda *args, **kwargs: [
+                {"id": "1", "titulo": "estudar direito"},
+                {"id": "2", "titulo": "estudar direito tributário"}
+            ]
+            resultado = self.orquestrador.processar(
+                "conclua a tarefa estudar direito"
+            )
+            self.assertEqual(resultado["tipo"], "tarefa_ambigua")
+            self.assertIn("mais de uma tarefa", resultado["resposta"])
+        finally:
+            orchestrator.tasks.buscar = original
+
+    def test_conversation_entity_resolves_pronoun(self):
+        entidade = {
+            "id": "P-A1",
+            "uuid": "uuid-p-a1",
+            "categoria": "projetos",
+            "nome": "STACY",
+            "atributos": {"objetivo": "assistente pessoal"},
+            "relacoes": [],
+            "historico": []
+        }
+        self.orquestrador.entidades["entidades"].append(entidade)
+
+        resultado = self.orquestrador.processar(
+            "o que voce sabe sobre STACY?"
+        )
+        self.assertEqual(resultado["tipo"], "local")
+
+        resultado = self.orquestrador.processar(
+            "e qual o nome dela?"
+        )
+        self.assertEqual(resultado["tipo"], "local")
+        self.assertIn("STACY", resultado["resposta"])
+
+    def test_topic_change_clears_stale_conversational_entity(self):
+        entidade = {
+            "id": "P-A1",
+            "uuid": "uuid-p-a1",
+            "categoria": "projetos",
+            "nome": "STACY",
+            "atributos": {},
+            "relacoes": [],
+            "historico": []
+        }
+        self.orquestrador.entidades["entidades"].append(entidade)
+
+        self.orquestrador.processar("o que voce sabe sobre STACY?")
+
+        original = orchestrator.ai.gerar_resposta_pesquisa
+        try:
+            orchestrator.ai.gerar_resposta_pesquisa = lambda *args, **kwargs: {
+                "resposta": "A capital da França é Paris.",
+                "fontes": [{"titulo": "Fonte teste", "url": "https://example.com"}]
+            }
+            self.orquestrador.processar("qual a capital da França?")
+        finally:
+            orchestrator.ai.gerar_resposta_pesquisa = original
+
+        self.assertIsNone(
+            self.orquestrador.conversa.obter_ultima_entidade()
+        )
+
+        self.orquestrador._usar_ai = lambda mensagem: {
+            "tipo": "ai",
+            "resposta": "Não tenho um referente suficiente.",
+            "origem": "teste"
+        }
+        resultado = self.orquestrador.processar("e qual o nome dela?")
+        self.assertEqual(resultado["tipo"], "ai")
+
+    def test_conversation_entity_does_not_become_persistent_context(self):
+        entidade = {
+            "id": "P-A1",
+            "uuid": "uuid-p-a1",
+            "categoria": "projetos",
+            "nome": "STACY",
+            "atributos": {},
+            "relacoes": [],
+            "historico": []
+        }
+        self.orquestrador.entidades["entidades"].append(entidade)
+
+        self.orquestrador.processar("o que voce sabe sobre STACY?")
+
+        self.assertNotIn(
+            "contexto",
+            self.orquestrador.entidades
+        )
+        self.assertEqual(
+            self.orquestrador.entidade_contextual["id"],
+            "P-A1"
+        )
+
+    def test_explicit_persistent_context_remains_available(self):
+        entidade = {
+            "id": "P-A1",
+            "uuid": "uuid-p-a1",
+            "categoria": "projetos",
+            "nome": "STACY",
+            "atributos": {},
+            "relacoes": [],
+            "historico": []
+        }
+        self.orquestrador.entidades["entidades"].append(entidade)
+
+        contexto = orchestrator.entity_store.definir_contexto_persistente(
+            self.orquestrador.entidades,
+            "P-A1"
+        )
+
+        self.assertEqual(contexto["id"], "P-A1")
+        self.assertEqual(
+            self.orquestrador.entidades["contexto"]["id"],
+            "P-A1"
+        )
+
+    def test_entity_resolver_can_disable_persistent_fallback(self):
+        dados = {
+            "entidades": [{
+                "id": "P-A1",
+                "uuid": "uuid-p-a1",
+                "categoria": "projetos",
+                "nome": "STACY",
+                "atributos": {},
+                "relacoes": [],
+                "historico": []
+            }],
+            "contexto": {
+                "id": "P-A1",
+                "uuid": "uuid-p-a1",
+                "categoria": "projetos",
+                "nome": "STACY"
+            }
+        }
+
+        resultado = entity_resolver.resolver(
+            "ele",
+            dados,
+            contexto_atual=None,
+            usar_contexto_persistente=False
+        )
+        self.assertIsNone(resultado)
+
+    def test_unresolved_pronoun_does_not_use_persistent_entity(self):
+        entidade = {
+            "id": "P-A1",
+            "uuid": "uuid-p-a1",
+            "categoria": "projetos",
+            "nome": "STACY",
+            "atributos": {},
+            "relacoes": [],
+            "historico": []
+        }
+        self.orquestrador.entidades["entidades"].append(entidade)
+        self.orquestrador.entidades["contexto"] = {
+            "id": "P-A1",
+            "uuid": "uuid-p-a1",
+            "categoria": "projetos",
+            "nome": "STACY"
+        }
+
+        self.orquestrador._usar_ai = lambda mensagem: {
+            "tipo": "ai",
+            "resposta": "Resposta de teste.",
+            "origem": "local"
+        }
+        resultado = self.orquestrador.processar("ele")
+        self.assertEqual(resultado["tipo"], "ai")
+
+    def test_local_ai_receives_contextual_followup(self):
+        original_health = orchestrator.ai.verificar_ia_local
+        original_local = orchestrator.ai.gerar_resposta_local
+        capturado = []
+
+        try:
+            orchestrator.ai.verificar_ia_local = lambda: True
+
+            def local_mock(historico, *args, **kwargs):
+                capturado.append(historico)
+                return "Resposta contextual."
+
+            orchestrator.ai.gerar_resposta_local = local_mock
+
+            self.orquestrador.processar(
+                "explique responsabilidade civil objetiva"
+            )
+            resultado = self.orquestrador.processar(
+                "e como funciona na pratica?"
+            )
+
+            self.assertEqual(resultado["tipo"], "ai")
+            textos = [
+                parte["text"]
+                for mensagem in capturado[-1]
+                for parte in mensagem.get("parts", [])
+                if isinstance(parte, dict) and "text" in parte
+            ]
+            self.assertIn(
+                "explique responsabilidade civil objetiva",
+                textos
+            )
+            self.assertIn(
+                "e como funciona na pratica?",
+                textos
+            )
+        finally:
+            orchestrator.ai.verificar_ia_local = original_health
+            orchestrator.ai.gerar_resposta_local = original_local
+
+    def test_stacy_identity_is_not_user_memory(self):
+        resultado = self.orquestrador.processar("qual o seu nomee?")
+        self.assertEqual(resultado["tipo"], "local")
+        self.assertIn("STACY", resultado["resposta"])
+        self.assertNotIn("Danley", resultado["resposta"])
+
+    def test_generic_color_question_does_not_fall_into_memory(self):
+        original = orchestrator.ai.gerar_resposta_pesquisa
+        try:
+            orchestrator.ai.gerar_resposta_pesquisa = lambda *args, **kwargs: {
+                "resposta": "O céu normalmente aparece azul durante o dia.",
+                "fontes": []
+            }
+            resultado = self.orquestrador.processar("qual a cor do céu?")
+        finally:
+            orchestrator.ai.gerar_resposta_pesquisa = original
+
+        self.assertEqual(resultado["tipo"], "pesquisa")
+        self.assertNotIn("Danley", resultado["resposta"])
+
+    def test_task_list_tolerates_small_spelling_errors(self):
+        resultado = intent.interpretar("e aa minhas tafefas?")
+        self.assertEqual(resultado["tipo"], "tarefa")
+        self.assertEqual(resultado["acao"], "listar")
+
+    def test_conversational_prefix_is_removed_before_routing(self):
+        resultado = intent.interpretar("que bom. quais sao minhas tarefas?")
+        self.assertEqual(resultado["tipo"], "tarefa")
+        self.assertEqual(resultado["acao"], "listar")
+
+    def test_task_creation_extracts_hour_written_as_horas(self):
+        resultado = intent.interpretar(
+            "crie uma tarefa estudar direito amanhã 18 horas"
+        )
+        self.assertEqual(resultado["tipo"], "tarefa")
+        self.assertEqual(resultado["acao"], "criar")
+        self.assertEqual(resultado["titulo"], "estudar direito")
+        self.assertEqual(resultado["hora"], "18:00")
+
+    def test_task_typo_and_hour_are_normalized_together(self):
+        resultado = intent.interpretar(
+            "crie uma tarafe para estudaf amanha 18 horas direto penal"
+        )
+        self.assertEqual(resultado["titulo"], "estudar direito penal")
+        self.assertEqual(resultado["hora"], "18:00")
+
+    def test_conversational_prefix_does_not_break_task_list(self):
+        resultado = intent.interpretar("que bom. quais sao minhas tarefas?")
+        self.assertEqual(resultado["tipo"], "tarefa")
+        self.assertEqual(resultado["acao"], "listar")
+
+    def test_conversational_prefix_does_not_break_task_creation(self):
+        resultado = intent.interpretar(
+            "otimo. crie uma tarefa estudar responsabilidade civil amanhã às 18h"
+        )
+        self.assertEqual(resultado["tipo"], "tarefa")
+        self.assertEqual(resultado["acao"], "criar")
+        self.assertEqual(resultado["titulo"], "estudar responsabilidade civil")
+        self.assertEqual(resultado["hora"], "18:00")
+
+    def test_task_creation_tolerates_command_typos(self):
+        resultado = intent.interpretar(
+            "crie uma tarafe para estudaf amanha 18 horas direto penal"
+        )
+        self.assertEqual(resultado["tipo"], "tarefa")
+        self.assertEqual(resultado["acao"], "criar")
+        self.assertEqual(resultado["titulo"], "estudar direito penal")
+        self.assertEqual(resultado["hora"], "18:00")
+
+    def test_goals_alias_is_internal_objectives_query(self):
+        resultado = intent.interpretar("e minhas metas?")
+        self.assertEqual(resultado["tipo"], "memoria")
+        self.assertEqual(resultado["categoria"], "objetivos")
+
+    def test_ambiguous_task_reference_does_not_become_literal_title(self):
+        resultado = intent.interpretar("crie essa tarefa stacy")
+        self.assertEqual(resultado["tipo"], "tarefa")
+        self.assertEqual(resultado["acao"], "referencia")
+
+    def test_ambiguous_task_reference_uses_last_task_context(self):
+        self.orquestrador.conversa.registrar_tarefa({
+            "id": "T-1",
+            "titulo": "estudar direito",
+            "status": "pendente"
+        })
+        resultado = self.orquestrador.processar("crie essa tarefa stacy")
+        self.assertEqual(resultado["tipo"], "clarificacao")
+        self.assertIn("estudar direito", resultado["resposta"])
+        self.assertNotIn("tarefa para Stacy", resultado["resposta"])
+
+
+    def test_local_ai_failure_falls_back_to_gemini(self):
+        original_verificar = orchestrator.ai.verificar_ia_local
+        original_gerar = orchestrator.ai.gerar_resposta
+        try:
+            orchestrator.ai.verificar_ia_local = lambda: False
+            orchestrator.ai.gerar_resposta = lambda *args, **kwargs: "Resposta do Gemini."
+            self.orquestrador.api_key = "chave"
+            self.orquestrador._usar_ai = orchestrator.StacyOrchestrator._usar_ai.__get__(
+                self.orquestrador,
+                orchestrator.StacyOrchestrator
+            )
+            resultado = self.orquestrador.processar("explique responsabilidade civil")
+        finally:
+            orchestrator.ai.verificar_ia_local = original_verificar
+            orchestrator.ai.gerar_resposta = original_gerar
+
+        self.assertEqual(resultado["tipo"], "ai")
+        self.assertEqual(resultado["origem"], "gemini")
+        self.assertEqual(resultado["resposta"], "Resposta do Gemini.")
+
+    def test_research_failure_keeps_conversation_context_in_fallback(self):
+        original_pesquisa = orchestrator.ai.gerar_resposta_pesquisa
+        original_gerar = orchestrator.ai.gerar_resposta
+        chamadas = []
+        try:
+            def falhar_pesquisa(*args, **kwargs):
+                raise RuntimeError("Google Search indisponível")
+
+            def fallback(*args, **kwargs):
+                chamadas.append(args[1])
+                return "Fallback contextual."
+
+            orchestrator.ai.gerar_resposta_pesquisa = falhar_pesquisa
+            orchestrator.ai.gerar_resposta = fallback
+            self.orquestrador.api_key = "chave"
+            self.orquestrador.conversa.registrar_mensagem(
+                "quem foi Joao Eunápio Borges?"
+            )
+            self.orquestrador.conversa.registrar_rota(
+                orchestrator.ROTA_PESQUISA_EXTERNA,
+                "quem foi Joao Eunápio Borges?"
+            )
+            resultado = self.orquestrador.processar("e qual foi sua obra principal?")
+
+        finally:
+            orchestrator.ai.gerar_resposta_pesquisa = original_pesquisa
+            orchestrator.ai.gerar_resposta = original_gerar
+
+        self.assertEqual(resultado["tipo"], "pesquisa_fallback")
+        self.assertEqual(resultado["resposta"], "Fallback contextual.")
+        self.assertTrue(chamadas)
+        textos = [
+            parte.get("text", "")
+            for item in chamadas[0]
+            for parte in item.get("parts", [])
+            if isinstance(parte, dict)
+        ]
+        self.assertIn("quem foi Joao Eunápio Borges?", textos)
+        self.assertIn("e qual foi sua obra principal?", textos)
+
+
+class TestTaskConversationCorrections(unittest.TestCase):
+    def setUp(self):
+        self.memoria = {
+            "usuario": {"nome": "Danley"},
+            "preferencias": [],
+            "projetos": [],
+            "objetivos": [],
+            "informacoes": []
+        }
+        self.entidades = {"entidades": []}
+        self.orquestrador = orchestrator.StacyOrchestrator(
+            api_key=None,
+            memoria=self.memoria,
+            entidades=self.entidades
+        )
+
+
+    def test_task_creation_corrects_cokega_and_removes_temporal_connector(self):
+        resultado = intent.interpretar(
+            "crie uma tarefa para ir visitar meu cokega as 16 horas de amanha"
+        )
+        self.assertEqual(resultado["tipo"], "tarefa")
+        self.assertEqual(resultado["acao"], "criar")
+        self.assertEqual(resultado["titulo"], "ir visitar meu colega")
+        self.assertEqual(resultado["hora"], "16:00")
+        self.assertIsNotNone(resultado["data"])
+
+    def test_user_name_is_not_classified_as_stacy_identity(self):
+        for mensagem in ("qual meu nome?", "e o meu nome?"):
+            with self.subTest(mensagem=mensagem):
+                resultado = intent.interpretar(mensagem)
+                self.assertEqual(resultado["tipo"], "memoria")
+                self.assertEqual(resultado["categoria"], "usuario")
+
+    def test_delete_last_task_is_internal_reference(self):
+        resultado = intent.interpretar("exclua a ultima tarefa criada")
+        self.assertEqual(resultado["tipo"], "tarefa")
+        self.assertEqual(resultado["acao"], "remover")
+        self.assertEqual(resultado["referencia"], "ultima")
+
+    def test_delete_her_is_internal_reference(self):
+        resultado = intent.interpretar("exclua ela")
+        self.assertEqual(resultado["tipo"], "tarefa")
+        self.assertEqual(resultado["acao"], "remover")
+        self.assertEqual(resultado["referencia"], "ultima")
+
+    def test_correct_last_task_title_by_replacement(self):
+        resultado = intent.interpretar(
+            "arrume o nome de cokega para colega da tarefa criada"
+        )
+        self.assertEqual(resultado["tipo"], "tarefa")
+        self.assertEqual(resultado["acao"], "corrigir_titulo")
+        self.assertEqual(resultado["referencia"], "ultima")
+        self.assertEqual(resultado["antigo"], "cokega")
+        self.assertEqual(resultado["novo"], "colega")
+
+    def test_delete_last_task_asks_confirmation_instead_of_web(self):
+        self.orquestrador.conversa.registrar_tarefa({
+            "id": "T-1",
+            "titulo": "ir visitar meu colega",
+            "status": "pendente"
+        })
+        resultado = self.orquestrador.processar(
+            "exclua a ultima tarefa criada"
+        )
+        self.assertEqual(resultado["tipo"], "confirmacao")
+        self.assertIn("ir visitar meu colega", resultado["resposta"])
+        self.assertEqual(resultado["rota"], orchestrator.ROTA_INTERNA)
+
+    def test_correct_last_task_title_executes_locally(self):
+        original = orchestrator.tasks.atualizar
+        try:
+            self.orquestrador.conversa.registrar_tarefa({
+                "id": "T-1",
+                "titulo": "ir visitar meu cokega",
+                "status": "pendente"
+            })
+            atualizado = {
+                "id": "T-1",
+                "titulo": "ir visitar meu colega",
+                "status": "pendente"
+            }
+            orchestrator.tasks.atualizar = lambda *args, **kwargs: atualizado
+            resultado = self.orquestrador.processar(
+                "arrume o nome de cokega para colega da tarefa criada"
+            )
+        finally:
+            orchestrator.tasks.atualizar = original
+
+        self.assertEqual(resultado["tipo"], "tarefa_atualizada")
+        self.assertIn("ir visitar meu colega", resultado["resposta"])
+
+
+    def test_conversational_prefix_maravilha_preserves_task(self):
+        resultado = intent.interpretar(
+            "maravilha. crie uma tarefa estudar direito amanhã"
+        )
+        self.assertEqual(resultado["tipo"], "tarefa")
+        self.assertEqual(resultado["acao"], "criar")
+        self.assertEqual(resultado["titulo"], "estudar direito")
+
+    def test_conversational_prefix_que_bom_preserves_memory_question(self):
+        resultado = intent.interpretar(
+            "que bom! quais sao meus objetivos?"
+        )
+        self.assertEqual(resultado["tipo"], "memoria")
+        self.assertEqual(resultado["acao"], "consultar")
+        self.assertEqual(resultado["categoria"], "objetivos")
+
+    def test_multiple_conversational_prefixes_preserve_task(self):
+        resultado = intent.interpretar(
+            "que bom, maravilha, crie uma tarefa estudar responsabilidade civil"
+        )
+        self.assertEqual(resultado["tipo"], "tarefa")
+        self.assertEqual(resultado["acao"], "criar")
+        self.assertEqual(resultado["titulo"], "estudar responsabilidade civil")
+
+    def test_conversational_prefix_preserves_research_request(self):
+        resultado = intent.interpretar(
+            "perfeito. pesquise sobre responsabilidade civil"
+        )
+        self.assertIsNone(resultado)
+
+
+
+    def test_user_memory_key_value_format_is_persisted(self):
+        original_save = orchestrator.memory.salvar_memoria
+        try:
+            orchestrator.memory.salvar_memoria = lambda memoria: None
+            resultado = self.orquestrador.processar(
+                "memorize usuario.nome=Danley"
+            )
+        finally:
+            orchestrator.memory.salvar_memoria = original_save
+
+        self.assertEqual(resultado["tipo"], "local")
+        self.assertEqual(self.memoria["usuario"]["nome"], "Danley")
+
+    def test_pending_action_failure_is_handled_without_key_error(self):
+        self.orquestrador.acao_pendente = {
+            "tipo": "remover_tarefa",
+            "tarefa_id": "T-1"
+        }
+        original_remover = orchestrator.tasks.remover
+        try:
+            orchestrator.tasks.remover = lambda _id: None
+            resultado = self.orquestrador.processar("sim")
+        finally:
+            orchestrator.tasks.remover = original_remover
+        self.assertEqual(resultado["tipo"], "erro_tarefa")
+
+    def test_memory_recall_is_human_readable(self):
+        self.memoria["projetos"] = [{"id": "P-A1", "valor": "STACY"}]
+        self.memoria["objetivos"] = [{"id": "O-A1", "valor": "aprender ingles"}]
+        resultado = self.orquestrador.processar("mostre minha memória")
+        self.assertEqual(resultado["tipo"], "local")
+        self.assertIn("STACY", resultado["resposta"])
+        self.assertIn("aprender ingles", resultado["resposta"])
 
 if __name__ == "__main__":
     unittest.main()

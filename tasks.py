@@ -170,3 +170,27 @@ def remover(tarefa_id):
     salvar(novas_tarefas)
 
     return removida
+
+
+def atualizar(tarefa_id, titulo=None, data=None, hora=None):
+    """Atualiza os campos fornecidos de uma tarefa existente."""
+    if not tarefa_id:
+        return None
+
+    tarefas = carregar()
+
+    for tarefa in tarefas:
+        if tarefa.get("id") != tarefa_id:
+            continue
+
+        if titulo is not None:
+            tarefa["titulo"] = titulo
+        if data is not None:
+            tarefa["data"] = data
+        if hora is not None:
+            tarefa["hora"] = hora
+
+        salvar(tarefas)
+        return tarefa
+
+    return None

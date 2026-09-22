@@ -90,7 +90,8 @@ def detectar_consulta_entidade(mensagem):
 def interpretar_contexto(
     mensagem,
     entity_store,
-    entidades
+    entidades,
+    contexto_atual=None
 ):
 
     consulta = detectar_consulta_entidade(
@@ -100,13 +101,20 @@ def interpretar_contexto(
     if consulta is None:
         return None
 
-    resolvida = entity_resolver.resolver(
-        mensagem,
-        entidades,
-        obter_entidade_contextual(
+    # A entidade da conversa atual tem prioridade. O contexto persistente
+    # continua disponível como fallback para consultas explícitas de entidade,
+    # mas não deve substituir uma referência conversacional já resolvida.
+    entidade_contextual = contexto_atual
+    if entidade_contextual is None and entity_resolver.detectar_referencia(mensagem) is None:
+        entidade_contextual = obter_entidade_contextual(
             entity_store,
             entidades
         )
+
+    resolvida = entity_resolver.resolver(
+        mensagem,
+        entidades,
+        entidade_contextual
     )
 
     if resolvida is not None:
@@ -126,9 +134,16 @@ def interpretar_contexto(
 
     else:
 
-        entidade = obter_entidade_contextual(
-            entity_store,
-            entidades
+        if contexto_atual is None and entity_resolver.detectar_referencia(mensagem) is not None:
+            return None
+
+        entidade = (
+            contexto_atual
+            if contexto_atual is not None
+            else obter_entidade_contextual(
+                entity_store,
+                entidades
+            )
         )
 
         if entidade is None:

@@ -141,6 +141,36 @@ class AIInfrastructureTests(unittest.TestCase):
         self.assertIn("ÚLTIMA MENSAGEM DO USUÁRIO", sistema)
         self.assertIn("não responda uma mensagem anterior", sistema)
 
+    @patch("ai.requests.post")
+    def test_local_chat_uses_openai_compatible_endpoint(self, mock_post):
+        class Response:
+            status_code = 200
+            text = "ok"
+            def json(self):
+                return {"choices": [{"message": {"content": "Resposta local."}}]}
+        mock_post.return_value = Response()
+        resultado = ai.gerar_resposta_local([{"role": "user", "parts": [{"text": "oi"}]}], "{}")
+        self.assertEqual(resultado, "Resposta local.")
+        self.assertEqual(mock_post.call_args.args[0], ai.config.LOCAL_AI_URL)
+        self.assertEqual(mock_post.call_args.kwargs["json"]["messages"][-1]["content"], "oi")
+        self.assertFalse(mock_post.call_args.kwargs["json"]["stream"])
+
+    @patch("ai.requests.post")
+    def test_local_chat_invalid_response_fails_closed(self, mock_post):
+        class Response:
+            status_code = 200
+            text = "ok"
+            def json(self):
+                return {"choices": []}
+        mock_post.return_value = Response()
+        with self.assertRaises(RuntimeError):
+            ai.gerar_resposta_local([{"role": "user", "parts": [{"text": "oi"}]}], "{}")
+
+    @patch("ai.requests.get")
+    def test_local_health_rejects_non_200(self, mock_get):
+        mock_get.return_value.status_code = 503
+        self.assertFalse(ai.verificar_ia_local())
+
 
 if __name__ == "__main__":
     unittest.main()

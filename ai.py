@@ -1,4 +1,5 @@
 import requests
+import json
 import config
 import response_guard
 from urllib.parse import urlparse
@@ -166,7 +167,10 @@ def gerar_resposta_pesquisa(
         f"models/{config.MODELO}:generateContent"
     )
 
-    historico_pesquisa = historico[-1:] if historico else []
+    # A pesquisa recebe o contexto externo já preparado pelo orchestrator.
+    # Não reduza para apenas a última mensagem: referências como "isso",
+    # "ele" e "sua classificação" dependem do turno anterior.
+    historico_pesquisa = historico[-8:] if historico else []
 
     sistema = (
         "Você é STACY, assistente pessoal do senhor Danley. "
@@ -408,3 +412,74 @@ def gerar_resposta_local(
         resposta,
         historico_local[-1]["parts"][0]["text"] if historico_local and historico_local[-1].get("parts") else None
     )
+
+def analisar_rota_local(mensagem, contexto_conversa=None):
+    """Interpreta linguagem natural para roteamento; não executa ações."""
+    if not verificar_ia_local():
+        raise RuntimeError("servidor local não está acessível.")
+
+    capacidades = (
+        "chat=conversa; answer=conhecimento; research=pesquisa externa; "
+        "action=ação executável; memory=memória; clarify=pedido ambíguo."
+    )
+    contexto = (contexto_conversa or "").strip()
+    if len(contexto) > 1200:
+        contexto = contexto[-1200:]
+
+    sistema = (
+        "Você é o intérprete de linguagem da STACY. "
+        "Apenas classifique a intenção e a capacidade necessária. "
+        "Não execute ações, não grave memória, não pesquise e não responda. "
+        "Retorne SOMENTE JSON válido com as chaves modo, capacidade, consulta, "
+        "dados, confidence e motivo. dados deve ser um objeto vazio quando não "
+        "houver operação estruturada. Para tarefas, use dados com acao, titulo, "
+        "data e hora quando aplicável. Para memória, use acao, categoria e valor "
+        "quando aplicável. modo deve ser chat, answer, research, action, memory "
+        "ou clarify. capacidade deve ser chat, knowledge, web, tasks, memory ou "
+        "core. Se houver dúvida real ou faltar dado essencial para uma ação, use "
+        "clarify. Não invente dados. " + capacidades
+    )
+    if contexto:
+        sistema += "\nContexto recente para resolver referências:\n" + contexto
+
+    payload = {
+        "messages": [
+            {"role": "system", "content": sistema},
+            {"role": "user", "content": mensagem.strip()}
+        ],
+        "temperature": 0.0,
+        "max_tokens": getattr(config, "LOCAL_ROUTER_MAX_TOKENS", 96),
+        "stream": False
+    }
+
+    modelo = getattr(config, "LOCAL_ROUTER_MODEL", None)
+    if modelo:
+        payload["model"] = modelo
+
+    response = requests.post(
+        config.LOCAL_AI_URL,
+        json=payload,
+        timeout=config.LOCAL_AI_TIMEOUT
+    )
+    if response.status_code != 200:
+        raise RuntimeError(f"Roteador local HTTP {response.status_code}: {response.text[:500]}")
+
+    data = response.json()
+    try:
+        texto = data["choices"][0]["message"]["content"].strip()
+    except (KeyError, IndexError, TypeError) as erro:
+        raise RuntimeError(f"Resposta do roteador local inválida: {data}") from erro
+
+    texto = texto.strip()
+    if texto.startswith("```") and texto.endswith("```"):
+        texto = texto.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+
+    try:
+        decisao = json.loads(texto)
+    except (ValueError, TypeError) as erro:
+        raise RuntimeError(f"Roteador local não retornou JSON válido: {texto}") from erro
+
+    if not isinstance(decisao, dict):
+        raise RuntimeError("Roteador local retornou formato inválido.")
+
+    return decisao

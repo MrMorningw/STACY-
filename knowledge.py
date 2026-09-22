@@ -46,6 +46,13 @@ CONHECIMENTO_VERIFICADO = [
         ),
         "Um carro vermelho é, por definição, vermelho."
     ),
+    (
+        re.compile(
+            r"qual a cor de um gato preto|qual e a cor de um gato preto",
+            re.I
+        ),
+        "Um gato preto tem pelagem predominantemente preta."
+    ),
 ]
 
 

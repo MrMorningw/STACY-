@@ -1,4 +1,5 @@
 import json
+import re
 import unicodedata
 from difflib import SequenceMatcher
 import context
@@ -12,6 +13,9 @@ import action
 import conversation
 import tasks
 import knowledge
+import cortex
+import ctac
+import mepo
 
 
 
@@ -122,7 +126,13 @@ def classificar_rota(mensagem, intencao=None, comando=None, conhecimento=False):
     if any(_contem_termo(texto, gatilho) for gatilho in gatilhos_fontes):
         return ROTA_PESQUISA_EXTERNA
 
-    # 3) PESQUISA IMPLÍCITA: atualidade ou fatos externos verificáveis.
+    # 3) CONHECIMENTO VERIFICADO: depois de pesquisa explícita e das
+    # operações internas, uma resposta já confirmada pelo CORE tem prioridade
+    # sobre qualquer rota implícita de pesquisa.
+    if conhecimento:
+        return ROTA_CONHECIMENTO
+
+    # 4) PESQUISA IMPLÍCITA: atualidade ou fatos externos verificáveis.
     termos_temporais = (
         "hoje", "agora", "atual", "atualmente", "ultimo", "ultima",
         "ultimos", "ultimas", "recentemente", "noticia", "noticias"
@@ -136,7 +146,8 @@ def classificar_rota(mensagem, intencao=None, comando=None, conhecimento=False):
         "quanto tempo vivem", "quantos anos vive", "qual a idade de",
         "qual o tamanho de", "qual a populacao de",
         "qual e a populacao de", "qual a capital de",
-        "qual e a capital de", "qual a temperatura de",
+        "qual e a capital de", "qual a capital da",
+        "qual e a capital da", "qual a temperatura de",
         "qual e a temperatura de", "qual a distancia de",
         "qual e a distancia de", "qual a massa de",
         "qual e a massa de", "qual a velocidade de",
@@ -154,6 +165,18 @@ def classificar_rota(mensagem, intencao=None, comando=None, conhecimento=False):
     # Perguntas sobre critérios/requisitos/classificação pedem fatos e
     # definições verificáveis. Elas devem sair para pesquisa externa quando
     # não forem atendidas pelo CORE, sem depender do assunto específico.
+    padroes_traducao = (
+        "como se diz ",
+        "como se fala ",
+        "como falar ",
+        "traduza ",
+        "traduz ",
+        "traducao de ",
+        "tradução de "
+    )
+    if any(padrao in texto for padrao in padroes_traducao):
+        return ROTA_PESQUISA_EXTERNA
+
     padroes_criterios = (
         "criterios para",
         "criterios de",
@@ -171,13 +194,7 @@ def classificar_rota(mensagem, intencao=None, comando=None, conhecimento=False):
     if any(padrao in texto for padrao in padroes_criterios):
         return ROTA_PESQUISA_EXTERNA
 
-    # CORE: um fato já verificado tem prioridade sobre qualquer
-    # padrão implícito de pesquisa. A pesquisa explícita já foi tratada
-    # acima e continua tendo prioridade absoluta.
-    if conhecimento:
-        return ROTA_CONHECIMENTO
-
-    # 4) PESQUISA IMPLÍCITA: perguntas quantitativas factuais que não
+    # 5) PESQUISA IMPLÍCITA: perguntas quantitativas factuais que não
     # possuem resposta verificada no CORE.
     padroes_quantitativos = (
         "quanto tempo ",
@@ -211,9 +228,32 @@ def classificar_rota(mensagem, intencao=None, comando=None, conhecimento=False):
     if any(padrao in texto for padrao in padroes_traducao):
         return ROTA_PESQUISA_EXTERNA
 
-    # 6) PESQUISA IMPLÍCITA: perguntas factuais comuns que um modelo local
-    # pequeno não deve responder por palpite. O CORE pode atender fatos
-    # previamente verificados; os demais seguem para pesquisa externa.
+    # Alguns fatos simples são verificáveis externamente, mas não devem
+    # impedir uma resposta determinística do CORE quando ela já existir.
+    # Ex.: "qual a cor de uma abobora?" pesquisa; "qual a cor de um gato
+    # preto?" pode ser respondida pelo conhecimento verificado do CORE.
+    # A pesquisa explícita já foi tratada acima; aqui, conhecimento verificado
+    # pelo CORE deve vencer somente os padrões implícitos.
+    if conhecimento:
+        return ROTA_CONHECIMENTO
+
+    padroes_fato_externo_simples = (
+        "qual a cor de ",
+        "qual e a cor de ",
+        "qual a cor do ",
+        "qual e a cor do ",
+        "qual a diferenca entre ",
+        "qual e a diferenca entre ",
+        "onde fica ",
+        "quando foi ",
+        "quem foi ",
+    )
+    if any(padrao in texto for padrao in padroes_fato_externo_simples):
+        return ROTA_PESQUISA_EXTERNA
+
+    # Perguntas conceituais, explicativas e triviais sem um padrão factual
+    # específico permanecem na IA local, salvo quando o usuário pedir
+    # pesquisa/fonte ou houver marcador de atualidade tratado acima.
     padroes_fato_comum = (
         "qual o nome ",
         "qual e o nome ",
@@ -267,6 +307,7 @@ class StacyOrchestrator:
         self.entidades = entidades
         self.historico = []
         self.acao_pendente = None
+        self.ultima_decisao = None
         self.conversa = conversation.ConversationState()
 
         self.entidade_contextual = (
@@ -276,12 +317,36 @@ class StacyOrchestrator:
         )
 
     def processar(self, mensagem):
-
         resultado = self._processar_interno(mensagem)
 
         return self._registrar_resultado_conversa(
             resultado
         )
+
+    def _processar_ctac_mepo(self, mensagem):
+        texto = _normalizar_rota(mensagem)
+        consultas_ctac = (
+            "ctac", "o que e ctac", "o que e o ctac",
+            "status do ctac", "estado do ctac", "situacao do ctac",
+            "coerencia da trajetoria"
+        )
+        consultas_mepo = (
+            "mepos", "mepos atuais", "quais mepos", "quais sao os mepos",
+            "quais sao meus mepos", "qual meu mepo", "qual e meu mepo",
+            "qual o mepo atual", "qual e o mepo atual", "status dos mepos"
+        )
+        if texto in consultas_ctac or "status do ctac" in texto or "estado do ctac" in texto:
+            validacao = ctac.validar_coerencia()
+            return {
+                "tipo": "ctac", "resposta": ctac.formatar_estado(),
+                "estado_ctac": validacao, "rota": ROTA_INTERNA
+            }
+        if texto in consultas_mepo or "quais sao os mepos" in texto:
+            return {
+                "tipo": "mepos", "resposta": ctac.formatar_mepos(),
+                "mepos": mepo.listar(), "rota": ROTA_INTERNA
+            }
+        return None
 
     def _processar_interno(self, mensagem):
 
@@ -327,7 +392,7 @@ class StacyOrchestrator:
         # contexto depois de uma interação curta.
         self.conversa.registrar_mensagem(mensagem)
 
-        if mensagem_normalizada in respostas_locais:
+        if self.acao_pendente is None and mensagem_normalizada in respostas_locais:
             return {
                 "tipo": "local",
                 "resposta": respostas_locais[mensagem_normalizada]
@@ -335,7 +400,7 @@ class StacyOrchestrator:
 
         # Tolerância geral para pequenas falhas de digitação em frases locais.
         for frase, resposta in respostas_locais.items():
-            if len(mensagem_normalizada) >= 6:
+            if self.acao_pendente is None and len(mensagem_normalizada) >= 6:
                 similaridade = SequenceMatcher(
                     None,
                     mensagem_normalizada,
@@ -356,11 +421,11 @@ class StacyOrchestrator:
 
             confirmacao = _normalizar_confirmacao(mensagem)
 
+            acao = self.acao_pendente
+
             if confirmacao in {
                 "sim", "s", "pode", "confirmo", "confirmado"
             }:
-
-                acao = self.acao_pendente
 
                 if acao.get("tipo") == "remover_tarefa":
                     resultado = tasks.remover(
@@ -375,7 +440,8 @@ class StacyOrchestrator:
                             "resposta": (
                                 "Não consegui remover "
                                 "a tarefa, senhor."
-                            )
+                            ),
+                            "acao": acao
                         }
 
                     return {
@@ -384,7 +450,8 @@ class StacyOrchestrator:
                             f"Removida, senhor: "
                             f"'{resultado['titulo']}'."
                         ),
-                        "tarefa": resultado
+                        "tarefa": resultado,
+                        "acao": acao
                     }
 
                 campos_colecao = [
@@ -438,7 +505,8 @@ class StacyOrchestrator:
                             f"de {entidade['nome']} "
                             f"com '{resultado['valor']}'."
                         ),
-                        "resultado": resultado
+                        "resultado": resultado,
+                        "acao": acao
                     }
 
                 if status == "ja_existente":
@@ -466,7 +534,8 @@ class StacyOrchestrator:
                             f"'{resultado.get('campo')}' "
                             f"de {entidade.get('nome', 'essa entidade')}."
                         ),
-                        "resultado": resultado
+                        "resultado": resultado,
+                        "acao": acao
                     }
 
                 return {
@@ -475,7 +544,8 @@ class StacyOrchestrator:
                         "Não consegui executar "
                         "a alteração, senhor."
                     ),
-                    "resultado": resultado
+                    "resultado": resultado,
+                    "acao": acao
                 }
 
             if confirmacao in {
@@ -489,19 +559,282 @@ class StacyOrchestrator:
                     "resposta": (
                         "Entendido, senhor. "
                         "A alteração foi cancelada."
-                    )
+                    ),
+                    "acao": acao
                 }
 
-            # Uma mensagem diferente de confirmação não deve deixar uma ação
-            # antiga armada para um futuro "sim". A consulta atual continua
-            # normalmente, mas a confirmação anterior é descartada.
+            # Uma mensagem diferente de confirmação invalida a operação
+            # pendente e seu estado operacional temporário.
             self.acao_pendente = None
+            self.conversa.limpar_operacao()
+
+            # Reprocessa respostas locais depois de descartar a operação antiga.
+            if mensagem_normalizada in respostas_locais:
+                return {
+                    "tipo": "local",
+                    "resposta": respostas_locais[mensagem_normalizada]
+                }
+
+            for frase, resposta in respostas_locais.items():
+                if len(mensagem_normalizada) >= 6:
+                    similaridade = SequenceMatcher(
+                        None,
+                        mensagem_normalizada,
+                        frase
+                    ).ratio()
+                    if similaridade >= 0.88:
+                        return {
+                            "tipo": "local",
+                            "resposta": resposta
+                        }
+
+        # Consultas sobre a própria conversa são determinísticas.
+        # Nunca devem depender de conhecimento externo ou de uma IA pequena.
+        consulta_conversa = self._resolver_consulta_conversa(mensagem)
+        if consulta_conversa is not None:
+            return consulta_conversa
 
         # O roteador decide a origem antes de qualquer IA.
         # A classificação interna é prioritária para impedir que dados pessoais
         # ou tarefas sejam enviados à pesquisa externa por engano.
+        #
+        # Antes da classificação factual, porém, consultas de entidade que já
+        # possuem um referente na conversa devem passar pelo resolvedor local.
+        # Ex.: depois de "STACY", "qual o nome dela?" é uma consulta de contexto,
+        # não uma nova pesquisa na Web.
+        entidade_contextual_conversa = None
+        entidade_conversa_id = self.conversa.obter_ultima_entidade()
+
+        if entidade_conversa_id:
+            entidade_contextual_conversa = entity_store.obter_por_id(
+                self.entidades,
+                entidade_conversa_id
+            )
+
+        if entidade_contextual_conversa is not None:
+            contexto_previo = context.interpretar_contexto(
+                mensagem,
+                entity_store,
+                self.entidades,
+                contexto_atual=entidade_contextual_conversa
+            )
+
+            if contexto_previo is not None:
+                resultado_previo = context.resolver_consulta(
+                    contexto_previo
+                )
+
+                if (
+                    resultado_previo is not None
+                    and resultado_previo.get("status") == "encontrada"
+                ):
+                    resposta_previa = self._formatar_contexto(
+                        contexto_previo,
+                        resultado_previo
+                    )
+
+                    if resposta_previa is not None:
+                        self._atualizar_contexto(
+                            contexto_previo["entidade"]
+                        )
+                        return {
+                            "tipo": "local",
+                            "resposta": resposta_previa,
+                            "contexto": contexto_previo,
+                            "resultado": resultado_previo
+                        }
+
+        # Uma mensagem sem referente, nome da entidade ou marcador de
+        # continuidade encerra o contexto conversacional temporário. A memória
+        # persistente permanece intacta.
+        if not self._deve_preservar_entidade_conversacional(mensagem):
+            self.conversa.limpar_entidade()
+
         comando = command.identificar_comando(mensagem)
         intencao = intent.interpretar(mensagem)
+
+        # A identidade da STACY pertence ao próprio sistema, não à memória
+        # do usuário nem à pesquisa externa.
+        if (
+            isinstance(intencao, dict)
+            and intencao.get("tipo") == "identidade"
+            and intencao.get("alvo") == "stacy"
+        ):
+            return {
+                "tipo": "local",
+                "resposta": (
+                    "Sou a STACY, senhor. Sua assistente pessoal."
+                ),
+                "rota": ROTA_INTERNA
+            }
+
+        # Memória estruturada é responsabilidade exclusiva do CORE.
+        # Execute consultas de memória imediatamente após a interpretação,
+        # antes do Cortex poder classificá-las como perguntas factuais.
+        if (
+            isinstance(intencao, dict)
+            and intencao.get("tipo") == "memoria"
+        ):
+            resultado_memoria = self._processar_intencao(intencao)
+            if resultado_memoria is not None:
+                return resultado_memoria
+
+        # Continuidade operacional: se a mensagem fornece apenas data/hora,
+        # aplica a alteração à última tarefa criada, sem exigir que o usuário
+        # repita o título.
+        continuacao_tarefa = self._resolver_continuacao_tarefa(mensagem)
+        if continuacao_tarefa is not None:
+            intencao = continuacao_tarefa
+
+        # Intenções de tarefa já reconhecidas pelo parser são operações
+        # determinísticas. Execute-as imediatamente, antes de Cortex, IA,
+        # conhecimento ou resolução contextual poderem alterar a leitura.
+        resultado_tarefa = self._processar_tarefa(intencao)
+        if resultado_tarefa is not None:
+            return resultado_tarefa
+
+        # CTAC/MEPO é contexto interno da trajetória: não passa por IA/Web.
+        resultado_ctac = self._processar_ctac_mepo(mensagem)
+        if resultado_ctac is not None:
+            return resultado_ctac
+
+        # Somente depois de comandos/tarefas determinísticos, tratamos uma
+        # referência sem referente ativo como conversa para esclarecimento.
+        # Assim, "crie essa tarefa" continua sendo processado pelo CORE,
+        # enquanto "qual o nome dela?" após mudança de assunto não ressuscita
+        # pesquisa externa anterior.
+        texto_referencia = f" {_normalizar_rota(mensagem)} "
+        pronomes_sem_referente = (
+            "ele", "ela", "dele", "dela", "eles", "elas",
+            "deles", "delas", "esse", "essa", "isso",
+            "aquele", "aquela", "aquilo"
+        )
+        tem_pronome_sem_entidade = (
+            not self.conversa.obter_ultima_entidade()
+            and any(
+                _contem_termo(texto_referencia, pronome)
+                for pronome in pronomes_sem_referente
+            )
+        )
+
+        if tem_pronome_sem_entidade:
+            return self._usar_ai(mensagem)
+
+        # O modelo local faz a interpretação semântica quando o CORE
+        # ainda não identificou uma operação. O Cortex continua sendo apenas
+        # coordenador/validador; a IA não recebe autoridade para executar.
+        decisao_ia = None
+        # Não acione o modelo local quando o roteador determinístico já sabe
+        # que a mensagem é interna ou exige pesquisa externa. Isso evita
+        # chamadas desnecessárias e, principalmente, evita esperar o timeout
+        # do llama-server em testes e em consultas que já têm rota definida.
+        rota_inicial = classificar_rota(
+            mensagem,
+            intencao=intencao,
+            comando=comando,
+            conhecimento=False
+        )
+        palavras_roteamento = (
+            "crie", "criar", "adicione", "adicionar", "anote", "anotar",
+            "lembre", "lembrar", "guarde", "guardar", "memorize", "memorizar",
+            "esqueça", "esqueca", "apague", "apagar", "remova", "remover",
+            "delete", "exclua", "excluir", "conclua", "concluir",
+            "atualize", "atualizar", "corrija", "corrigir", "arrume", "arrumar",
+            "altere", "alterar", "mude", "mudar", "troque", "trocar",
+            "coloque", "colocar", "registre", "registrar", "faça", "faca"
+        )
+        texto_roteamento = _normalizar_rota(mensagem)
+        precisa_roteador_local = any(
+            texto_roteamento.startswith(palavra + " ")
+            or texto_roteamento == palavra
+            for palavra in palavras_roteamento
+        ) or any(
+            _contem_termo(texto_roteamento, referencia)
+            for referencia in (
+                "essa tarefa", "esta tarefa", "ultima tarefa",
+                "última tarefa", "exclua ela", "apague ela", "remova ela"
+            )
+        )
+
+        if (
+            intencao is None
+            and comando is None
+            and rota_inicial == ROTA_IA_LOCAL
+            and precisa_roteador_local
+        ):
+            contexto_router = json.dumps(
+                self.conversa.ultimas_mensagens(4),
+                ensure_ascii=False
+            )
+            try:
+                decisao_ia = ai.analisar_rota_local(
+                    mensagem,
+                    contexto_router
+                )
+            except Exception:
+                # Falha do intérprete não derruba a STACY. O Cortex
+                # determinístico continua como fallback.
+                decisao_ia = None
+
+        decisao = cortex.analisar(
+            mensagem,
+            intencao=intencao,
+            comando=comando,
+            conhecimento=False,
+            decisao_ia=decisao_ia
+        )
+        if (
+            isinstance(decisao, dict)
+            and decisao.get("modo") == "clarify"
+        ):
+            return {
+                "tipo": "clarificacao",
+                "resposta": (
+                    "Preciso de um pouco mais de informação para entender "
+                    "o que o senhor deseja fazer."
+                ),
+                "rota": ROTA_IA_LOCAL
+            }
+
+        # Converte somente decisões estruturadas do intérprete em intenções
+        # executáveis. O modelo nunca executa diretamente.
+        if (
+            isinstance(decisao, dict)
+            and decisao.get("ferramenta") in {"tasks", "memory"}
+        ):
+            argumentos_ia = decisao.get("argumentos", {})
+            if isinstance(argumentos_ia, dict):
+                if decisao.get("ferramenta") == "tasks":
+                    dados_tarefa = {
+                        chave: valor
+                        for chave, valor in argumentos_ia.items()
+                        if chave in {"acao", "titulo", "data", "hora", "termo", "tarefa_id"}
+                        and valor not in (None, "")
+                    }
+                    if dados_tarefa.get("acao"):
+                        intencao = {
+                            "tipo": "tarefa",
+                            **dados_tarefa
+                        }
+                elif decisao.get("ferramenta") == "memory":
+                    dados_memoria = {
+                        chave: valor
+                        for chave, valor in argumentos_ia.items()
+                        if chave in {"acao", "categoria", "valor", "conteudo"}
+                        and valor not in (None, "")
+                    }
+                    if dados_memoria.get("acao"):
+                        intencao = {
+                            "tipo": "memoria",
+                            **dados_memoria
+                        }
+
+        self.ultima_decisao = cortex.analisar(
+            mensagem,
+            intencao=intencao,
+            comando=comando,
+            conhecimento=False
+        )
 
         rota_previa = classificar_rota(
             mensagem,
@@ -509,6 +842,22 @@ class StacyOrchestrator:
             comando=comando,
             conhecimento=False
         )
+
+        consulta_contextual = self._resolver_continuacao_pesquisa(mensagem)
+        if consulta_contextual is not None:
+            # Uma continuação de pesquisa mantém a intenção externa mesmo
+            # quando a frase atual, isoladamente, parece conversacional.
+            rota_previa = ROTA_PESQUISA_EXTERNA
+
+        # A rota interna já determinada pelo CORE é soberana.
+        # Uma pergunta interna como "quais sao meus objetivos?" contém
+        # palavras interrogativas, mas isso não autoriza o Cortex a desviá-la
+        # para a Web.
+        if rota_previa != ROTA_INTERNA:
+            if decisao["needs_memory"] or decisao["needs_action"]:
+                rota_previa = ROTA_INTERNA
+            elif decisao["needs_web"]:
+                rota_previa = ROTA_PESQUISA_EXTERNA
 
         resposta_conhecimento = None
         if rota_previa != ROTA_INTERNA:
@@ -544,24 +893,55 @@ class StacyOrchestrator:
             conhecimento=resposta_conhecimento is not None
         )
 
+        # Continuação de uma pesquisa anterior é uma decisão de contexto:
+        # a mensagem curta pode não conter, sozinha, nenhum gatilho factual.
+        if consulta_contextual is not None:
+            rota = ROTA_PESQUISA_EXTERNA
+
+        # Atualiza a decisão com o resultado do CORE.
+        self.ultima_decisao = cortex.analisar(
+            mensagem,
+            intencao=intencao,
+            comando=comando,
+            conhecimento=resposta_conhecimento is not None,
+            decisao_ia=decisao_ia
+        )
+
         if rota == ROTA_CONHECIMENTO:
             return {
                 "tipo": "conhecimento_verificado",
                 "resposta": resposta_conhecimento,
                 "origem": "core",
-                "rota": rota
+                "rota": rota,
+                "consulta": mensagem
             }
 
         if rota == ROTA_PESQUISA_EXTERNA:
+            # O histórico já carrega a consulta anterior; a ferramenta deve
+            # receber a mensagem atual intacta para preservar a continuidade
+            # sem reescrever a fala do usuário.
             return self._pesquisar_web(mensagem)
 
         # Rotas internas continuam pelo CORE abaixo, onde memória, tarefas,
         # entidades e ações são executadas sem passar por modelos.
 
+        entidade_contextual_conversa = None
+        entidade_conversa_id = self.conversa.obter_ultima_entidade()
+
+        if entidade_conversa_id:
+            entidade_contextual_conversa = entity_store.obter_por_id(
+                self.entidades,
+                entidade_conversa_id
+            )
+
         entidade_detectada = entity_resolver.resolver(
             mensagem,
             self.entidades,
-            self.entidade_contextual
+            entidade_contextual_conversa,
+            usar_contexto_persistente=(
+                entidade_contextual_conversa is None
+                and entity_resolver.detectar_referencia(mensagem) is None
+            )
         )
 
         if (
@@ -580,24 +960,6 @@ class StacyOrchestrator:
                 self.conversa.registrar_entidade(
                     entidade["id"]
                 )
-
-        # Consultas simples de memória devem ser resolvidas pelo CORE
-        # antes de contexto/IA, evitando que o modelo invente dados.
-        if (
-            isinstance(intencao, dict)
-            and intencao.get("tipo") == "memoria"
-            and intencao.get("acao") == "consultar"
-        ):
-            resultado_memoria = self._processar_intencao(intencao)
-            if resultado_memoria is not None:
-                return resultado_memoria
-
-        resultado_tarefa = self._processar_tarefa(
-            intencao
-        )
-
-        if resultado_tarefa is not None:
-            return resultado_tarefa
 
         entidade_atual = None
 
@@ -646,7 +1008,8 @@ class StacyOrchestrator:
         contexto = context.interpretar_contexto(
             mensagem,
             entity_store,
-            self.entidades
+            self.entidades,
+            contexto_atual=entidade_contextual_conversa
         )
 
         if contexto is not None:
@@ -716,6 +1079,187 @@ class StacyOrchestrator:
 
         return self._usar_ai(mensagem)
 
+    def _resolver_continuacao_tarefa(self, mensagem):
+        """Converte uma continuação de data/hora em atualização da última tarefa."""
+        tarefa = self.conversa.obter_ultima_tarefa()
+        if not isinstance(tarefa, dict):
+            return None
+
+        texto = mensagem.strip()
+        normalizado = _normalizar_rota(texto)
+        if normalizado.startswith("e "):
+            normalizado = normalizado[2:].strip()
+            texto = texto.strip()[2:].strip()
+
+        restante, data, hora = intent.extrair_data_hora_tarefa(texto)
+
+        # A mensagem precisa representar uma alteração, não uma nova tarefa.
+        restante_normalizado = _normalizar_rota(restante)
+        restante_normalizado = restante_normalizado.replace("  ", " ").strip()
+        if not data and not hora:
+            return None
+
+        if restante_normalizado not in {
+            "", "coloque", "colocar", "mude", "mudar",
+            "altere", "alterar", "passe", "passar",
+            "coloque para", "mude para", "mudar para",
+            "altere para", "alterar para", "passe para", "passar para",
+            "a tarefa", "a tarefa para"
+        }:
+            return None
+
+        return {
+            "tipo": "tarefa",
+            "acao": "atualizar",
+            "tarefa_id": tarefa.get("id"),
+            "data": data,
+            "hora": hora
+        }
+
+    def _deve_preservar_entidade_conversacional(self, mensagem):
+        """Indica se a mensagem ainda pode depender do referente atual."""
+        entidade_id = self.conversa.obter_ultima_entidade()
+        if not entidade_id:
+            return False
+
+        texto = _normalizar_rota(mensagem)
+
+        if entity_resolver.detectar_referencia(mensagem) is not None:
+            return True
+
+        entidade = entity_store.obter_por_id(
+            self.entidades,
+            entidade_id
+        )
+        if isinstance(entidade, dict):
+            nome = _normalizar_rota(entidade.get("nome", ""))
+            if nome and _contem_termo(texto, nome):
+                return True
+
+        if (
+            texto.startswith("e ")
+            or texto.startswith("mas ")
+            or texto.startswith("nesse ")
+            or texto.startswith("neste ")
+            or texto.startswith("nesta ")
+            or texto.startswith("sobre ")
+            or texto.startswith("no caso ")
+            or texto.startswith("na ")
+            or texto.startswith("no ")
+        ):
+            return True
+
+        # O contexto semântico genérico não decide a continuidade.
+        # Consultas factuais sobre outro assunto podem parecer relacionadas
+        # ao referente atual e isso manteria uma entidade obsoleta viva.
+        # Referência explícita, nome da entidade e marcadores de continuidade
+        # já cobrem as formas válidas de continuidade.
+        return False
+
+    def _resolver_continuacao_pesquisa(self, mensagem):
+        """Liga perguntas curtas ao assunto da última pesquisa sem adivinhar fatos."""
+        anterior = self.conversa.ultima_consulta
+        if not anterior or self.conversa.ultima_rota not in {
+            ROTA_PESQUISA_EXTERNA,
+            ROTA_CONHECIMENTO
+        }:
+            return None
+
+        texto = _normalizar_rota(mensagem)
+
+        # Uma referência pronominal sem entidade conversacional ativa não
+        # deve ressuscitar uma pesquisa de outro assunto. Nesse caso, deixe
+        # a mensagem seguir para a IA local, que poderá pedir esclarecimento.
+        # Pronomes sem referente ativo nunca podem herdar a última
+        # pesquisa externa. Isso inclui construções como "qual o nome dela?".
+        pronomes_sem_referente = (
+            " ele", " ela", " dele", " dela", " eles", " elas",
+            " deles", " delas", " esse", " essa", " isso", " aquele",
+            " aquela", " aquilo"
+        )
+        mensagem_normalizada = f" {_normalizar_rota(mensagem)} "
+        tem_referencia = (
+            entity_resolver.detectar_referencia(mensagem) is not None
+            or any(
+                _contem_termo(mensagem_normalizada.strip(), pronome.strip())
+                for pronome in pronomes_sem_referente
+            )
+        )
+        if tem_referencia and not self.conversa.obter_ultima_entidade():
+            return None
+
+        if not texto or len(texto.split()) > 14:
+            return None
+
+        inicio_continuacao = (
+            texto.startswith("e ")
+            or texto.startswith("mas ")
+            or texto.startswith("nesse ")
+            or texto.startswith("neste ")
+            or texto.startswith("nesta ")
+            or texto.startswith("sobre ")
+            or texto.startswith("no caso ")
+            or texto.startswith("na ")
+            or texto.startswith("no ")
+        )
+        referencia = any(
+            _contem_termo(texto, termo)
+            for termo in ("isso", "ele", "ela", "dele", "dela", "sua", "seu")
+        )
+
+        if not (inicio_continuacao or referencia):
+            return None
+
+        assunto = anterior.split(" | complemento:", 1)[0].strip()
+        return f"{assunto} | complemento: {mensagem.strip()}"
+
+    def _resolver_consulta_conversa(self, mensagem):
+        """Resolve perguntas sobre o histórico sem usar IA ou Web."""
+        texto = _normalizar_rota(mensagem)
+        ultimo = (
+            "qual foi a ultima coisa que eu perguntei",
+            "qual foi a ultima pergunta que eu fiz",
+            "qual foi minha ultima pergunta",
+            "qual foi a minha ultima pergunta",
+            "o que eu perguntei por ultimo",
+            "o que eu perguntei antes"
+        )
+        primeiro = (
+            "qual foi a primeira coisa que eu perguntei",
+            "qual foi a primeira pergunta que eu fiz",
+            "qual foi minha primeira pergunta",
+            "qual foi a minha primeira pergunta",
+            "qual foi a primeira pergunta nesta conversa",
+            "qual foi a primeira pergunta nessa conversa"
+        )
+        modo = None
+        if any(_contem_termo(texto, frase) for frase in ultimo):
+            modo = "ultima"
+        elif any(_contem_termo(texto, frase) for frase in primeiro):
+            modo = "primeira"
+        if modo is None:
+            return None
+        historico = self.conversa.obter_historico()
+        usuarios = [
+            item.get("conteudo", "").strip()
+            for item in historico[:-1]
+            if item.get("tipo") == "usuario"
+            and item.get("conteudo", "").strip()
+        ]
+        if not usuarios:
+            return {
+                "tipo": "local",
+                "resposta": "Ainda não tenho outra pergunta registrada nesta conversa.",
+                "rota": ROTA_INTERNA
+            }
+        pergunta = usuarios[-1] if modo == "ultima" else usuarios[0]
+        rotulo = "última" if modo == "ultima" else "primeira"
+        return {
+            "tipo": "local",
+            "resposta": f"A {rotulo} pergunta registrada foi: {pergunta}",
+            "rota": ROTA_INTERNA
+        }
+
     def _registrar_resultado_conversa(self, resultado):
         if not isinstance(resultado, dict):
             return resultado
@@ -725,6 +1269,34 @@ class StacyOrchestrator:
         if resposta is not None:
             self.conversa.registrar_resposta(resposta)
 
+        rota = resultado.get("rota")
+        if rota is None:
+            tipo = resultado.get("tipo")
+            if tipo in {"pesquisa", "pesquisa_fallback", "pesquisa_indisponivel"}:
+                rota = ROTA_PESQUISA_EXTERNA
+            elif tipo in {
+                "local", "tarefa_ultima", "tarefa_criada", "tarefa_atualizada",
+                "tarefas", "tarefa_concluida", "tarefa_nao_encontrada",
+                "tarefa_ambigua", "confirmacao", "tarefa_removida",
+                "erro_tarefa", "acao_executada", "acao_candidata",
+                "acao_ja_existente", "acao_cancelada", "erro_acao"
+            }:
+                rota = ROTA_INTERNA
+            elif tipo == "conhecimento_verificado":
+                rota = ROTA_CONHECIMENTO
+            else:
+                rota = ROTA_IA_LOCAL
+
+        consulta = resultado.get("consulta")
+        if consulta is not None:
+            self.conversa.registrar_rota(rota, consulta)
+        else:
+            self.conversa.registrar_rota(rota)
+
+        tarefa = resultado.get("tarefa")
+        if isinstance(tarefa, dict):
+            self.conversa.registrar_tarefa(tarefa)
+
         if resultado.get("entidade") is not None:
             entidade = resultado.get("entidade")
             entidade_id = entidade.get("id")
@@ -733,15 +1305,34 @@ class StacyOrchestrator:
                 self.conversa.registrar_entidade(
                     entidade_id
                 )
+        elif rota in {
+            ROTA_PESQUISA_EXTERNA,
+            ROTA_CONHECIMENTO
+        }:
+            # Uma nova pergunta factual sem entidade explícita encerra o
+            # referente conversacional anterior. Isso impede que um pronome
+            # posterior reutilize uma entidade de outro assunto.
+            self.conversa.limpar_entidade()
 
-        if resultado.get("acao") is not None:
-            self.conversa.registrar_acao(
-                resultado.get("acao")
-            )
+        acao = resultado.get("acao")
+        if acao is not None:
+            if resultado.get("tipo") == "acao_candidata":
+                self.conversa.registrar_acao_pendente(acao)
+            else:
+                self.conversa.registrar_acao(acao)
 
         if resultado.get("intencao") is not None:
             self.conversa.registrar_intencao(
                 resultado.get("intencao")
+            )
+
+        if resultado.get("tipo") in {
+            "erro_acao",
+            "erro_tarefa",
+            "pesquisa_indisponivel"
+        }:
+            self.conversa.registrar_erro(
+                resultado.get("erro") or resultado.get("tipo")
             )
 
         return resultado
@@ -751,24 +1342,22 @@ class StacyOrchestrator:
         entidade
     ):
 
-        identificador = entidade.get(
-            "id"
-        )
-
-        if not identificador:
-
+        # Contexto conversacional é temporário. Não gravamos automaticamente
+        # a entidade atual em entities.json, porque isso transformaria um
+        # referente de uma conversa em memória persistente.
+        if not isinstance(entidade, dict):
             return
 
-        contexto = (
-            entity_store.definir_contexto_persistente(
-                self.entidades,
-                identificador
-            )
-        )
+        identificador = entidade.get("id")
+        if not identificador:
+            return
 
-        if contexto is not None:
-
-            self.entidade_contextual = contexto
+        self.entidade_contextual = {
+            "id": entidade.get("id"),
+            "uuid": entidade.get("uuid"),
+            "categoria": entidade.get("categoria"),
+            "nome": entidade.get("nome")
+        }
 
     def _formatar_contexto(
         self,
@@ -1074,6 +1663,47 @@ class StacyOrchestrator:
 
         acao = intencao.get("acao")
 
+        if acao == "ultima":
+            tarefa = self.conversa.obter_ultima_tarefa()
+            if isinstance(tarefa, dict) and tarefa.get("titulo"):
+                resposta = f"A última tarefa criada é '{tarefa['titulo']}'."
+                if tarefa.get("data"):
+                    resposta += f" Data: {tarefa['data']}."
+                if tarefa.get("hora"):
+                    resposta += f" Horário: {tarefa['hora']}."
+                return {
+                    "tipo": "tarefa_ultima",
+                    "resposta": resposta,
+                    "tarefa": tarefa,
+                    "rota": ROTA_INTERNA
+                }
+            return {
+                "tipo": "tarefa_nao_encontrada",
+                "resposta": "Não encontrei nenhuma tarefa criada recentemente, senhor.",
+                "rota": ROTA_INTERNA
+            }
+
+        if acao == "referencia":
+            tarefa = self.conversa.obter_ultima_tarefa()
+            if isinstance(tarefa, dict) and tarefa.get("titulo"):
+                return {
+                    "tipo": "clarificacao",
+                    "resposta": (
+                        f"Senhor, a última tarefa registrada é "
+                        f"'{tarefa['titulo']}'. Deseja recriá-la?"
+                    ),
+                    "tarefa": tarefa,
+                    "rota": ROTA_INTERNA
+                }
+            return {
+                "tipo": "clarificacao",
+                "resposta": (
+                    "Qual tarefa o senhor deseja criar? "
+                    "Não vou adivinhar o que significa 'essa tarefa'."
+                ),
+                "rota": ROTA_INTERNA
+            }
+
         if acao == "criar":
 
             titulo = intencao.get("titulo")
@@ -1163,9 +1793,109 @@ class StacyOrchestrator:
                 "tarefas": tarefas
             }
 
+        if acao == "atualizar":
+            tarefa_id = intencao.get("tarefa_id")
+            data = intencao.get("data")
+            hora = intencao.get("hora")
+
+            if not tarefa_id or (data is None and hora is None):
+                return None
+
+            tarefa = tasks.atualizar(
+                tarefa_id,
+                data=data,
+                hora=hora
+            )
+
+            if tarefa is None:
+                return {
+                    "tipo": "erro_tarefa",
+                    "resposta": "Não consegui atualizar a tarefa, senhor."
+                }
+
+            return {
+                "tipo": "tarefa_atualizada",
+                "resposta": f"Atualizada, senhor: '{tarefa['titulo']}'.",
+                "tarefa": tarefa
+            }
+
+        if acao == "corrigir_titulo":
+            tarefa = self.conversa.obter_ultima_tarefa()
+            if not isinstance(tarefa, dict) or not tarefa.get("id"):
+                return {
+                    "tipo": "tarefa_nao_encontrada",
+                    "resposta": "Não encontrei uma tarefa criada recentemente, senhor."
+                }
+
+            antigo = intencao.get("antigo")
+            novo = (intencao.get("novo") or "").strip()
+            titulo_atual = tarefa.get("titulo", "")
+
+            if not novo:
+                return None
+
+            if antigo:
+                titulo_novo = re.sub(
+                    r"(?<!\w)" + re.escape(antigo) + r"(?!\w)",
+                    novo,
+                    titulo_atual,
+                    count=1,
+                    flags=re.IGNORECASE
+                )
+            else:
+                titulo_novo = novo
+
+            if titulo_novo == titulo_atual:
+                return {
+                    "tipo": "tarefa_atualizada",
+                    "resposta": f"O título já está como '{titulo_atual}', senhor.",
+                    "tarefa": tarefa
+                }
+
+            atualizado = tasks.atualizar(
+                tarefa["id"],
+                titulo=titulo_novo
+            )
+
+            if atualizado is None:
+                return {
+                    "tipo": "erro_tarefa",
+                    "resposta": "Não consegui atualizar o nome da tarefa, senhor."
+                }
+
+            return {
+                "tipo": "tarefa_atualizada",
+                "resposta": f"Nome da tarefa atualizado, senhor: '{atualizado['titulo']}'.",
+                "tarefa": atualizado
+            }
+
         if acao in ["concluir", "remover"]:
 
             termo = intencao.get("termo")
+
+            if acao == "remover" and intencao.get("referencia") == "ultima":
+                tarefa = self.conversa.obter_ultima_tarefa()
+                if not isinstance(tarefa, dict) or not tarefa.get("id"):
+                    return {
+                        "tipo": "tarefa_nao_encontrada",
+                        "resposta": "Não encontrei uma tarefa criada recentemente, senhor."
+                    }
+
+                self.acao_pendente = {
+                    "tipo": "remover_tarefa",
+                    "tarefa_id": tarefa["id"],
+                    "tarefa": tarefa
+                }
+
+                return {
+                    "tipo": "confirmacao",
+                    "resposta": (
+                        f"Senhor, confirma a remoção da tarefa "
+                        f"'{tarefa['titulo']}'? Esta ação não poderá ser desfeita."
+                    ),
+                    "tarefa": tarefa,
+                    "rota": ROTA_INTERNA
+                }
 
             if not termo:
                 return None
@@ -1283,18 +2013,46 @@ class StacyOrchestrator:
                 self.api_key,
                 historico_pesquisa
             )
-        except Exception as erro:
-            # Pesquisa externa não cai na IA local: isso preserva a regra
-            # de não inventar fatos quando a fonte externa está indisponível.
-            return {
-                "tipo": "pesquisa_indisponivel",
-                "resposta": (
-                    "Não consegui consultar fontes externas agora, senhor. "
-                    "Não vou inventar uma resposta."
-                ),
-                "origem": "gemini_google",
-                "erro": str(erro)
-            }
+        except Exception as erro_pesquisa:
+            # A pesquisa com Google Search é a primeira tentativa. Se o
+            # grounding falhar (por quota, indisponibilidade ou outro erro
+            # transitório), ainda tentamos o Gemini normal como fallback.
+            # Esse fallback NÃO é apresentado como pesquisa verificada e
+            # NÃO recebe memória persistente do usuário.
+            try:
+                fallback_historico = historico_pesquisa
+                resposta_fallback = ai.gerar_resposta(
+                    self.api_key,
+                    fallback_historico,
+                    "{}",
+                    None,
+                    None
+                )
+                return {
+                    "tipo": "pesquisa_fallback",
+                    "rota": ROTA_PESQUISA_EXTERNA,
+                    "consulta": mensagem,
+                    "resposta": resposta_fallback,
+                    "origem": "gemini_fallback",
+                    "fontes": [],
+                    "erro_pesquisa": str(erro_pesquisa)
+                }
+            except Exception as erro_gemini:
+                return {
+                    "tipo": "pesquisa_indisponivel",
+                    "rota": ROTA_PESQUISA_EXTERNA,
+                    "consulta": mensagem,
+                    "resposta": (
+                        "Não consegui consultar fontes externas agora, senhor. "
+                        "Também não foi possível obter o fallback do Gemini. "
+                        "Não vou inventar uma resposta."
+                    ),
+                    "origem": "gemini_google",
+                    "erro": (
+                        f"Pesquisa: {erro_pesquisa}; "
+                        f"Fallback: {erro_gemini}"
+                    )
+                }
 
         resposta = resultado["resposta"]
         fontes = resultado.get("fontes", [])
@@ -1307,6 +2065,8 @@ class StacyOrchestrator:
         return {
             "tipo": "pesquisa",
             "resposta": resposta,
+            "rota": ROTA_PESQUISA_EXTERNA,
+            "consulta": mensagem,
             "origem": "gemini_google",
             "fontes": fontes
         }
@@ -1359,14 +2119,16 @@ class StacyOrchestrator:
 
             conteudo = item.get("conteudo", "").strip()
             tipo = item.get("tipo")
+            rota_item = item.get("rota")
 
             if not conteudo:
                 continue
 
-            if tipo == "usuario":
-                rota_item = classificar_rota(conteudo)
-                if rota_item == ROTA_PESQUISA_EXTERNA:
-                    continue
+            # Turnos de pesquisa externa pertencem exclusivamente ao
+            # subsistema Web/Gemini. Nunca os reutilize como memória de prompt
+            # da IA local, inclusive as respostas da STACY a esses turnos.
+            if rota_item == ROTA_PESQUISA_EXTERNA:
+                continue
 
             contexto_local.append(item)
 
@@ -1384,8 +2146,29 @@ class StacyOrchestrator:
                     "servidor local não está acessível"
                 )
 
+            historico_local = []
+            for item in self.conversa.ultimas_mensagens(12):
+                if not isinstance(item, dict):
+                    continue
+
+                if item.get("rota") == ROTA_PESQUISA_EXTERNA:
+                    continue
+
+                conteudo = item.get("conteudo", "").strip()
+                if not conteudo:
+                    continue
+
+                historico_local.append({
+                    "role": (
+                        "model"
+                        if item.get("tipo") == "stacy"
+                        else "user"
+                    ),
+                    "parts": [{"text": conteudo}]
+                })
+
             resposta = ai.gerar_resposta_local(
-                self.historico,
+                historico_local,
                 contexto_memoria,
                 contexto_entidade,
                 contexto_conversa

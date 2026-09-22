@@ -1,0 +1,29 @@
+name: STACY MP-09 CI
+
+on:
+  push:
+    branches:
+      - mp09-ctac-mepo-20260922
+  pull_request:
+    branches:
+      - mp09-ctac-mepo-20260922
+      - mp01-cortex-routing-20260921
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Compile
+        run: python -m py_compile *.py
+      - name: Core regression tests
+        run: python -m unittest discover -v
+
+# MP-09 validation workflow.
