@@ -71,6 +71,9 @@ class ConversationState:
         self.ultima_acao = acao
         self.ultima_atualizacao = time.time()
 
+    def registrar_acao_pendente(self, acao):
+        self.registrar_acao(acao, aguardando_confirmacao=True)
+
     def registrar_rota(self, rota, consulta=None):
         self.ultima_rota = rota
         if consulta:
