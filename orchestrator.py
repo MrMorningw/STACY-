@@ -511,6 +511,28 @@ class StacyOrchestrator:
             self.acao_pendente = None
             self.conversa.limpar_operacao()
 
+            # A mensagem atual continua sendo processada normalmente depois
+            # de invalidar a operação antiga. Reavalie respostas locais para
+            # que uma saudação, por exemplo, não caia desnecessariamente na IA.
+            if mensagem_normalizada in respostas_locais:
+                return {
+                    "tipo": "local",
+                    "resposta": respostas_locais[mensagem_normalizada]
+                }
+
+            for frase, resposta in respostas_locais.items():
+                if len(mensagem_normalizada) >= 6:
+                    similaridade = SequenceMatcher(
+                        None,
+                        mensagem_normalizada,
+                        frase
+                    ).ratio()
+                    if similaridade >= 0.88:
+                        return {
+                            "tipo": "local",
+                            "resposta": resposta
+                        }
+
         # O roteador decide a origem antes de qualquer IA.
         # A classificação interna é prioritária para impedir que dados pessoais
         # ou tarefas sejam enviados à pesquisa externa por engano.
