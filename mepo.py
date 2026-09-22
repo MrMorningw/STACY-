@@ -10,22 +10,14 @@ ORDEM = tuple(range(1, 13))
 _STATUS_INICIAL = {
     1: "fechado", 2: "fechado", 3: "fechado", 4: "fechado",
     5: "fechado", 6: "fechado", 7: "fechado", 8: "fechado",
-    9: "fechado", 10: "fechado", 11: "fechado", 12: "planejado",
+    9: "fechado", 10: "fechado", 11: "fechado", 12: "fechado",
 }
 
 _NOMES = {
-    1: "STACY funcional",
-    2: "inteligência e contexto",
-    3: "memória avançada",
-    4: "ações e ferramentas",
-    5: "contexto operacional",
-    6: "voz",
-    7: "interface Android",
-    8: "automação e Android",
-    9: "CTAC e MEPO",
-    10: "orquestração",
-    11: "autonomia controlada",
-    12: "estabilização e finalização",
+    1: "STACY funcional", 2: "inteligência e contexto", 3: "memória avançada",
+    4: "ações e ferramentas", 5: "contexto operacional", 6: "voz",
+    7: "interface Android", 8: "automação e Android", 9: "CTAC e MEPO",
+    10: "orquestração", 11: "autonomia controlada", 12: "estabilização e finalização",
 }
 
 
@@ -53,12 +45,7 @@ def criar_registro(identificador):
     n = numero(identificador)
     if n is None:
         return None
-    return {
-        "id": f"MP-{n:02d}",
-        "numero": n,
-        "nome": _NOMES[n],
-        "status": _STATUS_INICIAL[n],
-    }
+    return {"id": f"MP-{n:02d}", "numero": n, "nome": _NOMES[n], "status": _STATUS_INICIAL[n]}
 
 
 def listar():
@@ -74,20 +61,14 @@ def validar_transicao(atual, novo):
     novo = str(novo or "").strip().lower()
     if atual not in ESTADOS or novo not in ESTADOS:
         return False
-    permitidas = {
-        "planejado": {"em_execucao"},
-        "em_execucao": {"validado"},
-        "validado": {"fechado"},
-        "fechado": set(),
-    }
+    permitidas = {"planejado": {"em_execucao"}, "em_execucao": {"validado"}, "validado": {"fechado"}, "fechado": set()}
     return novo in permitidas[atual]
 
 
 def validar_sequencia(registros=None):
     dados = listar() if registros is None else registros
     ids = [item.get("id") for item in dados if isinstance(item, dict)]
-    esperados = [f"MP-{n:02d}" for n in ORDEM]
-    return ids == esperados
+    return ids == [f"MP-{n:02d}" for n in ORDEM]
 
 
 def proximo_aberto():
@@ -99,10 +80,4 @@ def proximo_aberto():
 
 def resumo():
     registros = listar()
-    fechados = sum(item["status"] == "fechado" for item in registros)
-    return {
-        "total": len(registros),
-        "fechados": fechados,
-        "atual": proximo_aberto(),
-        "sequencia_valida": validar_sequencia(registros),
-    }
+    return {"total": len(registros), "fechados": sum(item["status"] == "fechado" for item in registros), "atual": proximo_aberto(), "sequencia_valida": validar_sequencia(registros)}

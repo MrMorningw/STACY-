@@ -3,10 +3,12 @@ name: STACY Android CI
 on:
   push:
     branches:
+      - main
       - mp08-automacao-android-20260922
   pull_request:
     branches:
       - mp08-automacao-android-20260922
+      - main
       - mp01-cortex-routing-20260921
 
 jobs:
