@@ -82,6 +82,30 @@ class OperationalContextTests(unittest.TestCase):
             estado.conversa.obter_operacao_atual()["erro"]
         )
 
+
+    def test_new_message_clears_stale_confirmation_before_local_reply(self):
+        estado = orchestrator.StacyOrchestrator(
+            api_key=None,
+            memoria={},
+            entidades={"entidades": []}
+        )
+        estado.acao_pendente = {
+            "tipo": "remover_tarefa",
+            "tarefa_id": "T-1"
+        }
+        estado.conversa.registrar_acao_pendente(
+            estado.acao_pendente
+        )
+
+        resultado = estado.processar("oi")
+
+        self.assertEqual(resultado["tipo"], "local")
+        self.assertIsNone(estado.acao_pendente)
+        self.assertEqual(
+            estado.conversa.obter_estado_operacional(),
+            "concluido"
+        )
+
     def test_initial_state_is_idle(self):
         self.assertEqual(
             self.contexto.obter_estado_operacional(),
