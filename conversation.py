@@ -3,6 +3,8 @@ import time
 
 class ConversationState:
 
+    ESTADOS_OPERACIONAIS = {"ocioso", "conversando", "aguardando_confirmacao", "concluido", "erro"}
+
     def __init__(self, limite=12):
         self.limite = limite
 
@@ -16,6 +18,8 @@ class ConversationState:
         self.ultima_tarefa = None
         self.intencao_pendente = None
         self.ultima_atualizacao = None
+        self.estado_operacional = "ocioso"
+        self.operacao_atual = None
 
         self.historico = []
 
@@ -23,6 +27,8 @@ class ConversationState:
 
         self.ultima_mensagem = mensagem
         self.ultima_atualizacao = time.time()
+        if self.estado_operacional == "ocioso":
+            self.estado_operacional = "conversando"
 
         self.historico.append({
             "tipo": "usuario",
@@ -45,6 +51,9 @@ class ConversationState:
             "rota": None
         })
 
+        if self.estado_operacional != "aguardando_confirmacao":
+            self.estado_operacional = "concluido"
+
         self._limitar_historico()
 
     def registrar_entidade(self, entidade_id):
@@ -57,10 +66,19 @@ class ConversationState:
         self.ultima_entidade_id = None
         self.ultima_atualizacao = time.time()
 
-    def registrar_acao(self, acao):
+    def registrar_acao(self, acao, aguardando_confirmacao=False):
 
-        self.ultima_acao = acao
+        self.ultima_acao = dict(acao) if isinstance(acao, dict) else acao
+        self.operacao_atual = dict(acao) if isinstance(acao, dict) else acao
         self.ultima_atualizacao = time.time()
+
+        if aguardando_confirmacao:
+            self.estado_operacional = "aguardando_confirmacao"
+        elif self.estado_operacional != "erro":
+            self.estado_operacional = "concluido"
+
+    def registrar_acao_pendente(self, acao):
+        self.registrar_acao(acao, aguardando_confirmacao=True)
 
     def registrar_rota(self, rota, consulta=None):
         self.ultima_rota = rota
@@ -102,13 +120,63 @@ class ConversationState:
         self.ultima_atualizacao = time.time()
 
     def registrar_intencao_pendente(self, intencao):
-        self.intencao_pendente = intencao
+        self.intencao_pendente = dict(intencao) if isinstance(intencao, dict) else intencao
+        self.operacao_atual = dict(intencao) if isinstance(intencao, dict) else intencao
+        self.estado_operacional = "conversando"
+        self.ultima_atualizacao = time.time()
 
     def obter_intencao_pendente(self):
         return self.intencao_pendente
 
     def limpar_intencao_pendente(self):
         self.intencao_pendente = None
+        if self.estado_operacional == "conversando":
+            self.operacao_atual = None
+            self.estado_operacional = "ocioso"
+        self.ultima_atualizacao = time.time()
+
+    def definir_estado_operacional(self, estado):
+        if estado not in self.ESTADOS_OPERACIONAIS:
+            raise ValueError(f"Estado operacional inválido: {estado}")
+        self.estado_operacional = estado
+        self.ultima_atualizacao = time.time()
+
+    def obter_estado_operacional(self):
+        return self.estado_operacional
+
+    def definir_operacao_atual(self, operacao):
+        if operacao is not None and not isinstance(operacao, dict):
+            raise TypeError("A operação atual deve ser um dicionário ou None.")
+        self.operacao_atual = dict(operacao) if isinstance(operacao, dict) else None
+        self.ultima_atualizacao = time.time()
+
+    def obter_operacao_atual(self):
+        return dict(self.operacao_atual) if isinstance(self.operacao_atual, dict) else self.operacao_atual
+
+    def registrar_erro(self, erro=None):
+        self.estado_operacional = "erro"
+        self.operacao_atual = {"erro": str(erro)} if erro is not None else None
+        self.ultima_atualizacao = time.time()
+
+    def limpar_operacao(self):
+        self.operacao_atual = None
+        self.ultima_acao = None
+        self.intencao_pendente = None
+        self.estado_operacional = "ocioso"
+        self.ultima_atualizacao = time.time()
+
+    def obter_contexto_operacional(self):
+        return {
+            "estado": self.estado_operacional,
+            "operacao_atual": self.obter_operacao_atual(),
+            "ultima_entidade_id": self.ultima_entidade_id,
+            "ultima_acao": dict(self.ultima_acao) if isinstance(self.ultima_acao, dict) else self.ultima_acao,
+            "ultima_intencao": dict(self.ultima_intencao) if isinstance(self.ultima_intencao, dict) else self.ultima_intencao,
+            "intencao_pendente": dict(self.intencao_pendente) if isinstance(self.intencao_pendente, dict) else self.intencao_pendente,
+            "ultima_mensagem": self.ultima_mensagem,
+            "ultima_resposta": self.ultima_resposta,
+            "ultima_atualizacao": self.ultima_atualizacao
+        }
 
     def obter_historico(self):
 
@@ -147,7 +215,9 @@ class ConversationState:
             "ultima_intencao": self.ultima_intencao,
             "ultima_rota": self.ultima_rota,
             "ultima_consulta": self.ultima_consulta,
-            "ultima_tarefa": self.ultima_tarefa
+            "ultima_tarefa": self.ultima_tarefa,
+            "estado_operacional": self.estado_operacional,
+            "operacao_atual": self.obter_operacao_atual()
         }
 
     def limpar(self):
@@ -162,6 +232,8 @@ class ConversationState:
         self.ultima_tarefa = None
         self.intencao_pendente = None
         self.ultima_atualizacao = None
+        self.estado_operacional = "ocioso"
+        self.operacao_atual = None
         self.historico = []
 
     def resumo(self):

@@ -569,7 +569,7 @@ class CoreRoutingTests(unittest.TestCase):
         self.assertEqual(resultado["resposta"], "Resposta de fallback.")
 
     def test_memory_recall_is_human_readable(self):
-        resultado = self.orquestrador.processar("o que você guardou de mim?")
+        resultado = self.orquestrador.processar("mostre minha memória")
         self.assertEqual(resultado["tipo"], "local")
         self.assertIn("STACY", resultado["resposta"])
         self.assertIn("aprender ingles", resultado["resposta"])
@@ -1347,6 +1347,40 @@ class TestTaskConversationCorrections(unittest.TestCase):
         self.assertIsNone(resultado)
 
 
+
+    def test_user_memory_key_value_format_is_persisted(self):
+        original_save = orchestrator.memory.salvar_memoria
+        try:
+            orchestrator.memory.salvar_memoria = lambda memoria: None
+            resultado = self.orquestrador.processar(
+                "memorize usuario.nome=Danley"
+            )
+        finally:
+            orchestrator.memory.salvar_memoria = original_save
+
+        self.assertEqual(resultado["tipo"], "local")
+        self.assertEqual(self.memoria["usuario"]["nome"], "Danley")
+
+    def test_pending_action_failure_is_handled_without_key_error(self):
+        self.orquestrador.acao_pendente = {
+            "tipo": "remover_tarefa",
+            "tarefa_id": "T-1"
+        }
+        original_remover = orchestrator.tasks.remover
+        try:
+            orchestrator.tasks.remover = lambda _id: None
+            resultado = self.orquestrador.processar("sim")
+        finally:
+            orchestrator.tasks.remover = original_remover
+        self.assertEqual(resultado["tipo"], "erro_tarefa")
+
+    def test_memory_recall_is_human_readable(self):
+        self.memoria["projetos"] = [{"id": "P-A1", "valor": "STACY"}]
+        self.memoria["objetivos"] = [{"id": "O-A1", "valor": "aprender ingles"}]
+        resultado = self.orquestrador.processar("mostre minha memória")
+        self.assertEqual(resultado["tipo"], "local")
+        self.assertIn("STACY", resultado["resposta"])
+        self.assertIn("aprender ingles", resultado["resposta"])
 
 if __name__ == "__main__":
     unittest.main()

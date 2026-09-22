@@ -366,7 +366,7 @@ class StacyOrchestrator:
         # contexto depois de uma interação curta.
         self.conversa.registrar_mensagem(mensagem)
 
-        if mensagem_normalizada in respostas_locais:
+        if self.acao_pendente is None and mensagem_normalizada in respostas_locais:
             return {
                 "tipo": "local",
                 "resposta": respostas_locais[mensagem_normalizada]
@@ -374,7 +374,7 @@ class StacyOrchestrator:
 
         # Tolerância geral para pequenas falhas de digitação em frases locais.
         for frase, resposta in respostas_locais.items():
-            if len(mensagem_normalizada) >= 6:
+            if self.acao_pendente is None and len(mensagem_normalizada) >= 6:
                 similaridade = SequenceMatcher(
                     None,
                     mensagem_normalizada,
@@ -395,11 +395,11 @@ class StacyOrchestrator:
 
             confirmacao = _normalizar_confirmacao(mensagem)
 
+            acao = self.acao_pendente
+
             if confirmacao in {
                 "sim", "s", "pode", "confirmo", "confirmado"
             }:
-
-                acao = self.acao_pendente
 
                 if acao.get("tipo") == "remover_tarefa":
                     resultado = tasks.remover(
@@ -414,7 +414,8 @@ class StacyOrchestrator:
                             "resposta": (
                                 "Não consegui remover "
                                 "a tarefa, senhor."
-                            )
+                            ),
+                            "acao": acao
                         }
 
                     return {
@@ -423,7 +424,8 @@ class StacyOrchestrator:
                             f"Removida, senhor: "
                             f"'{resultado['titulo']}'."
                         ),
-                        "tarefa": resultado
+                        "tarefa": resultado,
+                        "acao": acao
                     }
 
                 campos_colecao = [
@@ -465,7 +467,8 @@ class StacyOrchestrator:
                             f"de {entidade['nome']} "
                             f"com '{resultado['valor']}'."
                         ),
-                        "resultado": resultado
+                        "resultado": resultado,
+                        "acao": acao
                     }
 
                 if resultado["status"] == "ja_existente":
@@ -483,7 +486,8 @@ class StacyOrchestrator:
                             f"'{resultado['campo']}' "
                             f"de {entidade['nome']}."
                         ),
-                        "resultado": resultado
+                        "resultado": resultado,
+                        "acao": acao
                     }
 
                 return {
@@ -492,7 +496,8 @@ class StacyOrchestrator:
                         "Não consegui executar "
                         "a alteração, senhor."
                     ),
-                    "resultado": resultado
+                    "resultado": resultado,
+                    "acao": acao
                 }
 
             if confirmacao in {
@@ -506,13 +511,34 @@ class StacyOrchestrator:
                     "resposta": (
                         "Entendido, senhor. "
                         "A alteração foi cancelada."
-                    )
+                    ),
+                    "acao": acao
                 }
 
-            # Uma mensagem diferente de confirmação não deve deixar uma ação
-            # antiga armada para um futuro "sim". A consulta atual continua
-            # normalmente, mas a confirmação anterior é descartada.
+            # Uma mensagem diferente de confirmação invalida a operação
+            # pendente e seu estado operacional temporário.
             self.acao_pendente = None
+            self.conversa.limpar_operacao()
+
+            # Reprocessa respostas locais depois de descartar a operação antiga.
+            if mensagem_normalizada in respostas_locais:
+                return {
+                    "tipo": "local",
+                    "resposta": respostas_locais[mensagem_normalizada]
+                }
+
+            for frase, resposta in respostas_locais.items():
+                if len(mensagem_normalizada) >= 6:
+                    similaridade = SequenceMatcher(
+                        None,
+                        mensagem_normalizada,
+                        frase
+                    ).ratio()
+                    if similaridade >= 0.88:
+                        return {
+                            "tipo": "local",
+                            "resposta": resposta
+                        }
 
         # Consultas sobre a própria conversa são determinísticas.
         # Nunca devem depender de conhecimento externo ou de uma IA pequena.
@@ -1235,14 +1261,25 @@ class StacyOrchestrator:
             # posterior reutilize uma entidade de outro assunto.
             self.conversa.limpar_entidade()
 
-        if resultado.get("acao") is not None:
-            self.conversa.registrar_acao(
-                resultado.get("acao")
-            )
+        acao = resultado.get("acao")
+        if acao is not None:
+            if resultado.get("tipo") == "acao_candidata":
+                self.conversa.registrar_acao_pendente(acao)
+            else:
+                self.conversa.registrar_acao(acao)
 
         if resultado.get("intencao") is not None:
             self.conversa.registrar_intencao(
                 resultado.get("intencao")
+            )
+
+        if resultado.get("tipo") in {
+            "erro_acao",
+            "erro_tarefa",
+            "pesquisa_indisponivel"
+        }:
+            self.conversa.registrar_erro(
+                resultado.get("erro") or resultado.get("tipo")
             )
 
         return resultado
