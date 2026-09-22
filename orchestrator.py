@@ -2160,72 +2160,49 @@ class StacyOrchestrator:
             indent=2
         )
 
-        erros = []
+        # Converta apenas os turnos não externos para o histórico da IA local.
+        # O Gemini continua recebendo o histórico completo da sessão.
+        historico_local = []
+        for item in contexto_local:
+            tipo = item.get("tipo")
+            conteudo = item.get("conteudo", "").strip()
+            if not conteudo or tipo not in {"usuario", "stacy"}:
+                continue
+            historico_local.append({
+                "role": "user" if tipo == "usuario" else "model",
+                "parts": [{"text": conteudo}]
+            })
+
+        # Garanta que a consulta atual seja o último turno do histórico local.
+        if not historico_local or historico_local[-1]["parts"][0]["text"] != mensagem:
+            historico_local.append({
+                "role": "user",
+                "parts": [{"text": mensagem}]
+            })
 
         try:
-            if not ai.verificar_ia_local():
-                raise RuntimeError(
-                    "servidor local não está acessível"
-                )
-
-            historico_local = []
-            for item in self.conversa.ultimas_mensagens(12):
-                if not isinstance(item, dict):
-                    continue
-
-                if item.get("rota") == ROTA_PESQUISA_EXTERNA:
-                    continue
-
-                conteudo = item.get("conteudo", "").strip()
-                if not conteudo:
-                    continue
-
-                historico_local.append({
-                    "role": (
-                        "model"
-                        if item.get("tipo") == "stacy"
-                        else "user"
-                    ),
-                    "parts": [{"text": conteudo}]
-                })
-
-            resposta = ai.gerar_resposta_local(
+            resultado_hibrido = ai.gerar_resposta_hibrida(
+                self.api_key,
                 historico_local,
                 contexto_memoria,
                 contexto_entidade,
-                contexto_conversa
+                contexto_conversa,
+                historico_gemini=self.historico
             )
+            resposta = resultado_hibrido["resposta"]
+            origem = resultado_hibrido["origem"]
 
-            origem = "local"
-
-        except Exception as erro_local:
-
-            erros.append(f"IA local: {erro_local}")
-
-            print(
-                "[STACY] IA local indisponível; "
-                "tentando Gemini como fallback..."
-            )
-
-            try:
-                resposta = ai.gerar_resposta(
-                    self.api_key,
-                    self.historico,
-                    contexto_memoria,
-                    contexto_entidade,
-                    contexto_conversa
+            if resultado_hibrido.get("fallback"):
+                print(
+                    "[STACY] IA local indisponível; "
+                    "Gemini assumiu como fallback."
                 )
 
-                origem = "gemini"
-
-            except Exception as erro_gemini:
-
-                erros.append(f"Gemini: {erro_gemini}")
-
-                raise RuntimeError(
-                    "Não consegui obter uma resposta da IA agora, senhor. "
-                    "A IA local está indisponível e o Gemini não respondeu dentro do tempo esperado."
-                ) from erro_gemini
+        except Exception as erro_hibrido:
+            raise RuntimeError(
+                "Não consegui obter uma resposta da IA agora, senhor. "
+                "A IA local e o Gemini não responderam corretamente."
+            ) from erro_hibrido
 
         self.historico.append({
             "role": "model",

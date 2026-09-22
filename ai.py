@@ -483,3 +483,65 @@ def analisar_rota_local(mensagem, contexto_conversa=None):
         raise RuntimeError("Roteador local retornou formato inválido.")
 
     return decisao
+
+
+def gerar_resposta_hibrida(
+    api_key,
+    historico,
+    contexto_memoria,
+    contexto_entidade=None,
+    contexto_conversa=None,
+    historico_gemini=None
+):
+    """Política definitiva de geração: IA local primeiro, Gemini como fallback."""
+    erros = []
+
+    try:
+        if not verificar_ia_local():
+            raise RuntimeError("servidor local não está acessível")
+
+        resposta = gerar_resposta_local(
+            historico,
+            contexto_memoria,
+            contexto_entidade,
+            contexto_conversa
+        )
+
+        if not isinstance(resposta, str) or not resposta.strip():
+            raise RuntimeError("IA local retornou resposta vazia")
+
+        return {
+            "resposta": resposta.strip(),
+            "origem": "local",
+            "fallback": False,
+            "erros": []
+        }
+
+    except Exception as erro_local:
+        erros.append(f"IA local: {erro_local}")
+
+    try:
+        resposta = gerar_resposta(
+            api_key,
+            historico_gemini if historico_gemini is not None else historico,
+            contexto_memoria,
+            contexto_entidade,
+            contexto_conversa
+        )
+
+        if not isinstance(resposta, str) or not resposta.strip():
+            raise RuntimeError("Gemini retornou resposta vazia")
+
+        return {
+            "resposta": resposta.strip(),
+            "origem": "gemini",
+            "fallback": True,
+            "erros": erros
+        }
+
+    except Exception as erro_gemini:
+        erros.append(f"Gemini: {erro_gemini}")
+        raise RuntimeError(
+            "Não consegui obter uma resposta da IA agora, senhor. "
+            "A IA local e o Gemini não responderam corretamente."
+        ) from erro_gemini
