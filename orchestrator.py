@@ -327,7 +327,10 @@ class StacyOrchestrator:
         # contexto depois de uma interação curta.
         self.conversa.registrar_mensagem(mensagem)
 
-        if mensagem_normalizada in respostas_locais:
+        if (
+            self.acao_pendente is None
+            and mensagem_normalizada in respostas_locais
+        ):
             return {
                 "tipo": "local",
                 "resposta": respostas_locais[mensagem_normalizada]
@@ -335,7 +338,7 @@ class StacyOrchestrator:
 
         # Tolerância geral para pequenas falhas de digitação em frases locais.
         for frase, resposta in respostas_locais.items():
-            if len(mensagem_normalizada) >= 6:
+            if self.acao_pendente is None and len(mensagem_normalizada) >= 6:
                 similaridade = SequenceMatcher(
                     None,
                     mensagem_normalizada,
