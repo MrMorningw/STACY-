@@ -37,7 +37,7 @@ class AndroidAutomation(
 
     override fun openApplication(packageName: String): AutomationResult {
         val normalized = packageName.trim()
-        if (normalized.isEmpty()) {
+        if (AndroidAutomationRules.packageNameError(normalized) != null) {
             return AutomationResult.Failure("INVALID_PACKAGE", "Pacote do aplicativo não informado.")
         }
 
@@ -60,11 +60,12 @@ class AndroidAutomation(
         description: String?,
     ): AutomationResult {
         val normalizedTitle = title.trim()
-        if (normalizedTitle.isEmpty()) {
-            return AutomationResult.Failure("INVALID_TITLE", "O título do evento não pode ser vazio.")
-        }
-        if (endMillis <= startMillis) {
-            return AutomationResult.Failure(
+        when (AndroidAutomationRules.calendarError(normalizedTitle, startMillis, endMillis)) {
+            "INVALID_TITLE" -> return AutomationResult.Failure(
+                "INVALID_TITLE",
+                "O título do evento não pode ser vazio.",
+            )
+            "INVALID_INTERVAL" -> return AutomationResult.Failure(
                 "INVALID_INTERVAL",
                 "O horário final deve ser posterior ao horário inicial.",
             )
@@ -85,7 +86,7 @@ class AndroidAutomation(
 
     override fun shareText(text: String, title: String): AutomationResult {
         val normalizedText = text.trim()
-        if (normalizedText.isEmpty()) {
+        if (AndroidAutomationRules.shareTextError(normalizedText) != null) {
             return AutomationResult.Failure("EMPTY_TEXT", "Não há texto para compartilhar.")
         }
 
@@ -111,7 +112,7 @@ class AndroidAutomation(
         val normalizedTitle = title.trim()
         val normalizedText = text.trim()
 
-        if (normalizedTitle.isEmpty() || normalizedText.isEmpty()) {
+        if (AndroidAutomationRules.notificationError(normalizedTitle, normalizedText) != null) {
             return AutomationResult.Failure(
                 "INVALID_NOTIFICATION",
                 "Título e texto da notificação são obrigatórios.",
