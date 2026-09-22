@@ -10,10 +10,11 @@ class MepoTest(unittest.TestCase):
         self.assertEqual(len(registros), 12)
         self.assertTrue(mepo.validar_sequencia(registros))
 
-    def test_primeiros_oito_estao_fechados_e_mp09_ativo(self):
+    def test_mp01_a_mp11_estao_fechados_e_mp12_aguarda_inicio(self):
         registros = mepo.listar()
-        self.assertTrue(all(item["status"] == "fechado" for item in registros[:8]))
-        self.assertEqual(registros[8]["status"], "em_execucao")
+        self.assertTrue(all(item["status"] == "fechado" for item in registros[:11]))
+        self.assertEqual(registros[11]["status"], "planejado")
+        self.assertEqual(mepo.proximo_aberto()["id"], "MP-12")
 
     def test_transicoes_sao_controladas(self):
         self.assertTrue(mepo.validar_transicao("planejado", "em_execucao"))
