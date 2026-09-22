@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -30,14 +31,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -56,7 +52,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             StacyTheme {
-                StacyApp()
+                StacyApp(viewModel())
             }
         }
     }
@@ -78,13 +74,8 @@ fun StacyTheme(content: @Composable () -> Unit) {
 }
 
 @Composable
-fun StacyApp() {
-    val messages = remember {
-        mutableStateListOf(
-            ChatMessage("Boa tarde, senhor. Estou pronta.", false),
-        )
-    }
-    var input by remember { mutableStateOf("") }
+fun StacyApp(viewModel: StacyViewModel) {
+    val uiState = viewModel.uiState
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -103,27 +94,16 @@ fun StacyApp() {
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
-                reverseLayout = false,
             ) {
-                items(messages) { message ->
+                items(uiState.messages) { message ->
                     MessageBubble(message)
                 }
             }
 
             Composer(
-                value = input,
-                onValueChange = { input = it },
-                onSend = {
-                    val text = input.trim()
-                    if (text.isNotEmpty()) {
-                        messages += ChatMessage(text, true)
-                        messages += ChatMessage(
-                            "Recebi sua mensagem. O STACY Core será conectado a esta interface na próxima camada de integração.",
-                            false,
-                        )
-                        input = ""
-                    }
-                },
+                value = uiState.input,
+                onValueChange = viewModel::onInputChanged,
+                onSend = viewModel::onSend,
                 onVoice = {},
             )
         }
@@ -145,13 +125,13 @@ private fun StacyHeader() {
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text = "ONLINE • núcleo preparado",
+                text = "INTERFACE • núcleo preparado",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.secondary,
             )
         }
         Text(
-            text = "LOCAL",
+            text = "STACY",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.primary,
             fontWeight = FontWeight.Bold,
@@ -200,7 +180,10 @@ private fun Composer(
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.Bottom,
     ) {
-        IconButton(onClick = onVoice) {
+        IconButton(
+            onClick = onVoice,
+            enabled = false,
+        ) {
             Icon(
                 imageVector = Icons.Default.Mic,
                 contentDescription = "Voz",
@@ -222,7 +205,7 @@ private fun Composer(
             ),
         )
 
-        Spacer(modifier = Modifier.padding(3.dp))
+        Spacer(modifier = Modifier.width(4.dp))
 
         IconButton(
             onClick = onSend,
@@ -240,6 +223,6 @@ private fun Composer(
 @Composable
 private fun StacyPreview() {
     StacyTheme {
-        StacyApp()
+        StacyApp(StacyViewModel())
     }
 }
