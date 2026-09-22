@@ -131,7 +131,7 @@ private fun StacyHeader() {
             )
         }
         Text(
-            text = "STACY",
+            text = "READY",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.primary,
             fontWeight = FontWeight.Bold,
