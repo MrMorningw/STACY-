@@ -370,12 +370,16 @@ class StacyOrchestrator:
                     self.acao_pendente = None
 
                     if resultado is None:
+                        self.conversa.registrar_erro(
+                            "remoção de tarefa não executada"
+                        )
                         return {
                             "tipo": "erro_tarefa",
                             "resposta": (
                                 "Não consegui remover "
                                 "a tarefa, senhor."
-                            )
+                            ),
+                            "acao": acao
                         }
 
                     return {
@@ -384,7 +388,8 @@ class StacyOrchestrator:
                             f"Removida, senhor: "
                             f"'{resultado['titulo']}'."
                         ),
-                        "tarefa": resultado
+                        "tarefa": resultado,
+                        "acao": acao
                     }
 
                 campos_colecao = [
@@ -427,7 +432,8 @@ class StacyOrchestrator:
                                 "A ação foi processada, mas a entidade "
                                 "não está mais disponível, senhor."
                             ),
-                            "resultado": resultado
+                            "resultado": resultado,
+                            "acao": acao
                         }
 
                     return {
@@ -438,7 +444,8 @@ class StacyOrchestrator:
                             f"de {entidade['nome']} "
                             f"com '{resultado['valor']}'."
                         ),
-                        "resultado": resultado
+                        "resultado": resultado,
+                        "acao": acao
                     }
 
                 if status == "ja_existente":
@@ -455,7 +462,8 @@ class StacyOrchestrator:
                                 "A informação já estava registrada, "
                                 "mas a entidade não está mais disponível, senhor."
                             ),
-                            "resultado": resultado
+                            "resultado": resultado,
+                            "acao": acao
                         }
 
                     return {
@@ -466,7 +474,8 @@ class StacyOrchestrator:
                             f"'{resultado.get('campo')}' "
                             f"de {entidade.get('nome', 'essa entidade')}."
                         ),
-                        "resultado": resultado
+                        "resultado": resultado,
+                        "acao": acao
                     }
 
                 return {
@@ -475,7 +484,8 @@ class StacyOrchestrator:
                         "Não consegui executar "
                         "a alteração, senhor."
                     ),
-                    "resultado": resultado
+                    "resultado": resultado,
+                    "acao": acao
                 }
 
             if confirmacao in {
@@ -489,13 +499,14 @@ class StacyOrchestrator:
                     "resposta": (
                         "Entendido, senhor. "
                         "A alteração foi cancelada."
-                    )
+                    ),
+                    "acao": acao
                 }
 
-            # Uma mensagem diferente de confirmação não deve deixar uma ação
-            # antiga armada para um futuro "sim". A consulta atual continua
-            # normalmente, mas a confirmação anterior é descartada.
+            # Uma mensagem diferente de confirmação invalida a operação
+            # pendente e seu estado operacional temporário.
             self.acao_pendente = None
+            self.conversa.limpar_operacao()
 
         # O roteador decide a origem antes de qualquer IA.
         # A classificação interna é prioritária para impedir que dados pessoais
@@ -734,14 +745,28 @@ class StacyOrchestrator:
                     entidade_id
                 )
 
-        if resultado.get("acao") is not None:
-            self.conversa.registrar_acao(
-                resultado.get("acao")
-            )
+        acao = resultado.get("acao")
+
+        if acao is not None:
+            if resultado.get("tipo") == "acao_candidata":
+                # A confirmação mantém a operação aberta até o usuário
+                # confirmar ou cancelar.
+                self.conversa.registrar_acao_pendente(acao)
+            else:
+                self.conversa.registrar_acao(acao)
 
         if resultado.get("intencao") is not None:
             self.conversa.registrar_intencao(
                 resultado.get("intencao")
+            )
+
+        if resultado.get("tipo") in {
+            "erro_acao",
+            "erro_tarefa",
+            "pesquisa_indisponivel"
+        }:
+            self.conversa.registrar_erro(
+                resultado.get("erro") or resultado.get("tipo")
             )
 
         return resultado
