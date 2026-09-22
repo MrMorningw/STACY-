@@ -1,0 +1,36 @@
+name: STACY Android CI
+
+on:
+  push:
+    branches:
+      - mp07-interface-20260922
+  pull_request:
+    branches:
+      - mp07-interface-20260922
+      - mp01-cortex-routing-20260921
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.6.0"
+
+      - name: Build and lint
+        run: gradle assembleDebug testDebugUnitTest
+
