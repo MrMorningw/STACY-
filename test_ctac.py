@@ -5,10 +5,11 @@ import ctac
 
 class CtacTest(unittest.TestCase):
 
-    def test_estado_aponta_mp09(self):
+    def test_estado_aponta_proxima_mp12(self):
         estado = ctac.estado()
-        self.assertEqual(estado["mepo_atual"], "MP-09")
-        self.assertEqual(estado["mepos_fechados"], 8)
+        self.assertEqual(estado["mepo_atual"], "MP-12")
+        self.assertEqual(estado["status_mepo_atual"], "planejado")
+        self.assertEqual(estado["mepos_fechados"], 11)
 
     def test_coerencia_da_trajetoria(self):
         resultado = ctac.validar_coerencia()
@@ -16,7 +17,7 @@ class CtacTest(unittest.TestCase):
         self.assertEqual(resultado["erros"], [])
 
     def test_formatacao(self):
-        self.assertIn("MP-09", ctac.formatar_estado())
+        self.assertIn("MP-12", ctac.formatar_estado())
         self.assertIn("MP-01", ctac.formatar_mepos())
 
 
