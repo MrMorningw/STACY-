@@ -1375,7 +1375,9 @@ class TestTaskConversationCorrections(unittest.TestCase):
         self.assertEqual(resultado["tipo"], "erro_tarefa")
 
     def test_memory_recall_is_human_readable(self):
-        resultado = self.orquestrador.processar("o que você guardou de mim?")
+        self.memoria["projetos"] = [{"id": "P-A1", "valor": "STACY"}]
+        self.memoria["objetivos"] = [{"id": "O-A1", "valor": "aprender ingles"}]
+        resultado = self.orquestrador.processar("mostre minha memória")
         self.assertEqual(resultado["tipo"], "local")
         self.assertIn("STACY", resultado["resposta"])
         self.assertIn("aprender ingles", resultado["resposta"])
