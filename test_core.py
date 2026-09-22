@@ -563,10 +563,9 @@ class CoreRoutingTests(unittest.TestCase):
             orchestrator.ai.gerar_resposta_pesquisa = original_pesquisa
             orchestrator.ai.gerar_resposta = original_gemini
 
-        self.assertEqual(resultado["tipo"], "pesquisa_fallback")
-        self.assertEqual(resultado["origem"], "gemini_fallback")
+        self.assertEqual(resultado["tipo"], "pesquisa_indisponivel")
         self.assertEqual(resultado["fontes"], [])
-        self.assertEqual(resultado["resposta"], "Resposta de fallback.")
+        self.assertIn("não foi verificada", resultado["resposta"])
 
     def test_user_memory_key_value_format_is_persisted(self):
         original_save = orchestrator.memory.salvar_memoria
@@ -1214,14 +1213,10 @@ class TestContextContinuity(unittest.TestCase):
         chamadas = []
         try:
             def falhar_pesquisa(*args, **kwargs):
+                chamadas.append(args[1])
                 raise RuntimeError("Google Search indisponível")
 
-            def fallback(*args, **kwargs):
-                chamadas.append(args[1])
-                return "Fallback contextual."
-
             orchestrator.ai.gerar_resposta_pesquisa = falhar_pesquisa
-            orchestrator.ai.gerar_resposta = fallback
             self.orquestrador.api_key = "chave"
             self.orquestrador.conversa.registrar_mensagem(
                 "quem foi Joao Eunápio Borges?"
@@ -1236,8 +1231,8 @@ class TestContextContinuity(unittest.TestCase):
             orchestrator.ai.gerar_resposta_pesquisa = original_pesquisa
             orchestrator.ai.gerar_resposta = original_gerar
 
-        self.assertEqual(resultado["tipo"], "pesquisa_fallback")
-        self.assertEqual(resultado["resposta"], "Fallback contextual.")
+        self.assertEqual(resultado["tipo"], "pesquisa_indisponivel")
+        self.assertIn("não foi verificada", resultado["resposta"])
         self.assertTrue(chamadas)
         textos = [
             parte.get("text", "")
