@@ -1,0 +1,29 @@
+name: STACY MP-11 CI
+
+on:
+  push:
+    branches:
+      - mp11-autonomia-controlada-20260922
+  pull_request:
+    branches:
+      - mp11-autonomia-controlada-20260922
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Compile
+        run: python -m py_compile *.py
+      - name: MP-11 autonomy tests
+        run: python -m unittest test_autonomy.py -v
+      - name: Core regression tests
+        run: python -m unittest discover -v

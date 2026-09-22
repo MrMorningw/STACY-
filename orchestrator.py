@@ -17,6 +17,7 @@ import cortex
 import ctac
 import mepo
 import orchestration
+import autonomy
 
 
 
@@ -815,6 +816,7 @@ class StacyOrchestrator:
                     if dados_tarefa.get("acao"):
                         intencao = {
                             "tipo": "tarefa",
+                            "origem": autonomy.ORIGEM_IA,
                             **dados_tarefa
                         }
                 elif decisao.get("ferramenta") == "memory":
@@ -827,6 +829,7 @@ class StacyOrchestrator:
                     if dados_memoria.get("acao"):
                         intencao = {
                             "tipo": "memoria",
+                            "origem": autonomy.ORIGEM_IA,
                             **dados_memoria
                         }
 
@@ -1054,6 +1057,26 @@ class StacyOrchestrator:
             self.conversa.registrar_intencao(
                 intencao
             )
+
+            autorizacao = autonomy.avaliar_execucao(
+                intencao
+            )
+            if (
+                intencao.get("origem") == autonomy.ORIGEM_IA
+                and not autorizacao.get("executar")
+            ):
+                return {
+                    "tipo": "confirmacao_autonomia",
+                    "resposta": (
+                        "Identifiquei uma ação pela IA local, senhor, "
+                        "mas não vou executá-la automaticamente. "
+                        "Se desejar a execução, repita o pedido de forma "
+                        "explícita como comando da STACY."
+                    ),
+                    "intencao": intencao,
+                    "autonomia": autorizacao,
+                    "rota": ROTA_INTERNA
+                }
 
             resultado_intencao = self._processar_intencao(
                 intencao
