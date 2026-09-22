@@ -10,7 +10,7 @@ ORDEM = tuple(range(1, 13))
 _STATUS_INICIAL = {
     1: "fechado", 2: "fechado", 3: "fechado", 4: "fechado",
     5: "fechado", 6: "fechado", 7: "fechado", 8: "fechado",
-    9: "em_execucao", 10: "planejado", 11: "planejado", 12: "planejado",
+    9: "fechado", 10: "fechado", 11: "fechado", 12: "planejado",
 }
 
 _NOMES = {
