@@ -1,6 +1,8 @@
 package com.mrmorning.stacy
 
+import android.Manifest
 import android.os.Bundle
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -47,14 +49,53 @@ data class ChatMessage(
 )
 
 class MainActivity : ComponentActivity() {
+    private lateinit var voiceInput: AndroidVoiceInput
+
+    private val requestMicrophone =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) voiceInput.startListening()
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
             StacyTheme {
-                StacyApp(viewModel())
+                StacyApp(
+                    viewModel(),
+                    onVoice = { vm ->
+                        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) ==
+                            android.content.pm.PackageManager.PERMISSION_GRANTED
+                        ) {
+                            voiceInput.startListening()
+                        } else {
+                            requestMicrophone.launch(Manifest.permission.RECORD_AUDIO)
+                        }
+                    },
+                )
             }
         }
+
+        voiceInput = AndroidVoiceInput(
+            context = this,
+            onResult = { result ->
+                runOnUiThread {
+                    currentViewModel?.onVoiceResult(result)
+                }
+            },
+            onStateChanged = { listening ->
+                runOnUiThread {
+                    currentViewModel?.onVoiceStateChanged(listening)
+                }
+            },
+        )
+    }
+
+    private var currentViewModel: StacyViewModel? = null
+
+    override fun onDestroy() {
+        if (::voiceInput.isInitialized) voiceInput.destroy()
+        super.onDestroy()
     }
 }
 
@@ -74,7 +115,10 @@ fun StacyTheme(content: @Composable () -> Unit) {
 }
 
 @Composable
-fun StacyApp(viewModel: StacyViewModel) {
+fun StacyApp(
+    viewModel: StacyViewModel,
+    onVoice: (StacyViewModel) -> Unit = {},
+) {
     val uiState = viewModel.uiState
 
     Surface(
@@ -104,7 +148,7 @@ fun StacyApp(viewModel: StacyViewModel) {
                 value = uiState.input,
                 onValueChange = viewModel::onInputChanged,
                 onSend = viewModel::onSend,
-                onVoice = {},
+                onVoice = { onVoice(viewModel) },
             )
         }
     }
