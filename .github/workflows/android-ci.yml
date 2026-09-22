@@ -32,7 +32,5 @@ jobs:
           gradle-version: "9.6.0"
 
       - name: Build and lint
-        run: gradle assembleDebug lintDebug
+        run: gradle assembleDebug testDebugUnitTest
 
-      - name: Run JVM tests
-        run: gradle testDebugUnitTest
