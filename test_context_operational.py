@@ -1,12 +1,86 @@
 import unittest
 
 import conversation
+import orchestrator
 
 
 class OperationalContextTests(unittest.TestCase):
 
     def setUp(self):
         self.contexto = conversation.ConversationState()
+
+
+    def test_orchestrator_confirmation_keeps_action_pending(self):
+        estado = orchestrator.StacyOrchestrator(
+            api_key=None,
+            memoria={},
+            entidades={"entidades": []}
+        )
+        acao = {
+            "tipo": "atualizar_atributo",
+            "entidade_id": "P-A1",
+            "campo": "objetivos",
+            "valor": "Direito"
+        }
+        estado._registrar_resultado_conversa({
+            "tipo": "acao_candidata",
+            "resposta": "Deseja confirmar?",
+            "acao": acao
+        })
+        self.assertEqual(
+            estado.conversa.obter_estado_operacional(),
+            "aguardando_confirmacao"
+        )
+        self.assertEqual(
+            estado.conversa.obter_operacao_atual(),
+            acao
+        )
+
+    def test_orchestrator_completed_action_closes_operation(self):
+        estado = orchestrator.StacyOrchestrator(
+            api_key=None,
+            memoria={},
+            entidades={"entidades": []}
+        )
+        acao = {
+            "tipo": "atualizar_atributo",
+            "entidade_id": "P-A1",
+            "campo": "objetivos",
+            "valor": "Direito"
+        }
+        estado._registrar_resultado_conversa({
+            "tipo": "acao_executada",
+            "resposta": "Pronto, senhor.",
+            "acao": acao
+        })
+        self.assertEqual(
+            estado.conversa.obter_estado_operacional(),
+            "concluido"
+        )
+        self.assertEqual(
+            estado.conversa.obter_operacao_atual(),
+            acao
+        )
+
+    def test_orchestrator_error_marks_operational_state_as_error(self):
+        estado = orchestrator.StacyOrchestrator(
+            api_key=None,
+            memoria={},
+            entidades={"entidades": []}
+        )
+        estado._registrar_resultado_conversa({
+            "tipo": "erro_acao",
+            "resposta": "Não consegui executar.",
+            "erro": "falha de teste"
+        })
+        self.assertEqual(
+            estado.conversa.obter_estado_operacional(),
+            "erro"
+        )
+        self.assertIn(
+            "falha de teste",
+            estado.conversa.obter_operacao_atual()["erro"]
+        )
 
     def test_initial_state_is_idle(self):
         self.assertEqual(
