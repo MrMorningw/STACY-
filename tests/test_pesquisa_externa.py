@@ -55,6 +55,19 @@ class TestPesquisaExterna(unittest.TestCase):
 
         self.assertIn("fontes verificáveis", str(contexto.exception))
 
+    @patch("orchestrator.ai.gerar_resposta_pesquisa")
+    def test_pesquisa_indisponivel_nao_usa_resposta_nao_verificada(self, pesquisar):
+        pesquisar.side_effect = RuntimeError("quota")
+        estado = orchestrator.StacyOrchestrator("chave", {}, [])
+
+        resultado = estado._pesquisar_web(
+            "qual é a população atual do Brasil?"
+        )
+
+        self.assertEqual(resultado["tipo"], "pesquisa_indisponivel")
+        self.assertEqual(resultado["fontes"], [])
+        self.assertIn("não foi verificada", resultado["resposta"])
+
     def test_rotas_externas_basicas(self):
         casos = [
             ("pesquise as notícias atuais sobre o STF", orchestrator.ROTA_PESQUISA_EXTERNA),
