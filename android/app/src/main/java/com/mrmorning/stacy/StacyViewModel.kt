@@ -10,6 +10,8 @@ data class StacyUiState(
         ChatMessage("Boa tarde, senhor. Estou pronta.", false),
     ),
     val input: String = "",
+    val isListening: Boolean = false,
+    val voiceError: String? = null,
 )
 
 class StacyViewModel : ViewModel() {
@@ -17,7 +19,7 @@ class StacyViewModel : ViewModel() {
         private set
 
     fun onInputChanged(value: String) {
-        uiState = uiState.copy(input = value)
+        uiState = uiState.copy(input = value, voiceError = null)
     }
 
     fun onSend() {
@@ -27,6 +29,27 @@ class StacyViewModel : ViewModel() {
         uiState = uiState.copy(
             messages = uiState.messages + ChatMessage(text, true),
             input = "",
+            voiceError = null,
         )
+    }
+
+    fun onVoiceStateChanged(listening: Boolean) {
+        uiState = uiState.copy(isListening = listening)
+    }
+
+    fun onVoiceResult(result: VoiceResult) {
+        when (result) {
+            is VoiceResult.Success -> onInputChanged(result.text)
+            is VoiceResult.Failure -> {
+                uiState = uiState.copy(
+                    isListening = false,
+                    voiceError = result.message,
+                )
+            }
+        }
+    }
+
+    fun clearVoiceError() {
+        uiState = uiState.copy(voiceError = null)
     }
 }

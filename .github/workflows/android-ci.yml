@@ -3,10 +3,10 @@ name: STACY Android CI
 on:
   push:
     branches:
-      - mp07-interface-20260922
+      - mp08-automacao-android-20260922
   pull_request:
     branches:
-      - mp07-interface-20260922
+      - mp08-automacao-android-20260922
       - mp01-cortex-routing-20260921
 
 jobs:
@@ -31,6 +31,5 @@ jobs:
         with:
           gradle-version: "9.6.0"
 
-      - name: Build and lint
+      - name: Build and unit tests
         run: gradle assembleDebug testDebugUnitTest
-
