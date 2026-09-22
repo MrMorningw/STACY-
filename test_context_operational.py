@@ -41,11 +41,30 @@ class OperationalContextTests(unittest.TestCase):
             "tipo": "remover_tarefa",
             "tarefa_id": "T-1"
         }
-        self.contexto.registrar_acao(acao)
+        self.contexto.registrar_acao_pendente(acao)
 
         self.assertEqual(
             self.contexto.obter_estado_operacional(),
             "aguardando_confirmacao"
+        )
+        self.assertEqual(
+            self.contexto.obter_operacao_atual(),
+            acao
+        )
+
+    def test_executed_action_does_not_wait_for_confirmation(self):
+        acao = {
+            "tipo": "atualizar_atributo",
+            "entidade_id": "P-A1",
+            "campo": "objetivos",
+            "valor": "Direito"
+        }
+
+        self.contexto.registrar_acao(acao)
+
+        self.assertEqual(
+            self.contexto.obter_estado_operacional(),
+            "concluido"
         )
         self.assertEqual(
             self.contexto.obter_operacao_atual(),
@@ -58,7 +77,7 @@ class OperationalContextTests(unittest.TestCase):
             "tarefa_id": "T-1"
         }
         self.contexto.registrar_resposta("Confirma a remoção?")
-        self.contexto.registrar_acao(acao)
+        self.contexto.registrar_acao_pendente(acao)
 
         estado = self.contexto.obter_contexto_operacional()
 
@@ -92,7 +111,7 @@ class OperationalContextTests(unittest.TestCase):
         )
 
     def test_clear_operation_removes_temporary_state(self):
-        self.contexto.registrar_acao({
+        self.contexto.registrar_acao_pendente({
             "tipo": "remover_tarefa",
             "tarefa_id": "T-1"
         })
