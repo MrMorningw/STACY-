@@ -1,0 +1,39 @@
+name: STACY MP-12 CI
+
+on:
+  push:
+    branches:
+      - mp12-estabilizacao-final-20260922
+  pull_request:
+    branches:
+      - mp12-estabilizacao-final-20260922
+      - main
+
+jobs:
+  final:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Compile all Python files
+        run: python -m py_compile *.py
+      - name: Full regression suite
+        run: python -m unittest discover -v
+      - name: Verify CTAC trajectory
+        run: |
+          python - <<'PY'
+          import ctac
+          import mepo
+          assert mepo.validar_sequencia()
+          assert ctac.validar_coerencia()["coerente"]
+          registros = mepo.listar()
+          assert all(item["status"] == "fechado" for item in registros[:11])
+          assert registros[11]["status"] == "planejado"
+          print("CTAC FINAL: MP-01..MP-11 fechados; MP-12 planejado")
+          PY
