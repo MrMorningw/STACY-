@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "com.mrmorning.stacy"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.mrmorning.stacy"
