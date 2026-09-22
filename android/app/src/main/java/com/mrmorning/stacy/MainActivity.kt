@@ -35,7 +35,7 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -59,11 +59,25 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        val vm = ViewModelProvider(this)[StacyViewModel::class.java]
+        currentViewModel = vm
+
+        voiceInput = AndroidVoiceInput(
+            context = this,
+            onResult = { result ->
+                runOnUiThread { vm.onVoiceResult(result) }
+            },
+            onStateChanged = { listening ->
+                runOnUiThread { vm.onVoiceStateChanged(listening) }
+            },
+        )
+
         setContent {
             StacyTheme {
                 StacyApp(
-                    viewModel(),
-                    onVoice = { vm ->
+                    vm,
+                    onVoice = {
                         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) ==
                             android.content.pm.PackageManager.PERMISSION_GRANTED
                         ) {
@@ -75,20 +89,6 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
-
-        voiceInput = AndroidVoiceInput(
-            context = this,
-            onResult = { result ->
-                runOnUiThread {
-                    currentViewModel?.onVoiceResult(result)
-                }
-            },
-            onStateChanged = { listening ->
-                runOnUiThread {
-                    currentViewModel?.onVoiceStateChanged(listening)
-                }
-            },
-        )
     }
 
     private var currentViewModel: StacyViewModel? = null
