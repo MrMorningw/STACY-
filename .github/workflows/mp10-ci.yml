@@ -1,0 +1,29 @@
+name: STACY MP-10 CI
+
+on:
+  push:
+    branches:
+      - mp10-orquestracao-20260922
+  pull_request:
+    branches:
+      - mp10-orquestracao-20260922
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Compile
+        run: python -m py_compile *.py
+      - name: MP-10 orchestration tests
+        run: python -m unittest test_orchestration.py -v
+      - name: Core regression tests
+        run: python -m unittest discover -v

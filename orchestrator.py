@@ -16,6 +16,7 @@ import knowledge
 import cortex
 import ctac
 import mepo
+import orchestration
 
 
 
@@ -849,15 +850,13 @@ class StacyOrchestrator:
             # quando a frase atual, isoladamente, parece conversacional.
             rota_previa = ROTA_PESQUISA_EXTERNA
 
-        # A rota interna já determinada pelo CORE é soberana.
-        # Uma pergunta interna como "quais sao meus objetivos?" contém
-        # palavras interrogativas, mas isso não autoriza o Cortex a desviá-la
-        # para a Web.
-        if rota_previa != ROTA_INTERNA:
-            if decisao["needs_memory"] or decisao["needs_action"]:
-                rota_previa = ROTA_INTERNA
-            elif decisao["needs_web"]:
-                rota_previa = ROTA_PESQUISA_EXTERNA
+        # A decisão de rota passa pelo núcleo de orquestração, que aplica
+        # prioridades únicas e impede que capacidades concorrentes assumam
+        # controle da mesma mensagem.
+        rota_previa = orchestration.resolver_rota(
+            rota_previa,
+            decisao
+        )
 
         resposta_conhecimento = None
         if rota_previa != ROTA_INTERNA:
