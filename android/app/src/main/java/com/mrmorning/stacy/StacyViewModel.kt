@@ -16,6 +16,7 @@ data class StacyUiState(
     val coreOnline: Boolean = false,
     val voiceError: String? = null,
     val activeTopic: StacyTopic? = null,
+    val lastAssistantResponse: String? = null,
 )
 
 class StacyViewModel : ViewModel() {
@@ -52,6 +53,7 @@ class StacyViewModel : ViewModel() {
                 input = "",
                 isSending = true,
                 voiceError = null,
+                lastAssistantResponse = null,
             )
         }
 
@@ -64,6 +66,7 @@ class StacyViewModel : ViewModel() {
                         isSending = false,
                         coreOnline = true,
                         activeTopic = response.topic ?: it.activeTopic,
+                        lastAssistantResponse = response.text,
                     )
                 }
             } catch (error: Exception) {
@@ -77,9 +80,21 @@ class StacyViewModel : ViewModel() {
                         isSending = false,
                         coreOnline = false,
                         voiceError = error.message,
+                        lastAssistantResponse = null,
                     )
                 }
             }
+        }
+    }
+
+    fun onFileSelected(name: String) {
+        update {
+            it.copy(
+                messages = it.messages + ChatMessage(
+                    "Arquivo selecionado: $name",
+                    true,
+                ),
+            )
         }
     }
 
@@ -91,9 +106,7 @@ class StacyViewModel : ViewModel() {
         when (result) {
             is VoiceResult.Success -> {
                 val text = result.text.trim()
-                if (text.isNotEmpty()) {
-                    submit(text)
-                }
+                if (text.isNotEmpty()) submit(text)
             }
 
             is VoiceResult.Failure -> {
@@ -109,6 +122,10 @@ class StacyViewModel : ViewModel() {
 
     fun clearVoiceError() {
         update { it.copy(voiceError = null) }
+    }
+
+    fun clearSpokenResponse() {
+        update { it.copy(lastAssistantResponse = null) }
     }
 
     private fun update(transform: (StacyUiState) -> StacyUiState) {
