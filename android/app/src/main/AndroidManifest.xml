@@ -15,6 +15,7 @@
         android:allowBackup="true"
         android:label="STACY"
         android:supportsRtl="true"
+        android:usesCleartextTraffic="true"
         android:theme="@style/Theme.STACY">
         <activity
             android:name=".MainActivity"
