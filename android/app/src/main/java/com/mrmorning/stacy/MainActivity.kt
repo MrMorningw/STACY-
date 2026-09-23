@@ -1,47 +1,60 @@
 package com.mrmorning.stacy
 
 import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Divider
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
-import androidx.lifecycle.ViewModelProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModelProvider
+import kotlinx.coroutines.launch
 
 data class ChatMessage(
     val text: String,
@@ -50,11 +63,22 @@ data class ChatMessage(
 
 class MainActivity : ComponentActivity() {
     private lateinit var voiceInput: AndroidVoiceInput
+    private lateinit var voiceOutput: AndroidTextToSpeech
 
     private val requestMicrophone =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             if (granted) voiceInput.startListening()
         }
+
+    private val pickFile =
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            uri?.let {
+                val name = it.lastPathSegment ?: "arquivo selecionado"
+                currentViewModel?.onFileSelected(name)
+            }
+        }
+
+    private var currentViewModel: StacyViewModel? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -73,28 +97,34 @@ class MainActivity : ComponentActivity() {
             },
         )
 
+        voiceOutput = AndroidTextToSpeech(this)
+
         setContent {
             StacyTheme {
                 StacyApp(
-                    vm,
+                    viewModel = vm,
                     onVoice = {
-                        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) ==
-                            android.content.pm.PackageManager.PERMISSION_GRANTED
+                        if (
+                            checkSelfPermission(Manifest.permission.RECORD_AUDIO) ==
+                            PackageManager.PERMISSION_GRANTED
                         ) {
                             voiceInput.startListening()
                         } else {
                             requestMicrophone.launch(Manifest.permission.RECORD_AUDIO)
                         }
                     },
+                    onAttach = {
+                        pickFile.launch(arrayOf("*/*"))
+                    },
+                    onSpeak = { voiceOutput.speak(it) },
                 )
             }
         }
     }
 
-    private var currentViewModel: StacyViewModel? = null
-
     override fun onDestroy() {
         if (::voiceInput.isInitialized) voiceInput.destroy()
+        if (::voiceOutput.isInitialized) voiceOutput.shutdown()
         super.onDestroy()
     }
 }
@@ -117,51 +147,155 @@ fun StacyTheme(content: @Composable () -> Unit) {
 @Composable
 fun StacyApp(
     viewModel: StacyViewModel,
-    onVoice: (StacyViewModel) -> Unit = {},
+    onVoice: () -> Unit = {},
+    onAttach: () -> Unit = {},
+    onSpeak: (String) -> Unit = {},
 ) {
     val uiState = viewModel.uiState
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(Unit) {
+        viewModel.checkCore()
+    }
+
+    LaunchedEffect(uiState.lastAssistantResponse) {
+        uiState.lastAssistantResponse?.let {
+            onSpeak(it)
+            viewModel.clearSpokenResponse()
+        }
+    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background,
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .windowInsetsPadding(WindowInsets.safeDrawing),
+        ModalNavigationDrawer(
+            drawerState = drawerState,
+            drawerContent = {
+                StacyDrawer(
+                    activeTopic = uiState.activeTopic,
+                    onSelect = { topic ->
+                        viewModel.selectTopic(topic)
+                        scope.launch { drawerState.close() }
+                    },
+                )
+            },
         ) {
-            StacyHeader()
-
-            LazyColumn(
+            Column(
                 modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                    .fillMaxSize()
+                    .windowInsetsPadding(androidx.compose.foundation.layout.WindowInsets.safeDrawing),
             ) {
-                items(uiState.messages) { message ->
-                    MessageBubble(message)
-                }
-            }
+                StacyHeader(
+                    topic = uiState.activeTopic,
+                    coreOnline = uiState.coreOnline,
+                    onMenu = { scope.launch { drawerState.open() } },
+                )
 
-            Composer(
-                value = uiState.input,
-                onValueChange = viewModel::onInputChanged,
-                onSend = viewModel::onSend,
-                onVoice = { onVoice(viewModel) },
+                if (uiState.activeTopic == StacyTopic.CONFIGURACOES) {
+                    IntegrationPanel()
+                }
+
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    items(uiState.messages) { message ->
+                        MessageBubble(message)
+                    }
+                }
+
+                if (uiState.isSending) {
+                    Text(
+                        text = "STACY está processando...",
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.secondary,
+                    )
+                }
+
+                uiState.voiceError?.let { error ->
+                    Text(
+                        text = error,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+
+                Composer(
+                    value = uiState.input,
+                    onValueChange = viewModel::onInputChanged,
+                    onSend = viewModel::onSend,
+                    onVoice = onVoice,
+                    onAttach = onAttach,
+                    isListening = uiState.isListening,
+                    enabled = !uiState.isSending,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StacyDrawer(
+    activeTopic: StacyTopic?,
+    onSelect: (StacyTopic) -> Unit,
+) {
+    ModalDrawerSheet(
+        drawerContainerColor = MaterialTheme.colorScheme.surface,
+    ) {
+        Text(
+            text = "STACY",
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 24.dp),
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.SemiBold,
+        )
+
+        Text(
+            text = "TÓPICOS DENRY",
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.secondary,
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        StacyTopic.entries.forEach { topic ->
+            NavigationDrawerItem(
+                label = { Text(topic.title) },
+                icon = { Text(topic.icon) },
+                selected = activeTopic == topic,
+                onClick = { onSelect(topic) },
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
             )
         }
     }
 }
 
 @Composable
-private fun StacyHeader() {
+private fun StacyHeader(
+    topic: StacyTopic?,
+    coreOnline: Boolean,
+    onMenu: () -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 16.dp),
+            .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        IconButton(onClick = onMenu) {
+            Icon(
+                imageVector = Icons.Default.Menu,
+                contentDescription = "Tópicos Denry",
+            )
+        }
+
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = "STACY",
@@ -169,17 +303,69 @@ private fun StacyHeader() {
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text = "INTERFACE • núcleo preparado",
+                text = topic?.title ?: "Conversa",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.secondary,
             )
         }
+
         Text(
-            text = "READY",
+            text = if (coreOnline) "ONLINE" else "CORE OFFLINE",
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.primary,
+            color = if (coreOnline) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.error
+            },
             fontWeight = FontWeight.Bold,
         )
+    }
+}
+
+@Composable
+private fun IntegrationPanel() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 4.dp),
+    ) {
+        Text(
+            text = "INTEGRAÇÕES",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.secondary,
+            fontWeight = FontWeight.Bold,
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+
+        val integrations = listOf(
+            "Calendário",
+            "Alarmes",
+            "Notificações",
+            "WhatsApp",
+            "Instagram",
+            "Microsoft Teams",
+            "Gmail",
+            "Outlook",
+            "Outros aplicativos",
+        )
+
+        integrations.forEach { item ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 3.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(text = "•", color = MaterialTheme.colorScheme.primary)
+                Text(
+                    text = item,
+                    modifier = Modifier.padding(start = 10.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+        }
+
+        Divider(modifier = Modifier.padding(top = 8.dp))
     }
 }
 
@@ -216,21 +402,20 @@ private fun Composer(
     onValueChange: (String) -> Unit,
     onSend: () -> Unit,
     onVoice: () -> Unit,
+    onAttach: () -> Unit,
+    isListening: Boolean,
+    enabled: Boolean,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .windowInsetsPadding(WindowInsets.ime)
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.Bottom,
     ) {
-        IconButton(
-            onClick = onVoice,
-            enabled = false,
-        ) {
+        IconButton(onClick = onAttach, enabled = enabled) {
             Icon(
-                imageVector = Icons.Default.Mic,
-                contentDescription = "Voz",
+                imageVector = Icons.Default.Add,
+                contentDescription = "Adicionar arquivo ou foto",
             )
         }
 
@@ -238,7 +423,9 @@ private fun Composer(
             modifier = Modifier.weight(1f),
             value = value,
             onValueChange = onValueChange,
-            placeholder = { Text("Mensagem para STACY") },
+            placeholder = {
+                Text(if (isListening) "Ouvindo..." else "Mensagem para STACY")
+            },
             maxLines = 5,
             shape = RoundedCornerShape(24.dp),
             colors = TextFieldDefaults.colors(
@@ -249,11 +436,21 @@ private fun Composer(
             ),
         )
 
-        Spacer(modifier = Modifier.width(4.dp))
+        IconButton(onClick = onVoice, enabled = enabled) {
+            Icon(
+                imageVector = Icons.Default.Mic,
+                contentDescription = "Falar com STACY",
+                tint = if (isListening) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
+            )
+        }
 
         IconButton(
             onClick = onSend,
-            enabled = value.isNotBlank(),
+            enabled = enabled && value.isNotBlank(),
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.Send,
