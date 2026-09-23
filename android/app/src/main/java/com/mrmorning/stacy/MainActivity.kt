@@ -116,6 +116,7 @@ class MainActivity : ComponentActivity() {
                     onAttach = {
                         pickFile.launch(arrayOf("*/*"))
                     },
+                    onSpeak = { voiceOutput.speak(it) },
                 )
             }
         }
@@ -148,6 +149,7 @@ fun StacyApp(
     viewModel: StacyViewModel,
     onVoice: () -> Unit = {},
     onAttach: () -> Unit = {},
+    onSpeak: (String) -> Unit = {},
 ) {
     val uiState = viewModel.uiState
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -155,6 +157,13 @@ fun StacyApp(
 
     LaunchedEffect(Unit) {
         viewModel.checkCore()
+    }
+
+    LaunchedEffect(uiState.lastAssistantResponse) {
+        uiState.lastAssistantResponse?.let {
+            onSpeak(it)
+            viewModel.clearSpokenResponse()
+        }
     }
 
     Surface(
