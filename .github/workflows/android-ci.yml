@@ -35,3 +35,12 @@ jobs:
 
       - name: Build and unit tests
         run: gradle assembleDebug testDebugUnitTest
+
+      - name: Upload STACY APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: STACY-final-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 7
