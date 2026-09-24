@@ -105,6 +105,7 @@ class MainActivity : ComponentActivity() {
                             requestMicrophone.launch(Manifest.permission.RECORD_AUDIO)
                         }
                     },
+                    onFiles = { pickFiles.launch(arrayOf("*/*")) },
                 )
             }
         }
@@ -113,7 +114,7 @@ class MainActivity : ComponentActivity() {
     private var currentViewModel: StacyViewModel? = null
 
     private val pickFiles = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
-        if (uris.isNotEmpty()) currentViewModel?.addAssistantMessage("Recebi \\${uris.size} arquivo(s). O módulo de arquivos está pronto para a integração com o Core.")
+        if (uris.isNotEmpty()) currentViewModel?.addAssistantMessage("Recebi ${uris.size} arquivo(s). O módulo de arquivos está pronto para a integração com o Core.")
     }
 
     override fun onDestroy() {
@@ -239,6 +240,7 @@ private fun Composer(
     onValueChange: (String) -> Unit,
     onSend: () -> Unit,
     onVoice: () -> Unit,
+    onFiles: () -> Unit = {},
 ) {
     Row(
         modifier = Modifier
@@ -247,14 +249,8 @@ private fun Composer(
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.Bottom,
     ) {
-        IconButton(
-            onClick = onVoice,
-            enabled = false,
-        ) {
-            Icon(
-                imageVector = Icons.Default.Mic,
-                contentDescription = "Voz",
-            )
+        IconButton(onClick = onFiles) {
+            Icon(Icons.Default.Add, contentDescription = "Adicionar fotos ou arquivos", tint = StacyOrange)
         }
 
         TextField(
@@ -273,6 +269,10 @@ private fun Composer(
         )
 
         Spacer(modifier = Modifier.width(4.dp))
+
+        IconButton(onClick = onVoice) {
+            Icon(Icons.Default.Mic, contentDescription = "Voz", tint = StacyOrange)
+        }
 
         IconButton(
             onClick = onSend,
