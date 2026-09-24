@@ -4,7 +4,6 @@ import android.Manifest
 import android.os.Bundle
 import android.content.pm.PackageManager
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -62,10 +61,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 
-data class ChatMessage(
-    val text: String,
-    val fromUser: Boolean,
-)
 
 class MainActivity : ComponentActivity() {
     private lateinit var voiceInput: AndroidVoiceInput
@@ -141,7 +136,8 @@ fun StacyTheme(content: @Composable () -> Unit) {
 @Composable
 fun StacyApp(
     viewModel: StacyViewModel,
-    onVoice: (StacyViewModel) -> Unit = {},\n    onFiles: () -> Unit = {},
+    onVoice: (StacyViewModel) -> Unit = {},
+    onFiles: () -> Unit = {},
 ) {
     val uiState = viewModel.uiState
 
@@ -172,11 +168,15 @@ fun StacyApp(
                 value = uiState.input,
                 onValueChange = viewModel::onInputChanged,
                 onSend = viewModel::onSend,
-                onVoice = { onVoice(viewModel) },\n                onFiles = onFiles,
+                onVoice = { onVoice(viewModel) },
+                onFiles = onFiles,
             )
         }
     }
 }
+
+@Composable
+private val StacyOrange = Color(0xFFFF8A00)
 
 @Composable
 private fun StacyHeader() {
