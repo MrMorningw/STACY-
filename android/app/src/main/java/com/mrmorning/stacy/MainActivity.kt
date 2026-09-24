@@ -2,6 +2,8 @@ package com.mrmorning.stacy
 
 import android.Manifest
 import android.os.Bundle
+import android.content.pm.PackageManager
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -19,6 +21,7 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -26,8 +29,22 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.TaskAlt
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Memory
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -35,6 +52,7 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.ViewModelProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,6 +60,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 
 data class ChatMessage(
     val text: String,
@@ -93,6 +112,10 @@ class MainActivity : ComponentActivity() {
 
     private var currentViewModel: StacyViewModel? = null
 
+    private val pickFiles = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        if (uris.isNotEmpty()) currentViewModel?.addAssistantMessage("Recebi \\${uris.size} arquivo(s). O módulo de arquivos está pronto para a integração com o Core.")
+    }
+
     override fun onDestroy() {
         if (::voiceInput.isInitialized) voiceInput.destroy()
         super.onDestroy()
@@ -104,9 +127,9 @@ fun StacyTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = darkColorScheme(
             primary = Color(0xFF9EC5FF),
-            secondary = Color(0xFFB8C7E6),
-            background = Color(0xFF080B12),
-            surface = Color(0xFF101521),
+            secondary = Color(0xFFFF6A00),
+            background = Color(0xFF000000),
+            surface = Color(0xFF1A1A1A),
             onBackground = Color(0xFFE8EDF7),
             onSurface = Color(0xFFE8EDF7),
         ),
@@ -117,7 +140,7 @@ fun StacyTheme(content: @Composable () -> Unit) {
 @Composable
 fun StacyApp(
     viewModel: StacyViewModel,
-    onVoice: (StacyViewModel) -> Unit = {},
+    onVoice: (StacyViewModel) -> Unit = {},\n    onFiles: () -> Unit = {},
 ) {
     val uiState = viewModel.uiState
 
@@ -148,7 +171,7 @@ fun StacyApp(
                 value = uiState.input,
                 onValueChange = viewModel::onInputChanged,
                 onSend = viewModel::onSend,
-                onVoice = { onVoice(viewModel) },
+                onVoice = { onVoice(viewModel) },\n                onFiles = onFiles,
             )
         }
     }
