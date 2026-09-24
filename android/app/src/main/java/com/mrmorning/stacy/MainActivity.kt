@@ -175,7 +175,6 @@ fun StacyApp(
     }
 }
 
-@Composable
 private val StacyOrange = Color(0xFFFF8A00)
 
 @Composable
