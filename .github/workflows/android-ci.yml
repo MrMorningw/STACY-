@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - mp08-automacao-android-20260922
+      - stacy-final-android-20260924
   pull_request:
     branches:
       - mp08-automacao-android-20260922
