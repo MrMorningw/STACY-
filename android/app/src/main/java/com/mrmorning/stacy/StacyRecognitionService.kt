@@ -39,7 +39,9 @@ class StacyRecognitionService : RecognitionService() {
             override fun onEvent(eventType: Int, params: Bundle?) =
                 Unit
         })
-        recognizer.startListening(intent ?: Intent(Intent.ACTION_RECOGNIZE_SPEECH))
+        recognizer.startListening(
+            intent ?: Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+        )
     }
 
     override fun onStopListening(callback: Callback?) {
