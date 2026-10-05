@@ -185,7 +185,9 @@ private fun Composer(
         verticalAlignment = Alignment.Bottom) {
         IconButton(onClick = onFiles) { Icon(Icons.Default.Add, "Adicionar fotos ou arquivos", tint = StacyOrange) }
         TextField(
-            Modifier.weight(1f), value = value, onValueChange = onValueChange,
+            value = value,
+            onValueChange = onValueChange,
+            modifier = Modifier.weight(1f),
             placeholder = { Text("Mensagem para STACY") }, maxLines = 5,
             shape = RoundedCornerShape(24.dp),
             colors = TextFieldDefaults.colors(
