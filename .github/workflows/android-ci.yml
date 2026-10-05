@@ -7,6 +7,7 @@ on:
       - mp08-automacao-android-20260922
       - stacy-final-android-20260924
       - mp-ef10-android-assistant-ready
+      - stacy-prototipo36-core-integration-20261005
   pull_request:
     branches:
       - mp08-automacao-android-20260922
