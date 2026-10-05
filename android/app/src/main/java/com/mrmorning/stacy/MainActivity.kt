@@ -25,6 +25,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -35,21 +36,19 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
-import androidx.lifecycle.ViewModelProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-
-data class ChatMessage(
-    val text: String,
-    val fromUser: Boolean,
-)
+import androidx.lifecycle.ViewModelProvider
 
 class MainActivity : ComponentActivity() {
     private lateinit var voiceInput: AndroidVoiceInput
+    private lateinit var coreBridge: StacyCoreBridge
+    private lateinit var textToSpeech: AndroidTextToSpeech
 
     private val requestMicrophone =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -63,14 +62,28 @@ class MainActivity : ComponentActivity() {
         val vm = ViewModelProvider(this)[StacyViewModel::class.java]
         currentViewModel = vm
 
+        coreBridge = StacyCoreBridge(this)
+        textToSpeech = AndroidTextToSpeech(this)
+
+        vm.bindCore { message ->
+            coreBridge.process(
+                message = message,
+                onQueued = { runOnUiThread { vm.clearVoiceError() } },
+                onError = { error -> runOnUiThread { vm.onCoreError(error) } },
+            )
+        }
+
+        CoreResultStore.subscribe { result ->
+            vm.onCoreResponse(result.response)
+            if (result.response.isNotBlank()) {
+                textToSpeech.speak(result.response)
+            }
+        }
+
         voiceInput = AndroidVoiceInput(
             context = this,
-            onResult = { result ->
-                runOnUiThread { vm.onVoiceResult(result) }
-            },
-            onStateChanged = { listening ->
-                runOnUiThread { vm.onVoiceStateChanged(listening) }
-            },
+            onResult = { result -> runOnUiThread { vm.onVoiceResult(result) } },
+            onStateChanged = { listening -> runOnUiThread { vm.onVoiceStateChanged(listening) } },
         )
 
         setContent {
@@ -86,6 +99,7 @@ class MainActivity : ComponentActivity() {
                             requestMicrophone.launch(Manifest.permission.RECORD_AUDIO)
                         }
                     },
+                    onFiles = { pickFiles.launch(arrayOf("*/*")) },
                 )
             }
         }
@@ -93,8 +107,20 @@ class MainActivity : ComponentActivity() {
 
     private var currentViewModel: StacyViewModel? = null
 
+    private val pickFiles =
+        registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+            if (uris.isNotEmpty()) {
+                currentViewModel?.addAssistantMessage(
+                    "Recebi ${uris.size} arquivo(s). O módulo de arquivos foi conectado à interface; " +
+                        "o processamento semântico dos arquivos depende da integração correspondente no CORE.",
+                )
+            }
+        }
+
     override fun onDestroy() {
+        CoreResultStore.clear()
         if (::voiceInput.isInitialized) voiceInput.destroy()
+        if (::textToSpeech.isInitialized) textToSpeech.shutdown()
         super.onDestroy()
     }
 }
@@ -104,9 +130,9 @@ fun StacyTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = darkColorScheme(
             primary = Color(0xFF9EC5FF),
-            secondary = Color(0xFFB8C7E6),
-            background = Color(0xFF080B12),
-            surface = Color(0xFF101521),
+            secondary = Color(0xFFFF6A00),
+            background = Color(0xFF000000),
+            surface = Color(0xFF1A1A1A),
             onBackground = Color(0xFFE8EDF7),
             onSurface = Color(0xFFE8EDF7),
         ),
@@ -118,6 +144,7 @@ fun StacyTheme(content: @Composable () -> Unit) {
 fun StacyApp(
     viewModel: StacyViewModel,
     onVoice: (StacyViewModel) -> Unit = {},
+    onFiles: () -> Unit = {},
 ) {
     val uiState = viewModel.uiState
 
@@ -149,10 +176,13 @@ fun StacyApp(
                 onValueChange = viewModel::onInputChanged,
                 onSend = viewModel::onSend,
                 onVoice = { onVoice(viewModel) },
+                onFiles = onFiles,
             )
         }
     }
 }
+
+private val StacyOrange = Color(0xFFFF8A00)
 
 @Composable
 private fun StacyHeader() {
@@ -163,19 +193,15 @@ private fun StacyHeader() {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
+            Text("STACY", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
             Text(
-                text = "STACY",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text = "INTERFACE • núcleo preparado",
+                "INTERFACE • CORE CONECTADO",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.secondary,
             )
         }
         Text(
-            text = "READY",
+            "ONLINE",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.primary,
             fontWeight = FontWeight.Bold,
@@ -216,6 +242,7 @@ private fun Composer(
     onValueChange: (String) -> Unit,
     onSend: () -> Unit,
     onVoice: () -> Unit,
+    onFiles: () -> Unit = {},
 ) {
     Row(
         modifier = Modifier
@@ -224,14 +251,8 @@ private fun Composer(
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.Bottom,
     ) {
-        IconButton(
-            onClick = onVoice,
-            enabled = false,
-        ) {
-            Icon(
-                imageVector = Icons.Default.Mic,
-                contentDescription = "Voz",
-            )
+        IconButton(onClick = onFiles) {
+            Icon(Icons.Default.Add, contentDescription = "Adicionar fotos ou arquivos", tint = StacyOrange)
         }
 
         TextField(
@@ -251,14 +272,12 @@ private fun Composer(
 
         Spacer(modifier = Modifier.width(4.dp))
 
-        IconButton(
-            onClick = onSend,
-            enabled = value.isNotBlank(),
-        ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.Send,
-                contentDescription = "Enviar",
-            )
+        IconButton(onClick = onVoice) {
+            Icon(Icons.Default.Mic, contentDescription = "Voz", tint = StacyOrange)
+        }
+
+        IconButton(onClick = onSend, enabled = value.isNotBlank()) {
+            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Enviar")
         }
     }
 }
@@ -266,7 +285,5 @@ private fun Composer(
 @Preview(showBackground = true)
 @Composable
 private fun StacyPreview() {
-    StacyTheme {
-        StacyApp(StacyViewModel())
-    }
+    StacyTheme { StacyApp(StacyViewModel()) }
 }

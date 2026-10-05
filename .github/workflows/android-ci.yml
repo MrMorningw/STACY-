@@ -5,6 +5,8 @@ on:
     branches:
       - main
       - mp08-automacao-android-20260922
+      - stacy-final-android-20260924
+      - mp-ef10-android-assistant-ready
   pull_request:
     branches:
       - mp08-automacao-android-20260922
@@ -35,3 +37,12 @@ jobs:
 
       - name: Build and unit tests
         run: gradle assembleDebug testDebugUnitTest
+
+      - name: Upload STACY APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: STACY-final-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 7
