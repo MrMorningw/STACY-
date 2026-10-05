@@ -2,7 +2,6 @@ package com.mrmorning.stacy
 
 import android.Manifest
 import android.os.Bundle
-import android.content.pm.PackageManager
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -20,30 +19,16 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.TaskAlt
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Memory
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.DrawerValue
-import androidx.compose.material3.ModalDrawerSheet
-import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.NavigationDrawerItem
-import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -51,19 +36,19 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.lifecycle.ViewModelProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.launch
-
+import androidx.lifecycle.ViewModelProvider
 
 class MainActivity : ComponentActivity() {
     private lateinit var voiceInput: AndroidVoiceInput
+    private lateinit var coreBridge: StacyCoreBridge
+    private lateinit var textToSpeech: AndroidTextToSpeech
 
     private val requestMicrophone =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -77,14 +62,28 @@ class MainActivity : ComponentActivity() {
         val vm = ViewModelProvider(this)[StacyViewModel::class.java]
         currentViewModel = vm
 
+        coreBridge = StacyCoreBridge(this)
+        textToSpeech = AndroidTextToSpeech(this)
+
+        vm.bindCore { message ->
+            coreBridge.process(
+                message = message,
+                onQueued = { runOnUiThread { vm.clearVoiceError() } },
+                onError = { error -> runOnUiThread { vm.onCoreError(error) } },
+            )
+        }
+
+        CoreResultStore.subscribe { result ->
+            vm.onCoreResponse(result.response)
+            if (result.response.isNotBlank()) {
+                textToSpeech.speak(result.response)
+            }
+        }
+
         voiceInput = AndroidVoiceInput(
             context = this,
-            onResult = { result ->
-                runOnUiThread { vm.onVoiceResult(result) }
-            },
-            onStateChanged = { listening ->
-                runOnUiThread { vm.onVoiceStateChanged(listening) }
-            },
+            onResult = { result -> runOnUiThread { vm.onVoiceResult(result) } },
+            onStateChanged = { listening -> runOnUiThread { vm.onVoiceStateChanged(listening) } },
         )
 
         setContent {
@@ -108,12 +107,20 @@ class MainActivity : ComponentActivity() {
 
     private var currentViewModel: StacyViewModel? = null
 
-    private val pickFiles = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
-        if (uris.isNotEmpty()) currentViewModel?.addAssistantMessage("Recebi ${uris.size} arquivo(s). O módulo de arquivos está pronto para a integração com o Core.")
-    }
+    private val pickFiles =
+        registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+            if (uris.isNotEmpty()) {
+                currentViewModel?.addAssistantMessage(
+                    "Recebi ${uris.size} arquivo(s). O módulo de arquivos foi conectado à interface; " +
+                        "o processamento semântico dos arquivos depende da integração correspondente no CORE.",
+                )
+            }
+        }
 
     override fun onDestroy() {
+        CoreResultStore.clear()
         if (::voiceInput.isInitialized) voiceInput.destroy()
+        if (::textToSpeech.isInitialized) textToSpeech.shutdown()
         super.onDestroy()
     }
 }
@@ -186,19 +193,15 @@ private fun StacyHeader() {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
+            Text("STACY", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
             Text(
-                text = "STACY",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text = "INTERFACE • núcleo preparado",
+                "INTERFACE • CORE CONECTADO",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.secondary,
             )
         }
         Text(
-            text = "READY",
+            "ONLINE",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.primary,
             fontWeight = FontWeight.Bold,
@@ -273,14 +276,8 @@ private fun Composer(
             Icon(Icons.Default.Mic, contentDescription = "Voz", tint = StacyOrange)
         }
 
-        IconButton(
-            onClick = onSend,
-            enabled = value.isNotBlank(),
-        ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.Send,
-                contentDescription = "Enviar",
-            )
+        IconButton(onClick = onSend, enabled = value.isNotBlank()) {
+            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Enviar")
         }
     }
 }
@@ -288,7 +285,5 @@ private fun Composer(
 @Preview(showBackground = true)
 @Composable
 private fun StacyPreview() {
-    StacyTheme {
-        StacyApp(StacyViewModel())
-    }
+    StacyTheme { StacyApp(StacyViewModel()) }
 }
