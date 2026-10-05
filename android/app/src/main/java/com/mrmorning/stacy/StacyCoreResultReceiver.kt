@@ -8,12 +8,10 @@ import org.json.JSONObject
 class StacyCoreResultReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val executionId = intent.getIntExtra(EXTRA_EXECUTION_ID, 0)
-        val bundle = intent.getBundleExtra(EXTRA_RESULT_BUNDLE)
-        if (bundle == null) {
+        val bundle = intent.getBundleExtra(EXTRA_RESULT_BUNDLE) ?: run {
             StacyCoreBridge.fail(executionId, "O Termux não devolveu o resultado do CORE.")
             return
         }
-
         val stdout = bundle.getString(EXTRA_STDOUT, "").orEmpty()
         val stderr = bundle.getString(EXTRA_STDERR, "").orEmpty()
         val exitCode = bundle.getInt(EXTRA_EXIT_CODE, -1)
@@ -24,12 +22,14 @@ class StacyCoreResultReceiver : BroadcastReceiver() {
         }
 
         try {
-            val response = JSONObject(stdout.trim()).optString("resposta").trim()
+            val json = JSONObject(stdout.trim())
+            val tipo = json.optString("tipo", "resposta").trim()
+            val response = json.optString("resposta").trim()
             if (response.isEmpty()) {
                 StacyCoreBridge.fail(executionId, "O CORE concluiu sem retornar uma resposta.")
                 return
             }
-            CoreResultStore.publish(context, CoreResult(response, exitCode, stderr))
+            CoreResultStore.publish(context, CoreResult(tipo, response, exitCode, stderr))
         } catch (_: Exception) {
             StacyCoreBridge.fail(executionId, "A STACY recebeu uma resposta inválida do CORE.")
         }
