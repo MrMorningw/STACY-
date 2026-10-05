@@ -37,7 +37,7 @@ class StacyRecognitionService : RecognitionService() {
             override fun onPartialResults(partialResults: Bundle?) =
                 callback.partialResults(partialResults ?: Bundle())
             override fun onEvent(eventType: Int, params: Bundle?) =
-                callback.event(eventType, params ?: Bundle())
+                Unit
         })
         recognizer.startListening(intent ?: Intent(Intent.ACTION_RECOGNIZE_SPEECH))
     }
