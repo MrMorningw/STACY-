@@ -39,11 +39,11 @@ class MainActivity : ComponentActivity() {
                     when (result) {
                         is VoiceResult.Success -> {
                             webState("pensando")
-                            vm.submitFromVoice(result.text)
+                            vm.onVoiceResult(result)
                         }
                         is VoiceResult.Failure -> {
                             webState("offline")
-                            vm.onVoiceError(result.message)
+                            vm.onVoiceResult(result)
                         }
                     }
                 }
@@ -96,7 +96,7 @@ class MainActivity : ComponentActivity() {
     inner class StacyJsBridge {
         @JavascriptInterface
         fun stacySend(message: String) {
-            runOnUiThread { vm.submitFromInterface(message) }
+            runOnUiThread { vm.onInputChanged(message); vm.onSend() }
         }
 
         @JavascriptInterface
