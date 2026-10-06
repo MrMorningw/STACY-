@@ -20,15 +20,18 @@ jobs:
     steps:
       - name: Checkout STACY
         uses: actions/checkout@v5
+
       - name: Set up JDK 17
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "9.6.0"
+
       - name: Restore release keystore
         working-directory: android
         env:
@@ -37,6 +40,16 @@ jobs:
           test -n "$STACY_KEYSTORE_BASE64"
           echo "$STACY_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/stacy-release.jks"
           test -s "$RUNNER_TEMP/stacy-release.jks"
+
+      - name: Configure Android SDK tools
+        run: |
+          test -n "$ANDROID_HOME"
+          BUILD_TOOLS_VERSION="$(ls -1 "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
+          test -n "$BUILD_TOOLS_VERSION"
+          echo "$ANDROID_HOME/build-tools/$BUILD_TOOLS_VERSION" >> "$GITHUB_PATH"
+          echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
+          echo "Using Android Build Tools $BUILD_TOOLS_VERSION"
+
       - name: Build signed Release APK
         working-directory: android
         env:
@@ -44,12 +57,16 @@ jobs:
         run: |
           gradle assembleRelease
           test -f app/build/outputs/apk/release/app-release.apk
+
       - name: Verify signed APK
         working-directory: android
         run: |
           APK="app/build/outputs/apk/release/app-release.apk"
+          command -v apksigner
+          command -v aapt
           apksigner verify --verbose "$APK"
           apksigner verify --print-certs "$APK"
+
       - name: Read version and integrity
         id: metadata
         working-directory: android
@@ -70,6 +87,7 @@ jobs:
           echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
           echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
           echo "cert_sha256=$CERT_SHA256" >> "$GITHUB_OUTPUT"
+
       - name: Upload signed APK artifact
         uses: actions/upload-artifact@v4
         with:
@@ -77,6 +95,7 @@ jobs:
           path: android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
+
       - name: Publish to STACY--UPDATES
         if: env.STACY_UPDATES_TOKEN != ''
         env:
