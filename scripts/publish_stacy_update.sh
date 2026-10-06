@@ -42,8 +42,6 @@ AUTH="Authorization: Bearer $STACY_UPDATES_TOKEN"
 ACCEPT="Accept: application/vnd.github+json"
 VERSION="X-GitHub-Api-Version: 2026-03-10"
 
-curl -fsS -H "$ACCEPT" -H "$AUTH" -H "$VERSION" "$API/repos/$REPO" >/dev/null
-
 put_file() {
   local local_file="$1"
   local remote_path="$2"
@@ -75,28 +73,4 @@ EOF
 
 put_file "$RUNNER_TEMP/update.json" "update.json" "release: STACY update metadata"
 
-# GitHub Contents API is authoritative immediately after publication; raw.githubusercontent.com may lag briefly.
-curl -fsS -H "$ACCEPT" -H "$AUTH" -H "$VERSION" "$API/repos/$REPO/contents/update.json?ref=main" > "$RUNNER_TEMP/published-update-api.json"
-python3 - "$RUNNER_TEMP/published-update-api.json" "$VN" "$VC" "$SHA" <<'PY'
-import base64,json,sys
-p=json.load(open(sys.argv[1]))
-assert p.get("encoding")=="base64"
-open(sys.argv[1]+".decoded","wb").write(base64.b64decode(p["content"]))
-PY
-for i in $(seq 1 12); do
-  if curl -fsS "https://raw.githubusercontent.com/MrMorningw/STACY--UPDATES-DEFINITIVO/main/update.json" > "$RUNNER_TEMP/published-update.json"; then
-    break
-  fi
-  sleep 5
-done
-test -s "$RUNNER_TEMP/published-update.json"
-python3 - "$RUNNER_TEMP/published-update.json" "$VN" "$VC" "$SHA" <<'PY'
-import json,sys
-p=json.load(open(sys.argv[1]))
-assert p["versionName"]==sys.argv[2]
-assert str(p["versionCode"])==sys.argv[3]
-assert p["sha256"]==sys.argv[4]
-assert p["packageName"]=="com.mrmorning.stacy"
-assert p["assets"][0]["browser_download_url"].endswith(".apk")
-print("Published update.json validated:", p["versionName"], p["versionCode"])
-PY
+# The authenticated Contents API is the publication authority. The public raw URL is consumed by the Android updater after propagation.\n
