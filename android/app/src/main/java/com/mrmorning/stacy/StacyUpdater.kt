@@ -22,7 +22,7 @@ class StacyUpdater(
 ) {
     companion object {
         private const val API_URL =
-            "https://api.github.com/repos/MrMorningw/STACY-/releases/latest"
+            "https://raw.githubusercontent.com/MrMorningw/STACY--UPDATES/main/update.json"
         private const val USER_AGENT = "STACY-Updater/1.0"
         private const val APK_PREFIX = "STACY"
     }
