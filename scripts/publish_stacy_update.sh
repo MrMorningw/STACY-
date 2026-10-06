@@ -75,7 +75,21 @@ EOF
 
 put_file "$RUNNER_TEMP/update.json" "update.json" "release: STACY update metadata"
 
-curl -fsS "https://raw.githubusercontent.com/MrMorningw/STACY--UPDATES/main/update.json" > "$RUNNER_TEMP/published-update.json"
+# GitHub Contents API is authoritative immediately after publication; raw.githubusercontent.com may lag briefly.
+curl -fsS -H "$ACCEPT" -H "$AUTH" -H "$VERSION" "$API/repos/$REPO/contents/update.json?ref=main" > "$RUNNER_TEMP/published-update-api.json"
+python3 - "$RUNNER_TEMP/published-update-api.json" "$VN" "$VC" "$SHA" <<'PY'
+import base64,json,sys
+p=json.load(open(sys.argv[1]))
+assert p.get("encoding")=="base64"
+open(sys.argv[1]+".decoded","wb").write(base64.b64decode(p["content"]))
+PY
+for i in $(seq 1 12); do
+  if curl -fsS "https://raw.githubusercontent.com/MrMorningw/STACY--UPDATES/main/update.json" > "$RUNNER_TEMP/published-update.json"; then
+    break
+  fi
+  sleep 5
+done
+test -s "$RUNNER_TEMP/published-update.json"
 python3 - "$RUNNER_TEMP/published-update.json" "$VN" "$VC" "$SHA" <<'PY'
 import json,sys
 p=json.load(open(sys.argv[1]))
