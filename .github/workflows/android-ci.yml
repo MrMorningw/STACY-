@@ -50,7 +50,7 @@ jobs:
 
 
   release-bootstrap:
-    if: github.event_name == 'push' && github.event.head_commit.message == 'chore: bootstrap updater'
+    if: github.event_name == 'push' && github.event.head_commit.message == 'chore: bootstrap updater' || github.event.head_commit.message == 'fix: bootstrap updater metadata'
     runs-on: ubuntu-latest
     env:
       STACY_KEYSTORE_PASSWORD: ${{ secrets.STACY_KEYSTORE_PASSWORD }}
@@ -101,9 +101,9 @@ jobs:
           APK=app/build/outputs/apk/release/app-release.apk
           apksigner verify --verbose "$APK"
           BADGING="$(aapt dump badging "$APK")"
-          VC="$(printf '%s\\n' "$BADGING" | sed -n "s/.*versionCode='\\\\([^']*\\\\)'.*/\\\\1/p")"
-          VN="$(printf '%s\\n' "$BADGING" | sed -n "s/.*versionName='\\\\([^']*\\\\)'.*/\\\\1/p")"
-          PKG="$(printf '%s\\n' "$BADGING" | sed -n "s/package: name='\\\\([^']*\\\\)'.*/\\\\1/p")"
+          VC="$(printf '%s\n' "$BADGING" | sed -n "s/.*versionCode='\\([^']*\\)'.*/\\1/p")"
+          VN="$(printf '%s\n' "$BADGING" | sed -n "s/.*versionName='\\([^']*\\)'.*/\\1/p")"
+          PKG="$(printf '%s\n' "$BADGING" | sed -n "s/package: name='\\([^']*\\)'.*/\\1/p")"
           SHA="$(sha256sum "$APK" | awk '{print $1}')"
           CERT="$(apksigner verify --print-certs "$APK" | sed -n 's/.*certificate SHA-256 digest: //p' | head -1 | tr -d ':')"
           test "$PKG" = com.mrmorning.stacy; test -n "$VC"; test -n "$VN"; test -n "$SHA"; test -n "$CERT"
