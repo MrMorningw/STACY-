@@ -11,6 +11,7 @@ permissions:
 
 jobs:
   release:
+    if: github.event_name == 'workflow_dispatch' || github.event.head_commit.message == 'chore: bootstrap updater'
     runs-on: ubuntu-24.04
     env:
       STACY_KEYSTORE_PASSWORD: ${{ secrets.STACY_KEYSTORE_PASSWORD }}
