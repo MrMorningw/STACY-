@@ -3,8 +3,6 @@ name: STACY Release and Update Channel
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
     tags:
       - "v*"
 
@@ -13,7 +11,6 @@ permissions:
 
 jobs:
   release:
-    if: github.event_name != 'push' || github.ref_type == 'tag' || github.event.head_commit.message == 'chore: trigger STACY release channel'
     runs-on: ubuntu-24.04
     env:
       STACY_KEYSTORE_PASSWORD: ${{ secrets.STACY_KEYSTORE_PASSWORD }}
