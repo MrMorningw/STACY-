@@ -124,13 +124,86 @@ jobs:
           CERT_SHA256: ${{ steps.metadata.outputs.cert_sha256 }}
         run: |
           set -euo pipefail
-          rm -rf "$RUNNER_TEMP/stacy-updates"
-          git clone "https://x-access-token:$STACY_UPDATES_TOKEN@github.com/MrMorningw/STACY--UPDATES.git" "$RUNNER_TEMP/stacy-updates"
-          cd "$RUNNER_TEMP/stacy-updates"
-          mkdir -p releases
+
+          API="https://api.github.com"
+          REPO="MrMorningw/STACY--UPDATES"
+          AUTH="Authorization: Bearer $STACY_UPDATES_TOKEN"
+
+          echo "Validando acesso ao canal de atualizações..."
+          HTTP_CODE="$(curl -sS -o "$RUNNER_TEMP/stacy-repo.json" -w "%{http_code}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "$AUTH" \
+            -H "X-GitHub-Api-Version: 2026-03-10" \
+            "$API/repos/$REPO")"
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::STACY_UPDATES_TOKEN não possui acesso válido ao repositório $REPO (HTTP $HTTP_CODE)."
+            exit 1
+          fi
+
+          put_file() {
+            local repo_path="$1"
+            local source_file="$2"
+            local message="$3"
+            local lookup="$RUNNER_TEMP/stacy-lookup.json"
+            local payload="$RUNNER_TEMP/stacy-payload.json"
+            local code
+            local sha=""
+
+            code="$(curl -sS -o "$lookup" -w "%{http_code}" \
+              -H "Accept: application/vnd.github+json" \
+              -H "$AUTH" \
+              -H "X-GitHub-Api-Version: 2026-03-10" \
+              "$API/repos/$REPO/contents/$repo_path?ref=main")"
+
+            if [ "$code" = "200" ]; then
+              sha="$(jq -r '.sha // empty' "$lookup")"
+            elif [ "$code" != "404" ]; then
+              echo "::error::Falha ao consultar $repo_path (HTTP $code)."
+              cat "$lookup"
+              exit 1
+            fi
+
+            python3 - "$source_file" "$message" "$sha" > "$payload" <<'PY'
+import base64
+import json
+import sys
+
+source, message, sha = sys.argv[1], sys.argv[2], sys.argv[3]
+with open(source, "rb") as f:
+    content = base64.b64encode(f.read()).decode("ascii")
+
+body = {
+    "message": message,
+    "content": content,
+    "branch": "main",
+    "committer": {
+        "name": "STACY Release Bot",
+        "email": "stacy-release-bot@users.noreply.github.com",
+    },
+}
+if sha:
+    body["sha"] = sha
+
+json.dump(body, sys.stdout, separators=(",", ":"))
+PY
+
+            curl -fsS -X PUT \
+              -H "Accept: application/vnd.github+json" \
+              -H "$AUTH" \
+              -H "X-GitHub-Api-Version: 2026-03-10" \
+              --data-binary "@$payload" \
+              "$API/repos/$REPO/contents/$repo_path" > "$RUNNER_TEMP/stacy-publish.json"
+
+            jq -e '.content.sha' "$RUNNER_TEMP/stacy-publish.json" >/dev/null
+            echo "Publicado: $repo_path"
+          }
+
           APK_NAME="STACY-$VERSION_NAME.apk"
-          cp "$GITHUB_WORKSPACE/android/app/build/outputs/apk/release/app-release.apk" "releases/$APK_NAME"
-          cat > update.json <<EOF
+          APK_PATH="$GITHUB_WORKSPACE/android/app/build/outputs/apk/release/app-release.apk"
+
+          mkdir -p "$RUNNER_TEMP/stacy-release-meta"
+          cat > "$RUNNER_TEMP/stacy-release-meta/update.json" <<EOF
           {
             "versionCode": $VERSION_CODE,
             "versionName": "$VERSION_NAME",
@@ -148,8 +221,19 @@ jobs:
             ]
           }
           EOF
-          git config user.name "STACY Release Bot"
-          git config user.email "stacy-release-bot@users.noreply.github.com"
-          git add update.json "releases/$APK_NAME"
-          git commit -m "release: STACY $VERSION_NAME"
-          git push origin main
+
+          put_file "releases/$APK_NAME" "$APK_PATH" "release: STACY $VERSION_NAME APK"
+          put_file "update.json" "$RUNNER_TEMP/stacy-release-meta/update.json" "release: STACY $VERSION_NAME metadata"
+
+      - name: Verify published update channel
+        env:
+          VERSION_NAME: ${{ steps.metadata.outputs.version_name }}
+        run: |
+          set -euo pipefail
+          UPDATE_URL="https://raw.githubusercontent.com/MrMorningw/STACY--UPDATES/main/update.json"
+          APK_URL="https://raw.githubusercontent.com/MrMorningw/STACY--UPDATES/main/releases/STACY-$VERSION_NAME.apk"
+
+          curl -fsSL "$UPDATE_URL" -o "$RUNNER_TEMP/stacy-public-update.json"
+          jq -e '.versionName and .versionCode and .assets[0].browser_download_url' "$RUNNER_TEMP/stacy-public-update.json" >/dev/null
+          curl -fsSLI "$APK_URL" >/dev/null
+          echo "Canal público STACY verificado."
