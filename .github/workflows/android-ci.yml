@@ -54,4 +54,4 @@ jobs:
           STACY_KEY_ALIAS: ${{ secrets.STACY_KEY_ALIAS }}
           STACY_KEY_PASSWORD: ${{ secrets.STACY_KEY_PASSWORD }}
           STACY_UPDATES_TOKEN: ${{ secrets.STACY_UPDATES_TOKEN }}
-        run: bash scripts/publish_stacy_update.sh
+        run: bash ../scripts/publish_stacy_update.sh
