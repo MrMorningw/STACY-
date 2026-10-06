@@ -3,6 +3,8 @@ package com.mrmorning.stacy
 import android.Manifest
 import android.annotation.SuppressLint
 import android.os.Bundle
+import android.content.Intent
+import android.net.Uri
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -17,6 +19,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var textToSpeech: AndroidTextToSpeech
     private lateinit var webView: WebView
     private lateinit var vm: StacyViewModel
+    private var voiceEnabled = true
 
     private val requestMicrophone =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -69,7 +72,7 @@ class MainActivity : ComponentActivity() {
         CoreResultStore.subscribe { result ->
             runOnUiThread {
                 if (result.response.isNotBlank()) {
-                    textToSpeech.speak(result.response)
+                    if (voiceEnabled) textToSpeech.speak(result.response)
                     webResponse(result.response, result.tipo)
                 } else if (result.exitCode != 0) {
                     webResponse(
@@ -105,10 +108,28 @@ class MainActivity : ComponentActivity() {
                 if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) ==
                     android.content.pm.PackageManager.PERMISSION_GRANTED
                 ) {
+                    webState("ouvindo")
                     voiceInput.startListening()
                 } else {
                     requestMicrophone.launch(Manifest.permission.RECORD_AUDIO)
                 }
+            }
+        }
+
+        @JavascriptInterface
+        fun stacySetVoiceEnabled(enabled: Boolean) {
+            voiceEnabled = enabled
+        }
+
+        @JavascriptInterface
+        fun stacyOpenAppSettings() {
+            runOnUiThread {
+                startActivity(
+                    Intent(
+                        android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.parse("package:$packageName"),
+                    ),
+                )
             }
         }
     }
