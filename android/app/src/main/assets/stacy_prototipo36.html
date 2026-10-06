@@ -611,6 +611,7 @@ const states={
  pesquisando:{label:"PESQUISANDO",energy:1.14,rot:1.00,pulse:.50,glow:.84,title:"Pesquisando informações.",sub:"Buscando dados relevantes."},
  executando:{label:"EXECUTANDO",energy:1.30,rot:1.32,pulse:.72,glow:.98,title:"Executando sua solicitação.",sub:"Processando a tarefa."},
  respondendo:{label:"RESPONDENDO",energy:1.08,rot:.88,pulse:.64,glow:.86,title:"Aqui está sua resposta.",sub:"Preparando a resposta."},
+ erro:{label:"ERRO",energy:.25,rot:.08,pulse:.08,glow:.12,title:"Não consegui concluir.",sub:"Verifique a conexão com o núcleo."},
  offline:{label:"OFFLINE",energy:.12,rot:.04,pulse:0,glow:0,title:"STACY está offline.",sub:"Tentando reconectar..."}
 };
 let state="online", current={...states.online}, target={...states.online};
@@ -620,19 +621,21 @@ const infoText=document.getElementById("infoText");
 const progress=document.getElementById("progress");
 
 function setState(name){
+ if(!states[name]) name="erro";
  state=name; target={...states[name]};
  if(name==='pesquisando'||name==='executando'){ researchProgress=0; phaseClock=0; }
  if(name==='online'||name==='ouvindo'||name==='pensando'||name==='respondendo'||name==='offline'){ phaseClock=0; }
  app.classList.toggle("responding",name==="respondendo");
  status.textContent=target.label;
  status.classList.toggle("status-online",name==="online");
- status.classList.toggle("status-offline",name==="offline");
+ status.classList.toggle("status-offline",name==="offline"||name==="erro");
  if(name==='respondendo') document.getElementById('responseBubble').textContent='Encontrei o que você pediu. Estou organizando os resultados.';
  const active=["pesquisando","executando"].includes(name);
  progress.style.display=active?"block":"none";
  if(name==="pesquisando")infoText.textContent="Pesquisa em andamento";
  else if(name==="executando")infoText.textContent="Execução em andamento";
  else if(name==="offline")infoText.textContent="Serviços indisponíveis";
+ else if(name==="erro")infoText.textContent="Falha na comunicação com o núcleo";
  else infoText.textContent="Núcleo STACY • sistema operacional";
 }
 
