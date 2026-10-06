@@ -10,6 +10,7 @@ test -n "${STACY_KEYSTORE_BASE64:-}"
 test -n "${STACY_UPDATES_TOKEN:-}"
 
 KEYSTORE_PATH="${RUNNER_TEMP}/stacy-release.jks"
+export STACY_KEYSTORE_PATH="$KEYSTORE_PATH"
 echo "$STACY_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
 test -s "$KEYSTORE_PATH"
 
