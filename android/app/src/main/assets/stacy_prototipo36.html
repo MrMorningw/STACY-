@@ -313,6 +313,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
 .stacy-action{margin-top:14px;border:1px solid rgba(255,117,31,.30);border-radius:11px;background:rgba(255,117,31,.08);color:#ff7925;padding:10px 13px;font-size:10px;letter-spacing:1px;cursor:pointer}
 .stacy-action:hover{background:rgba(255,117,31,.16)}
 .stacy-action.small{margin-top:0;white-space:nowrap;padding:9px 11px}
+.stacy-update-status{margin-top:6px;color:#6f675f;font-size:10px;letter-spacing:.2px;line-height:1.35}
 .stacy-action-row{display:flex;gap:8px;margin-top:14px}
 .stacy-input{flex:1;min-width:0;border:1px solid rgba(255,117,31,.22);border-radius:11px;background:rgba(0,0,0,.35);color:#eee;padding:10px;font-size:12px;outline:none}
 .stacy-input:focus{border-color:rgba(255,117,31,.55)}
@@ -812,7 +813,7 @@ requestAnimationFrame(animate);
     pesquisa:{title:'Pesquisa',kicker:'INTELIGÊNCIA',html:'<div class="stacy-card"><div class="stacy-card-label">PESQUISA</div><div class="stacy-card-title">Centro de pesquisa</div><div class="stacy-card-text">A consulta abaixo é enviada diretamente ao CORE.</div><div class="stacy-action-row"><input class="stacy-input" id="stacyResearchInput" placeholder="O que deseja pesquisar?"><button class="stacy-action" data-stacy-action="pesquisa">PESQUISAR</button></div></div>'},
     calendario:{title:'Calendário',kicker:'AGENDA',html:'<div class="stacy-card"><div class="stacy-card-label">COMPROMISSOS</div><div class="stacy-card-title">Agenda real</div><div class="stacy-card-text">Solicite ao CORE os compromissos e eventos disponíveis.</div><button class="stacy-action" data-stacy-action="calendario">CONSULTAR AGENDA</button></div>'},
     memoria:{title:'Memória',kicker:'NÚCLEO DE MEMÓRIA',html:'<div class="stacy-card"><div class="stacy-card-label">MEMÓRIA</div><div class="stacy-card-title">Contexto da STACY</div><div class="stacy-card-text">Consulte o estado atual da memória pelo núcleo.</div><button class="stacy-action" data-stacy-action="memoria">CONSULTAR MEMÓRIA</button></div>'},
-    config:{title:'Configurações',kicker:'SISTEMA',html:'<div class="stacy-card"><div class="stacy-setting-row"><div><div class="stacy-setting-name">Voz da STACY</div><div class="stacy-setting-desc">Ativar ou silenciar respostas faladas.</div></div><button class="stacy-action small" data-stacy-action="voz">VOZ: <span id="voiceSetting">ATIVA</span></button></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Animações</div><div class="stacy-setting-desc">Controlar o movimento visual do núcleo.</div></div><button class="stacy-action small" data-stacy-action="animacoes">ANIMAÇÕES: <span id="animSetting">ATIVAS</span></button></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Privacidade e permissões</div><div class="stacy-setting-desc">Abrir as permissões e configurações do aplicativo.</div></div><button class="stacy-action small" data-stacy-action="privacidade">ABRIR</button></div></div>'},
+    config:{title:'Configurações',kicker:'SISTEMA',html:'<div class="stacy-card"><div class="stacy-setting-row"><div><div class="stacy-setting-name">Voz da STACY</div><div class="stacy-setting-desc">Ativar ou silenciar respostas faladas.</div></div><button class="stacy-action small" data-stacy-action="voz">VOZ: <span id="voiceSetting">ATIVA</span></button></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Animações</div><div class="stacy-setting-desc">Controlar o movimento visual do núcleo.</div></div><button class="stacy-action small" data-stacy-action="animacoes">ANIMAÇÕES: <span id="animSetting">ATIVAS</span></button></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Privacidade e permissões</div><div class="stacy-setting-desc">Abrir as permissões e configurações do aplicativo.</div></div><button class="stacy-action small" data-stacy-action="privacidade">ABRIR</button></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Atualização da STACY</div><div class="stacy-setting-desc">Verificar uma nova versão oficial, validar o pacote e iniciar a atualização.</div><div class="stacy-update-status" id="stacyUpdateStatus">Pronta para verificar.</div></div><button class="stacy-action small" data-stacy-action="atualizacao">VERIFICAR</button></div></div>'},
     sobre:{title:'Sobre',kicker:'IDENTIDADE',html:'<div class="stacy-card"><div class="stacy-card-label">STACY AI</div><div class="stacy-card-title">Assistente pessoal inteligente</div><div class="stacy-card-text">Núcleo visual, voz, memória, pesquisa, automação e integrações reunidos em uma única experiência.</div><button class="stacy-action" data-stacy-action="status">VERIFICAR NÚCLEO</button></div><div class="stacy-card"><div class="stacy-card-label">IDENTIDADE VISUAL</div><div class="stacy-card-title">Átomo · Espaço · Laranja</div><div class="stacy-card-text">Interface definitiva em evolução contínua.</div></div>'}
   };
 
@@ -875,6 +876,10 @@ requestAnimationFrame(animate);
     }
   }
   window.stacyNativeSend=nativeSend;
+  window.stacyNativeUpdateStatus=function(status){
+    const el=document.getElementById('stacyUpdateStatus');
+    if(el)el.textContent=String(status||'');
+  };
   document.body.addEventListener('click',function(e){
     const action=e.target.closest('[data-stacy-action]');
     if(!action)return;
@@ -897,6 +902,16 @@ requestAnimationFrame(animate);
     }
     if(key==='privacidade'){
       if(window.Android && typeof Android.stacyOpenAppSettings==='function')Android.stacyOpenAppSettings();
+      return;
+    }
+    if(key==='atualizacao'){
+      const status=document.getElementById('stacyUpdateStatus');
+      if(status)status.textContent='Verificando…';
+      if(window.Android && typeof Android.stacyCheckUpdate==='function'){
+        Android.stacyCheckUpdate();
+      }else if(status){
+        status.textContent='Ponte nativa indisponível.';
+      }
       return;
     }
     const commands={
