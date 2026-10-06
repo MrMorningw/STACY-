@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       STACY_KEYSTORE_PASSWORD: ${{ secrets.STACY_KEYSTORE_PASSWORD }}
       STACY_KEY_ALIAS: ${{ secrets.STACY_KEY_ALIAS }}
@@ -92,11 +92,11 @@ jobs:
           set -euo pipefail
           APK="app/build/outputs/apk/release/app-release.apk"
           BADGING="$(aapt dump badging "$APK")"
-          VERSION_CODE="$(printf '%s\n' "$BADGING" | sed -n "s/.*versionCode '\\([^']*\\)'.*/\\1/p")"
-          VERSION_NAME="$(printf '%s\n' "$BADGING" | sed -n "s/.*versionName '\\([^']*\\)'.*/\\1/p")"
+          VERSION_CODE="$(printf '%s\n' "$BADGING" | sed -n "s/.*versionCode='\\([^']*\\)'.*/\\1/p")"
+          VERSION_NAME="$(printf '%s\n' "$BADGING" | sed -n "s/.*versionName='\\([^']*\\)'.*/\\1/p")"
           PACKAGE_NAME="$(printf '%s\n' "$BADGING" | sed -n "s/package: name='\\([^']*\\)'.*/\\1/p")"
           SHA256="$(sha256sum "$APK" | awk '{print $1}')"
-          CERT_SHA256="$(apksigner verify --print-certs "$APK" | sed -n "s/Signer #1 certificate SHA-256 digest: //p" | tr -d ':')"
+          CERT_SHA256="$(apksigner verify --print-certs "$APK" | sed -n "s/.*certificate SHA-256 digest: //p" | head -n 1 | tr -d ':')"
           test "$PACKAGE_NAME" = "com.mrmorning.stacy"
           test -n "$VERSION_CODE"
           test -n "$VERSION_NAME"
