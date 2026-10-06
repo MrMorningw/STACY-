@@ -20,6 +20,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var webView: WebView
     private lateinit var vm: StacyViewModel
     private var voiceEnabled = true
+    private lateinit var updater: StacyUpdater
 
     private val requestMicrophone =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -34,6 +35,9 @@ class MainActivity : ComponentActivity() {
         vm = ViewModelProvider(this)[StacyViewModel::class.java]
         coreBridge = StacyCoreBridge(this)
         textToSpeech = AndroidTextToSpeech(this)
+        updater = StacyUpdater(this) { status ->
+            runOnUiThread { webUpdateStatus(status) }
+        }
 
         voiceInput = AndroidVoiceInput(
             context = this,
@@ -122,6 +126,11 @@ class MainActivity : ComponentActivity() {
         }
 
         @JavascriptInterface
+        fun stacyCheckUpdate() {
+            updater.checkAndUpdate()
+        }
+
+        @JavascriptInterface
         fun stacyOpenAppSettings() {
             runOnUiThread {
                 startActivity(
@@ -138,6 +147,15 @@ class MainActivity : ComponentActivity() {
         if (!::webView.isInitialized) return
         webView.evaluateJavascript(
             "window.stacyNativeState && window.stacyNativeState(" + JSONObject.quote(state) + ")",
+            null,
+        )
+    }
+
+    private fun webUpdateStatus(status: String) {
+        if (!::webView.isInitialized) return
+        webView.evaluateJavascript(
+            "window.stacyNativeUpdateStatus && window.stacyNativeUpdateStatus(" +
+                JSONObject.quote(status) + ")",
             null,
         )
     }
