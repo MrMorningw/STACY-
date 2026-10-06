@@ -47,5 +47,72 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: Updater bootstrap test
-        run: echo "STACY updater bootstrap workflow syntax OK"
+      - name: Publish signed STACY update channel
+        env:
+          STACY_KEYSTORE_BASE64: ${{ secrets.STACY_KEYSTORE_BASE64 }}
+          STACY_KEYSTORE_PASSWORD: ${{ secrets.STACY_KEYSTORE_PASSWORD }}
+          STACY_KEY_ALIAS: ${{ secrets.STACY_KEY_ALIAS }}
+          STACY_KEY_PASSWORD: ${{ secrets.STACY_KEY_PASSWORD }}
+          STACY_UPDATES_TOKEN: ${{ secrets.STACY_UPDATES_TOKEN }}
+          STACY_KEYSTORE_PATH: ${{ runner.temp }}/stacy-release.jks
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "Update channel skipped outside main."
+            exit 0
+          fi
+          test -n "$STACY_KEYSTORE_BASE64"
+          test -n "$STACY_UPDATES_TOKEN"
+          echo "$STACY_KEYSTORE_BASE64" | base64 --decode > "$STACY_KEYSTORE_PATH"
+          test -s "$STACY_KEYSTORE_PATH"
+          gradle assembleRelease
+          APK=app/build/outputs/apk/release/app-release.apk
+          test -f "$APK"
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          APKSIGNER="$(find "$SDK_ROOT/build-tools" -type f -name apksigner -perm -111 | sort -V | tail -1)"
+          AAPT="$(find "$SDK_ROOT/build-tools" -type f -name aapt -perm -111 | sort -V | tail -1)"
+          test -n "$APKSIGNER"
+          test -n "$AAPT"
+          "$APKSIGNER" verify --verbose "$APK"
+          BADGING="$("$AAPT" dump badging "$APK")"
+          VC="$(printf '%s
+' "$BADGING" | sed -n "s/.*versionCode='\\([^']*\\)'.*/\\1/p")"
+          VN="$(printf '%s
+' "$BADGING" | sed -n "s/.*versionName='\\([^']*\\)'.*/\\1/p")"
+          PKG="$(printf '%s
+' "$BADGING" | sed -n "s/package: name='\\([^']*\\)'.*/\\1/p")"
+          SHA="$(sha256sum "$APK" | awk '{print $1}')"
+          CERT="$("$APKSIGNER" verify --print-certs "$APK" | sed -n 's/.*certificate SHA-256 digest: //p' | head -1 | tr -d ':')"
+          test "$PKG" = com.mrmorning.stacy
+          test -n "$VC" -a -n "$VN" -a -n "$SHA" -a -n "$CERT"
+          API=https://api.github.com
+          REPO=MrMorningw/STACY--UPDATES
+          AUTH="Authorization: Bearer $STACY_UPDATES_TOKEN"
+          HDR=(-H "Accept: application/vnd.github+json" -H "$AUTH" -H "X-GitHub-Api-Version: 2026-03-10")
+          curl -fsS "${HDR[@]}" "$API/repos/$REPO" >/dev/null
+          APK_B64="$(base64 -w 0 "$APK")"
+          APK_URL="$API/repos/$REPO/contents/releases/STACY-$VN.apk"
+          APK_SHA="$(curl -fsS "${HDR[@]}" "$APK_URL" 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin).get("sha",""))' || true)"
+          python3 - "$APK_B64" "$VN" "$APK_SHA" > "$RUNNER_TEMP/apk-payload.json" <<'PY'
+import json,sys
+data,vn,sha=sys.argv[1:]
+p={"message":f"release: STACY {vn} APK","content":data,"branch":"main"}
+if sha: p["sha"]=sha
+print(json.dumps(p))
+PY
+          curl -fsS -X PUT "${HDR[@]}" --data-binary "@$RUNNER_TEMP/apk-payload.json" "$APK_URL" >/dev/null
+          cat > "$RUNNER_TEMP/update.json" <<EOF
+{"versionCode":$VC,"versionName":"$VN","packageName":"com.mrmorning.stacy","minAndroid":26,"sha256":"$SHA","signingCertificateSha256":"$CERT","assets":[{"name":"STACY-$VN.apk","version_code":$VC,"digest":"sha256:$SHA","browser_download_url":"https://raw.githubusercontent.com/MrMorningw/STACY--UPDATES/main/releases/STACY-$VN.apk"}]}
+EOF
+          META_URL="$API/repos/$REPO/contents/update.json"
+          META_SHA="$(curl -fsS "${HDR[@]}" "$META_URL" 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin).get("sha",""))' || true)"
+          META_B64="$(base64 -w 0 "$RUNNER_TEMP/update.json")"
+          python3 - "$META_B64" "$META_SHA" > "$RUNNER_TEMP/meta-payload.json" <<'PY'
+import json,sys
+data,sha=sys.argv[1:]
+p={"message":"release: STACY update metadata","content":data,"branch":"main"}
+if sha: p["sha"]=sha
+print(json.dumps(p))
+PY
+          curl -fsS -X PUT "${HDR[@]}" --data-binary "@$RUNNER_TEMP/meta-payload.json" "$META_URL" >/dev/null
+          echo "STACY update channel published: $VN ($VC)"
