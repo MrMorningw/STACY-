@@ -7,7 +7,6 @@ on:
       - mp08-automacao-android-20260922
       - stacy-final-android-20260924
       - mp-ef10-android-assistant-ready
-      - stacy-prototipo36-core-integration-20261005
   pull_request:
     branches:
       - mp08-automacao-android-20260922
@@ -48,8 +47,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: Bootstrap signed STACY updater
-        if: ${{ github.event_name == 'push' && github.event.head_commit.message == 'fix: run release bootstrap from stable CI' }}
+      - name: Publish signed STACY update channel
         env:
           STACY_KEYSTORE_BASE64: ${{ secrets.STACY_KEYSTORE_BASE64 }}
           STACY_KEYSTORE_PASSWORD: ${{ secrets.STACY_KEYSTORE_PASSWORD }}
@@ -59,6 +57,12 @@ jobs:
           STACY_KEYSTORE_PATH: ${{ runner.temp }}/stacy-release.jks
         run: |
           set -euo pipefail
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "Update channel: non-main branch; skipped."
+            exit 0
+          fi
+          test -n "$STACY_KEYSTORE_BASE64"
+          test -n "$STACY_UPDATES_TOKEN"
           echo "$STACY_KEYSTORE_BASE64" | base64 --decode > "$STACY_KEYSTORE_PATH"
           test -s "$STACY_KEYSTORE_PATH"
           gradle assembleRelease
