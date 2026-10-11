@@ -60,7 +60,7 @@ if [ -z "$VC" ] || [ -z "$VN" ] || [ -z "$SHA" ] || [ -z "$CERT" ]; then
 fi
 
 API="https://api.github.com"
-REPO="MrMorningw/STACY--UPDATES-DEFINITIVO"
+REPO="MrMorningw/STACY---UPTADES-DEFINITIVO"
 AUTH="Authorization: Bearer $STACY_UPDATES_TOKEN"
 ACCEPT="Accept: application/vnd.github+json"
 VERSION="X-GitHub-Api-Version: 2022-11-28"
@@ -100,7 +100,7 @@ PY
 put_file "$APK" "releases/STACY-$VN.apk" "release: STACY $VN APK"
 
 cat > "$RUNNER_TEMP/update.json" <<EOF
-{"versionCode":$VC,"versionName":"$VN","packageName":"com.mrmorning.stacy","minAndroid":26,"sha256":"$SHA","signingCertificateSha256":"$CERT","assets":[{"name":"STACY-$VN.apk","version_code":$VC,"digest":"sha256:$SHA","browser_download_url":"https://raw.githubusercontent.com/MrMorningw/STACY--UPDATES-DEFINITIVO/main/releases/STACY-$VN.apk"}]}
+{"versionCode":$VC,"versionName":"$VN","packageName":"com.mrmorning.stacy","minAndroid":26,"sha256":"$SHA","signingCertificateSha256":"$CERT","assets":[{"name":"STACY-$VN.apk","version_code":$VC,"digest":"sha256:$SHA","browser_download_url":"https://raw.githubusercontent.com/MrMorningw/STACY---UPTADES-DEFINITIVO/main/releases/STACY-$VN.apk"}]}
 EOF
 
 put_file "$RUNNER_TEMP/update.json" "update.json" "release: STACY update metadata"
