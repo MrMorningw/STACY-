@@ -6,8 +6,11 @@ if [ "${GITHUB_REF:-}" != "refs/heads/main" ]; then
   exit 0
 fi
 
-test -n "${STACY_KEYSTORE_BASE64:-}"
-test -n "${STACY_UPDATES_TOKEN:-}"
+: "${STACY_KEYSTORE_BASE64:?Missing STACY_KEYSTORE_BASE64 secret}"
+: "${STACY_KEYSTORE_PASSWORD:?Missing STACY_KEYSTORE_PASSWORD secret}"
+: "${STACY_KEY_ALIAS:?Missing STACY_KEY_ALIAS secret}"
+: "${STACY_KEY_PASSWORD:?Missing STACY_KEY_PASSWORD secret}"
+: "${STACY_UPDATES_TOKEN:?Missing STACY_UPDATES_TOKEN secret}"
 
 KEYSTORE_PATH="${RUNNER_TEMP}/stacy-release.jks"
 export STACY_KEYSTORE_PATH="$KEYSTORE_PATH"
@@ -40,7 +43,7 @@ API="https://api.github.com"
 REPO="MrMorningw/STACY--UPDATES-DEFINITIVO"
 AUTH="Authorization: Bearer $STACY_UPDATES_TOKEN"
 ACCEPT="Accept: application/vnd.github+json"
-VERSION="X-GitHub-Api-Version: 2026-03-10"
+VERSION="X-GitHub-Api-Version: 2022-11-28"
 
 put_file() {
   local local_file="$1"
@@ -48,9 +51,10 @@ put_file() {
   local message="$3"
   local sha=""
   local payload="$RUNNER_TEMP/payload.json"
+  local response="$RUNNER_TEMP/github-response.json"
 
-  sha="$(curl -fsS -H "$ACCEPT" -H "$AUTH" -H "$VERSION" "$API/repos/$REPO/contents/$remote_path" 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin).get("sha",""))' || true)"
-  export PUT_LOCAL_FILE="$local_file" PUT_VERSION="$VN" PUT_MESSAGE="$message" PUT_SHA="$sha" PUT_REMOTE_PATH="$remote_path"
+  sha="$(curl -sS -H "$ACCEPT" -H "$AUTH" -H "$VERSION" "$API/repos/$REPO/contents/$remote_path" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("sha",""))' 2>/dev/null || true)"
+  export PUT_LOCAL_FILE="$local_file" PUT_MESSAGE="$message" PUT_SHA="$sha" PUT_REMOTE_PATH="$remote_path"
 
   python3 > "$payload" <<'PY'
 import base64,json,os
@@ -62,7 +66,15 @@ if os.environ.get("PUT_SHA"):
 print(json.dumps(p))
 PY
 
-  curl -fsS -X PUT -H "$ACCEPT" -H "$AUTH" -H "$VERSION" --data-binary "@$payload" "$API/repos/$REPO/contents/$remote_path" >/dev/null
+  local status
+  status="$(curl -sS -o "$response" -w '%{http_code}' -X PUT -H "$ACCEPT" -H "$AUTH" -H "$VERSION" --data-binary "@$payload" "$API/repos/$REPO/contents/$remote_path")"
+  if [[ "$status" != "200" && "$status" != "201" ]]; then
+    echo "GitHub Contents API failed for $remote_path (HTTP $status):"
+    python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("message",d))' "$response" 2>/dev/null || cat "$response"
+    echo "Check that the repository exists at $REPO, the token has Contents: Read and write for that exact repository, and the repository has a default branch."
+    return 1
+  fi
+  echo "Published $remote_path (HTTP $status)."
 }
 
 put_file "$APK" "releases/STACY-$VN.apk" "release: STACY $VN APK"
@@ -73,4 +85,4 @@ EOF
 
 put_file "$RUNNER_TEMP/update.json" "update.json" "release: STACY update metadata"
 
-# The authenticated Contents API is the publication authority. The public raw URL is consumed by the Android updater after propagation.\n
+echo "STACY update channel published: version $VN (code $VC), SHA-256 $SHA"
