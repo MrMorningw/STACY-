@@ -626,7 +626,7 @@ function setState(name){
  state=name; target={...states[name]};
  if(name==='pesquisando'||name==='executando'){ researchProgress=0; phaseClock=0; }
  if(name==='online'||name==='ouvindo'||name==='pensando'||name==='respondendo'||name==='offline'){ phaseClock=0; }
- app.classList.toggle("responding",name==="respondendo");
+ app.classList.toggle("responding",name==="respondendo"||name==="erro");
  status.textContent=target.label;
  status.classList.toggle("status-online",name==="online");
  status.classList.toggle("status-offline",name==="offline"||name==="erro");
