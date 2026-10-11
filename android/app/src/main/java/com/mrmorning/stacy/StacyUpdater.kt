@@ -144,11 +144,14 @@ class StacyUpdater(
             throw SecurityException("A integridade do APK não foi confirmada.")
         }
 
-        val archiveInfo = context.packageManager.getPackageArchiveInfo(
-            file.absolutePath,
-            if (Build.VERSION.SDK_INT >= 28) PackageManager.GET_SIGNING_CERTIFICATES
-            else @Suppress("DEPRECATION") PackageManager.GET_SIGNATURES,
-        ) ?: throw IllegalStateException("O arquivo baixado não é um APK válido.")
+        @Suppress("DEPRECATION")
+        val signingFlags = if (Build.VERSION.SDK_INT >= 28) {
+            PackageManager.GET_SIGNING_CERTIFICATES
+        } else {
+            PackageManager.GET_SIGNATURES
+        }
+        val archiveInfo = context.packageManager.getPackageArchiveInfo(file.absolutePath, signingFlags)
+            ?: throw IllegalStateException("O arquivo baixado não é um APK válido.")
         if (archiveInfo.packageName != context.packageName) {
             throw SecurityException("O pacote baixado não pertence à STACY.")
         }
