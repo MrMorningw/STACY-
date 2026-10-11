@@ -22,7 +22,7 @@ class StacyUpdater(
 ) {
     companion object {
         private const val API_URL =
-            "https://raw.githubusercontent.com/MrMorningw/STACY--UPDATES-DEFINITIVO/main/update.json"
+            "https://raw.githubusercontent.com/MrMorningw/STACY---UPTADES-DEFINITIVO/main/update.json"
         private const val USER_AGENT = "STACY-Updater/1.0"
         private const val APK_PREFIX = "STACY"
     }
@@ -36,6 +36,7 @@ class StacyUpdater(
                 val release = fetchLatestRelease()
                 val asset = findApkAsset(release)
                     ?: throw IllegalStateException("A versão publicada não possui um APK STACY.")
+                asset.put("signingCertificateSha256", release.optString("signingCertificateSha256", ""))
                 val assetVersionCode = asset.optInt("version_code", -1)
                 val currentVersionCode = currentVersionCode()
 
@@ -60,7 +61,7 @@ class StacyUpdater(
             connectTimeout = 12_000
             readTimeout = 20_000
             setRequestProperty("Accept", "application/vnd.github+json")
-            setRequestProperty("X-GitHub-Api-Version", "2026-03-10")
+            setRequestProperty("X-GitHub-Api-Version", "2022-11-28")
             setRequestProperty("User-Agent", USER_AGENT)
         }
         return try {
@@ -143,10 +144,34 @@ class StacyUpdater(
             throw SecurityException("A integridade do APK não foi confirmada.")
         }
 
-        val archiveInfo = context.packageManager.getPackageArchiveInfo(file.absolutePath, 0)
-            ?: throw IllegalStateException("O arquivo baixado não é um APK válido.")
+        val archiveInfo = context.packageManager.getPackageArchiveInfo(
+            file.absolutePath,
+            if (Build.VERSION.SDK_INT >= 28) PackageManager.GET_SIGNING_CERTIFICATES
+            else @Suppress("DEPRECATION") PackageManager.GET_SIGNATURES,
+        ) ?: throw IllegalStateException("O arquivo baixado não é um APK válido.")
         if (archiveInfo.packageName != context.packageName) {
             throw SecurityException("O pacote baixado não pertence à STACY.")
+        }
+
+        val expectedCertificate = asset.optString("signingCertificateSha256", "")
+            .ifBlank { "" }
+            .replace(":", "")
+            .lowercase()
+        // The publisher stores the certificate digest at the top level of update.json.
+        // Pass it through the selected asset when validating the downloaded APK.
+        val actualCertificate = if (Build.VERSION.SDK_INT >= 28) {
+            archiveInfo.signingInfo?.apkContentsSigners?.firstOrNull()?.toByteArray()
+        } else {
+            @Suppress("DEPRECATION")
+            archiveInfo.signatures?.firstOrNull()?.toByteArray()
+        }?.let { bytes ->
+            MessageDigest.getInstance("SHA-256").digest(bytes)
+                .joinToString("") { "%02x".format(it) }
+        }
+        if (expectedCertificate.isNotBlank() &&
+            (actualCertificate == null || actualCertificate != expectedCertificate)
+        ) {
+            throw SecurityException("A assinatura do APK não corresponde ao certificado publicado.")
         }
 
         val downloadedVersionCode = if (Build.VERSION.SDK_INT >= 28) {
