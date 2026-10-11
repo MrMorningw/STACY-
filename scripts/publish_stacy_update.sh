@@ -30,14 +30,34 @@ test -n "$AAPT"
 
 "$APKSIGNER" verify --verbose "$APK"
 BADGING="$("$AAPT" dump badging "$APK")"
-VC="$(printf '%s\n' "$BADGING" | sed -n "s/.*versionCode='\\([^']*\\)'.*/\\1/p")"
-VN="$(printf '%s\n' "$BADGING" | sed -n "s/.*versionName='\\([^']*\\)'.*/\\1/p")"
-PKG="$(printf '%s\n' "$BADGING" | sed -n "s/package: name='\\([^']*\\)'.*/\\1/p")"
+# Parse aapt output with Python rather than fragile nested shell/sed escaping.
+mapfile -t META < <(printf '%s\n' "$BADGING" | python3 -c '
+import re, sys
+s = sys.stdin.read()
+patterns = [
+    r"versionCode=\x27([^\x27]+)\x27",
+    r"versionName=\x27([^\x27]+)\x27",
+    r"package: name=\x27([^\x27]+)\x27",
+]
+for pattern in patterns:
+    m = re.search(pattern, s)
+    print(m.group(1) if m else "")
+')
+VC="${META[0]:-}"
+VN="${META[1]:-}"
+PKG="${META[2]:-}"
 SHA="$(sha256sum "$APK" | awk '{print $1}')"
 CERT="$("$APKSIGNER" verify --print-certs "$APK" | sed -n 's/.*certificate SHA-256 digest: //p' | head -1 | tr -d ':')"
 
-test "$PKG" = "com.mrmorning.stacy"
-test -n "$VC" -a -n "$VN" -a -n "$SHA" -a -n "$CERT"
+if [ "$PKG" != "com.mrmorning.stacy" ]; then
+  echo "Unexpected APK package name: '${PKG:-empty}' (expected com.mrmorning.stacy)"
+  exit 1
+fi
+if [ -z "$VC" ] || [ -z "$VN" ] || [ -z "$SHA" ] || [ -z "$CERT" ]; then
+  echo "Could not extract release metadata from the APK."
+  echo "versionCode='${VC:-}', versionName='${VN:-}', sha256_present=$([[ -n "$SHA" ]] && echo yes || echo no), certificate_present=$([[ -n "$CERT" ]] && echo yes || echo no)"
+  exit 1
+fi
 
 API="https://api.github.com"
 REPO="MrMorningw/STACY--UPDATES-DEFINITIVO"
@@ -54,7 +74,7 @@ put_file() {
   local response="$RUNNER_TEMP/github-response.json"
 
   sha="$(curl -sS -H "$ACCEPT" -H "$AUTH" -H "$VERSION" "$API/repos/$REPO/contents/$remote_path" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("sha",""))' 2>/dev/null || true)"
-  export PUT_LOCAL_FILE="$local_file" PUT_MESSAGE="$message" PUT_SHA="$sha" PUT_REMOTE_PATH="$remote_path"
+  export PUT_LOCAL_FILE="$local_file" PUT_MESSAGE="$message" PUT_SHA="$sha"
 
   python3 > "$payload" <<'PY'
 import base64,json,os
@@ -71,7 +91,7 @@ PY
   if [[ "$status" != "200" && "$status" != "201" ]]; then
     echo "GitHub Contents API failed for $remote_path (HTTP $status):"
     python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d.get("message",d))' "$response" 2>/dev/null || cat "$response"
-    echo "Check that the repository exists at $REPO, the token has Contents: Read and write for that exact repository, and the repository has a default branch."
+    echo "Check repository $REPO, token access (Contents: Read and write), and the main branch."
     return 1
   fi
   echo "Published $remote_path (HTTP $status)."
