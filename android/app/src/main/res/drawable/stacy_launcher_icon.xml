@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="432dp"
+    android:height="432dp"
+    android:viewportWidth="432"
+    android:viewportHeight="432">
+    <path android:fillColor="#000000" android:pathData="M0,0h432v432h-432z" />
+    <path android:fillColor="#000000" android:strokeColor="#FF7417" android:strokeWidth="3.5"
+        android:pathData="M65,18H367A47,47 0,0 1,414 65V367A47,47 0,0 1,367 414H65A47,47 0,0 1,18 367V65A47,47 0,0 1,65 18Z" />
+    <path android:fillColor="#000000" android:strokeColor="#FF7417" android:strokeWidth="4.5"
+        android:strokeLineCap="round" android:strokeLineJoin="round"
+        android:pathData="M216,95 C182,95 166,168 173,216 C166,264 182,337 216,337 C250,337 266,264 259,216 C266,168 250,95 216,95 Z" />
+    <path android:fillColor="#000000" android:strokeColor="#FF7417" android:strokeWidth="4.5"
+        android:strokeLineCap="round" android:strokeLineJoin="round"
+        android:pathData="M113,142 C130,112 197,139 234,179 C276,211 307,273 289,298 C272,327 205,294 168,254 C126,222 95,167 113,142 Z" />
+    <path android:fillColor="#000000" android:strokeColor="#FF7417" android:strokeWidth="4.5"
+        android:strokeLineCap="round" android:strokeLineJoin="round"
+        android:pathData="M319,142 C302,112 235,139 198,179 C156,211 125,273 143,298 C160,327 227,294 264,254 C306,222 337,167 319,142 Z" />
+    <path android:fillColor="#FF7417" android:pathData="M216,164 m-48,0 a48,48 0,1 0,96 0 a48,48 0,1 0,-96 0" />
+    <path android:fillColor="#000000" android:pathData="M231,140 C229,133 222,129 212,129 C198,129 190,137 190,149 C190,162 199,168 215,172 C227,175 232,179 232,187 C232,197 224,203 212,203 C202,203 195,199 192,191 L178,191 C181,206 194,214 212,214 C233,214 246,203 246,186 C246,172 238,165 219,160 C207,157 204,154 204,148 C204,142 208,139 214,139 C220,139 224,141 226,146 Z" />
+    <circle android:fillColor="#FF7417" android:cx="100" android:cy="157" android:r="6" />
+    <circle android:fillColor="#FFB05A" android:cx="332" android:cy="157" android:r="6" />
+</vector>
