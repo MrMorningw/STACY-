@@ -17,8 +17,8 @@
 
     <application
         android:allowBackup="true"
-        android:icon="@drawable-nodpi/stacy_launcher_icon"
-        android:roundIcon="@drawable-nodpi/stacy_launcher_icon"
+        android:icon="@drawable/stacy_launcher_icon"
+        android:roundIcon="@drawable/stacy_launcher_icon"
         android:label="STACY"
         android:supportsRtl="true"
         android:theme="@style/Theme.STACY">
