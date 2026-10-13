@@ -87,7 +87,177 @@ class StacyCoreBridge(private val context: Context) {
                   exit 0
                 fi
                 cd "${'$'}ROOT"
-                exec bash "${'$'}ROOT/android/termux_widget/stacy-android.sh" "${'$'}1"
+                exec bash "${'
+            """.trimIndent()
+            val intent = Intent().apply {
+                setClassName("com.termux", "com.termux.app.RunCommandService")
+                action = "com.termux.RUN_COMMAND"
+                putExtra("com.termux.RUN_COMMAND_PATH", "/data/data/com.termux/files/usr/bin/bash")
+                putExtra(
+                    "com.termux.RUN_COMMAND_ARGUMENTS",
+                    arrayOf("-lc", command, "stacy-android", "--execution-id=$executionId", request.message),
+                )
+                putExtra("com.termux.RUN_COMMAND_WORKDIR", "/data/data/com.termux/files/home")
+                putExtra("com.termux.RUN_COMMAND_BACKGROUND", true)
+                putExtra("com.termux.RUN_COMMAND_SESSION_ACTION", "0")
+                putExtra("com.termux.RUN_COMMAND_PENDING_INTENT", pendingIntent)
+            }
+            context.startService(intent)
+        } catch (_: SecurityException) {
+            fail(executionId, "Permita que aplicativos externos executem comandos no Termux e tente novamente.")
+        } catch (error: Exception) {
+            fail(executionId, "Não foi possível acionar o CORE: ${error.message ?: "erro desconhecido"}.")
+        }
+    }
+
+    private fun finish(executionId: Int) {
+        pendingTimeouts.remove(executionId)?.let(timeoutHandler::removeCallbacks)
+        synchronized(queue) {
+            if (activeExecutionId == executionId) activeExecutionId = null
+        }
+        startNext()
+    }
+
+    companion object {
+        private const val CORE_TIMEOUT_MS = 45_000L
+        private val NEXT_ID = AtomicInteger(1000)
+        private val callbacks = ConcurrentHashMap<Int, (String) -> Unit>()
+        private val activeBridges = ConcurrentHashMap<Int, StacyCoreBridge>()
+
+        fun fail(executionId: Int, message: String) {
+            val bridge = activeBridges.remove(executionId)
+            callbacks.remove(executionId)?.invoke(message)
+            bridge?.finish(executionId)
+        }
+
+        fun isExecutionActive(executionId: Int): Boolean =
+            activeBridges.containsKey(executionId)
+
+        fun complete(executionId: Int) {
+            callbacks.remove(executionId)
+            activeBridges.remove(executionId)?.finish(executionId)
+        }
+    }
+}
+
+data class CoreResult(
+    val tipo: String,
+    val response: String,
+    val exitCode: Int,
+    val stderr: String,
+    val androidAction: JSONObject? = null,
+    val fontes: JSONArray? = null,
+)
+
+object CoreResultStore {
+    @Volatile private var listener: ((CoreResult) -> Unit)? = null
+    fun subscribe(listener: (CoreResult) -> Unit) { this.listener = listener }
+    fun clear() { listener = null }
+    fun publish(context: Context, result: CoreResult, afterPublish: () -> Unit = {}) {
+        context.mainExecutor.execute {
+            try {
+                listener?.invoke(result)
+            } finally {
+                afterPublish()
+            }
+        }
+    }
+}
+
+private fun PackageManager.getPackageInfoOrNull(packageName: String): android.content.pm.PackageInfo? =
+    try {
+        if (android.os.Build.VERSION.SDK_INT >= 33) getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0))
+        else {
+            @Suppress("DEPRECATION")
+            getPackageInfo(packageName, 0)
+        }
+    } catch (_: PackageManager.NameNotFoundException) { null }
+}ROOT/android/termux_widget/stacy-android.sh" "${'
+            """.trimIndent()
+            val intent = Intent().apply {
+                setClassName("com.termux", "com.termux.app.RunCommandService")
+                action = "com.termux.RUN_COMMAND"
+                putExtra("com.termux.RUN_COMMAND_PATH", "/data/data/com.termux/files/usr/bin/bash")
+                putExtra(
+                    "com.termux.RUN_COMMAND_ARGUMENTS",
+                    arrayOf("-lc", command, "stacy-android", "--execution-id=$executionId", request.message),
+                )
+                putExtra("com.termux.RUN_COMMAND_WORKDIR", "/data/data/com.termux/files/home")
+                putExtra("com.termux.RUN_COMMAND_BACKGROUND", true)
+                putExtra("com.termux.RUN_COMMAND_SESSION_ACTION", "0")
+                putExtra("com.termux.RUN_COMMAND_PENDING_INTENT", pendingIntent)
+            }
+            context.startService(intent)
+        } catch (_: SecurityException) {
+            fail(executionId, "Permita que aplicativos externos executem comandos no Termux e tente novamente.")
+        } catch (error: Exception) {
+            fail(executionId, "Não foi possível acionar o CORE: ${error.message ?: "erro desconhecido"}.")
+        }
+    }
+
+    private fun finish(executionId: Int) {
+        pendingTimeouts.remove(executionId)?.let(timeoutHandler::removeCallbacks)
+        synchronized(queue) {
+            if (activeExecutionId == executionId) activeExecutionId = null
+        }
+        startNext()
+    }
+
+    companion object {
+        private const val CORE_TIMEOUT_MS = 45_000L
+        private val NEXT_ID = AtomicInteger(1000)
+        private val callbacks = ConcurrentHashMap<Int, (String) -> Unit>()
+        private val activeBridges = ConcurrentHashMap<Int, StacyCoreBridge>()
+
+        fun fail(executionId: Int, message: String) {
+            val bridge = activeBridges.remove(executionId)
+            callbacks.remove(executionId)?.invoke(message)
+            bridge?.finish(executionId)
+        }
+
+        fun isExecutionActive(executionId: Int): Boolean =
+            activeBridges.containsKey(executionId)
+
+        fun complete(executionId: Int) {
+            callbacks.remove(executionId)
+            activeBridges.remove(executionId)?.finish(executionId)
+        }
+    }
+}
+
+data class CoreResult(
+    val tipo: String,
+    val response: String,
+    val exitCode: Int,
+    val stderr: String,
+    val androidAction: JSONObject? = null,
+    val fontes: JSONArray? = null,
+)
+
+object CoreResultStore {
+    @Volatile private var listener: ((CoreResult) -> Unit)? = null
+    fun subscribe(listener: (CoreResult) -> Unit) { this.listener = listener }
+    fun clear() { listener = null }
+    fun publish(context: Context, result: CoreResult, afterPublish: () -> Unit = {}) {
+        context.mainExecutor.execute {
+            try {
+                listener?.invoke(result)
+            } finally {
+                afterPublish()
+            }
+        }
+    }
+}
+
+private fun PackageManager.getPackageInfoOrNull(packageName: String): android.content.pm.PackageInfo? =
+    try {
+        if (android.os.Build.VERSION.SDK_INT >= 33) getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0))
+        else {
+            @Suppress("DEPRECATION")
+            getPackageInfo(packageName, 0)
+        }
+    } catch (_: PackageManager.NameNotFoundException) { null }
+}@"
             """.trimIndent()
             val intent = Intent().apply {
                 setClassName("com.termux", "com.termux.app.RunCommandService")
