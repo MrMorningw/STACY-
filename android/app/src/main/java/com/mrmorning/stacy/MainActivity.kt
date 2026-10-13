@@ -8,6 +8,8 @@ import android.net.Uri
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.webkit.WebChromeClient
+import android.webkit.ValueCallback
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.ViewModelProvider
@@ -22,6 +24,21 @@ class MainActivity : ComponentActivity() {
     private lateinit var vm: StacyViewModel
     private var voiceEnabled = true
     private lateinit var updater: StacyUpdater
+    private var pendingFileChooser: ValueCallback<Array<Uri>>? = null
+    private val fileChooserResult = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val callback = pendingFileChooser ?: return@registerForActivityResult
+        pendingFileChooser = null
+        val data = result.data
+        val uris = if (result.resultCode == RESULT_OK && data != null) {
+            val clip = data.clipData
+            when {
+                clip != null -> Array(clip.itemCount) { index -> clip.getItemAt(index).uri }
+                data.data != null -> arrayOf(data.data!!)
+                else -> null
+            }
+        } else null
+        callback.onReceiveValue(uris)
+    }
 
     private val requestMicrophone =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -30,6 +47,12 @@ class MainActivity : ComponentActivity() {
         }
 
     @SuppressLint("SetJavaScriptEnabled")
+    override fun onDestroy() {
+        pendingFileChooser?.onReceiveValue(null)
+        pendingFileChooser = null
+        super.onDestroy()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -105,6 +128,26 @@ class MainActivity : ComponentActivity() {
             settings.allowFileAccess = true
             settings.allowContentAccess = true
             webViewClient = WebViewClient()
+            webChromeClient = object : WebChromeClient() {
+                override fun onShowFileChooser(
+                    webView: WebView?,
+                    filePathCallback: ValueCallback<Array<Uri>>?,
+                    fileChooserParams: FileChooserParams?,
+                ): Boolean {
+                    pendingFileChooser?.onReceiveValue(null)
+                    pendingFileChooser = filePathCallback ?: return false
+                    return try {
+                        val intent = fileChooserParams?.createIntent()
+                            ?: Intent(Intent.ACTION_GET_CONTENT).apply { type = "*/*"; addCategory(Intent.CATEGORY_OPENABLE) }
+                        fileChooserResult.launch(intent)
+                        true
+                    } catch (_: Exception) {
+                        pendingFileChooser?.onReceiveValue(null)
+                        pendingFileChooser = null
+                        false
+                    }
+                }
+            }
             addJavascriptInterface(StacyJsBridge(), "Android")
             loadUrl("file:///android_asset/stacy_prototipo36.html")
         }
