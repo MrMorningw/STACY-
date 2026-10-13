@@ -1,16 +1,41 @@
 # Interface Android da STACY
 
-A camada Android é opcional e não altera o STACY CORE.
+## Arquitetura atual do núcleo
 
-## Voz
+A interface Android conversa com o STACY CORE Python por meio do serviço de comandos do Termux. **Nesta versão, o APK ainda não contém um runtime Python independente**: o Termux e o repositório do núcleo precisam estar instalados no aparelho.
 
-A interface usa os comandos do Termux:API:
+## Preparação do CORE no Termux
 
-- `termux-speech-to-text` para entrada.
-- `termux-tts-speak` para saída.
+1. Instale o Termux de uma fonte compatível e abra-o ao menos uma vez.
+2. No Termux, habilite a opção que permite comandos de aplicativos externos. A STACY usa a permissão `com.termux.permission.RUN_COMMAND`.
+3. Instale os requisitos básicos:
+
+   ```bash
+   pkg update
+   pkg install python git
+   ```
+
+4. Disponibilize o repositório privado da STACY no caminho `$HOME/stacy` usando seu método autenticado de acesso ao GitHub. Não coloque token ou senha diretamente no código nem em comandos que fiquem salvos no histórico.
+5. Entre na pasta e instale as dependências:
+
+   ```bash
+   cd ~/stacy
+   python -m pip install -r requirements.txt
+   ```
+
+6. Abra a STACY e envie uma mensagem simples. Se o núcleo ou uma dependência estiver ausente, a ponte Android deve devolver uma mensagem de diagnóstico.
+
+A chave `GEMINI_API_KEY` é opcional para os fluxos locais; funcionalidades que dependem da API de IA precisam da chave configurada no ambiente do Termux. Nunca a publique no repositório.
+
+## Voz e recursos opcionais
+
+A interface usa comandos do Termux:API quando disponíveis:
+
+- `termux-speech-to-text` para entrada de voz.
+- `termux-tts-speak` para saída de voz.
 - `termux-notification` para notificações.
 
-Se algum recurso não estiver instalado, a STACY informa a indisponibilidade e preserva o modo texto.
+A instalação do Termux:API e do plugin Termux:Widget é externa ao repositório. A ausência desses complementos não deve impedir o uso textual do CORE.
 
 ## Atalho Termux:Widget
 
@@ -20,6 +45,4 @@ O arquivo `stacy-voz.sh` pode ser colocado no diretório de scripts do Termux:Wi
 chmod +x stacy-voz.sh
 ```
 
-O atalho chama `python stacy.py --voz` e, portanto, continua usando exatamente o mesmo CORE.
-
-A instalação do aplicativo Termux:API e do plugin Termux:Widget é externa ao repositório; a ausência deles não impede o funcionamento textual da STACY.
+O atalho chama `python stacy.py --voz` e continua usando o mesmo CORE.
