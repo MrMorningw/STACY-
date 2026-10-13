@@ -95,6 +95,19 @@ def main(argv=None):
         payload = {"tipo": kind, "resposta": response}
         if isinstance(result, dict) and isinstance(result.get("acao_android"), dict):
             payload["acao_android"] = result["acao_android"]
+        if isinstance(result, dict) and isinstance(result.get("fontes"), list):
+            fontes_seguras = []
+            for fonte in result["fontes"][:5]:
+                if not isinstance(fonte, dict):
+                    continue
+                url = fonte.get("url")
+                titulo = fonte.get("titulo", "Fonte")
+                if isinstance(url, str) and url.startswith("https://"):
+                    fontes_seguras.append({
+                        "titulo": str(titulo)[:180],
+                        "url": url[:2048],
+                    })
+            payload["fontes"] = fontes_seguras
         _emit(payload)
     except Exception:
         traceback.print_exc(file=sys.stderr)
