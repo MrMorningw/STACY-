@@ -16,3 +16,8 @@ STATUS_INVALIDA = anpes.STATUS_INVALIDA
 def avaliar_execucao(intencao):
     """Determina se uma intenção pode seguir para execução."""
     return anpes.avaliar_intencao(intencao)
+
+
+def anpes_estado():
+    """Expõe o diagnóstico do ANPES sem alterar o estado do CORE."""
+    return anpes.estado()
