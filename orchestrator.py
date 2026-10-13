@@ -1140,18 +1140,22 @@ class StacyOrchestrator:
             autorizacao = autonomy.avaliar_execucao(
                 intencao
             )
-            if (
-                intencao.get("origem") == autonomy.ORIGEM_IA
-                and not autorizacao.get("executar")
-            ):
-                return {
-                    "tipo": "confirmacao_autonomia",
-                    "resposta": (
+            if not autorizacao.get("executar"):
+                if intencao.get("origem") == autonomy.ORIGEM_IA:
+                    resposta_autorizacao = (
                         "Identifiquei uma ação pela IA local, senhor, "
                         "mas não vou executá-la automaticamente. "
                         "Se desejar a execução, repita o pedido de forma "
                         "explícita como comando da STACY."
-                    ),
+                    )
+                else:
+                    resposta_autorizacao = (
+                        "A intenção não passou pela política de autorização "
+                        "do ANPES, senhor. A execução foi bloqueada."
+                    )
+                return {
+                    "tipo": "confirmacao_autonomia",
+                    "resposta": resposta_autorizacao,
                     "intencao": intencao,
                     "autonomia": autorizacao,
                     "rota": ROTA_INTERNA
