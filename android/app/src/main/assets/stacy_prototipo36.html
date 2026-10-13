@@ -339,6 +339,7 @@ body.stacy-no-animations *{animation:none!important;transition:none!important}
 
 .stacy-chat-log{display:none;position:absolute;left:4%;right:4%;top:calc(env(safe-area-inset-top) + 76px);bottom:calc(env(safe-area-inset-bottom) + 82px);z-index:25;overflow-y:auto;overscroll-behavior:contain;padding:10px 2px 18px;box-sizing:border-box;flex-direction:column;gap:10px;scrollbar-width:thin;scrollbar-color:rgba(255,117,31,.3) transparent}
 #app.chat-active .stacy-chat-log{display:flex}
+#app.chat-active .responsePanel{display:none!important}
 #app.chat-active #scene,#app.chat-active .info{opacity:.14;transition:opacity .25s ease}
 .stacy-chat-row{display:flex;width:100%;animation:stacyMessageIn .24s ease both}
 .stacy-chat-row.user{justify-content:flex-end}
