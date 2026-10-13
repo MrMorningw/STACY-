@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 import android_core
 from conversation import ConversationState
+from android_session import load_api_key
 
 
 class AndroidCoreEntryPointTests(unittest.TestCase):
@@ -90,6 +91,23 @@ class AndroidCoreEntryPointTests(unittest.TestCase):
             self.assertIn("interrompida com segurança", payload["resposta"])
             self.assertNotIn("detalhe interno privado", stdout)
             self.assertIn("detalhe interno privado", stderr)
+
+    def test_api_key_environment_takes_precedence_over_private_file(self):
+        with tempfile.TemporaryDirectory() as state_dir:
+            Path(state_dir, "secrets.json").write_text(
+                json.dumps({"GEMINI_API_KEY": "file-key"}), encoding="utf-8"
+            )
+            with patch.dict(os.environ, {"STACY_STATE_DIR": state_dir, "GEMINI_API_KEY": "env-key"}):
+                self.assertEqual(load_api_key(), "env-key")
+
+    def test_api_key_can_be_loaded_from_private_file(self):
+        with tempfile.TemporaryDirectory() as state_dir:
+            Path(state_dir, "secrets.json").write_text(
+                json.dumps({"GEMINI_API_KEY": "local-key"}), encoding="utf-8"
+            )
+            with patch.dict(os.environ, {"STACY_STATE_DIR": state_dir}, clear=False):
+                os.environ.pop("GEMINI_API_KEY", None)
+                self.assertEqual(load_api_key(), "local-key")
 
     def test_empty_input_returns_json_error(self):
         stdout = io.StringIO()
