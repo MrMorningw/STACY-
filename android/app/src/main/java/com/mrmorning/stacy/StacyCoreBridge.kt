@@ -54,7 +54,7 @@ class StacyCoreBridge(private val context: Context) {
         val timeout = Runnable {
             fail(
                 executionId,
-                "O núcleo STACY não respondeu em 90 segundos. Verifique o Termux e tente novamente.",
+                "O CORE não devolveu resposta em 45 segundos. Confira se o Termux está instalado e aberto ao menos uma vez, se a permissão de execução de comandos por aplicativos externos está ativada e se o repositório existe em ~/stacy. Depois, tente novamente.",
             )
         }
         pendingTimeouts[executionId] = timeout
@@ -119,7 +119,7 @@ class StacyCoreBridge(private val context: Context) {
     }
 
     companion object {
-        private const val CORE_TIMEOUT_MS = 90_000L
+        private const val CORE_TIMEOUT_MS = 45_000L
         private val NEXT_ID = AtomicInteger(1000)
         private val callbacks = ConcurrentHashMap<Int, (String) -> Unit>()
         private val activeBridges = ConcurrentHashMap<Int, StacyCoreBridge>()
