@@ -47,12 +47,6 @@ class MainActivity : ComponentActivity() {
         }
 
     @SuppressLint("SetJavaScriptEnabled")
-    override fun onDestroy() {
-        pendingFileChooser?.onReceiveValue(null)
-        pendingFileChooser = null
-        super.onDestroy()
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -320,6 +314,8 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        pendingFileChooser?.onReceiveValue(null)
+        pendingFileChooser = null
         CoreResultStore.clear()
         if (::voiceInput.isInitialized) voiceInput.destroy()
         if (::textToSpeech.isInitialized) textToSpeech.shutdown()
