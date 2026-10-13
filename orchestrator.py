@@ -325,6 +325,33 @@ class StacyOrchestrator:
             resultado
         )
 
+
+    def _processar_anpes(self, mensagem):
+        texto = _normalizar_rota(mensagem)
+        consultas = {
+            "status do anpes", "estado do anpes", "situacao do anpes",
+            "status do nucleo anpes", "estado do nucleo anpes",
+            "status do nucleo", "estado do nucleo",
+            "o que e anpes", "o que e o anpes", "o que faz o anpes",
+        }
+        if texto not in consultas:
+            return None
+
+        estado = autonomy.anpes_estado()
+        resposta = (
+            "ANPES está integrado ao gate de autonomia do CORE, senhor. "
+            "A validação de planos está disponível, com simulação por padrão "
+            "e limite de oito etapas. A execução de planos ainda exige "
+            "executores explicitamente registrados; esta consulta não executa "
+            "ações. O núcleo não executa shell arbitrário nem se modifica sozinho."
+        )
+        return {
+            "tipo": "anpes_status",
+            "resposta": resposta,
+            "anpes": estado,
+            "rota": ROTA_INTERNA,
+        }
+
     def _processar_ctac_mepo(self, mensagem):
         texto = _normalizar_rota(mensagem)
         consultas_ctac = (
@@ -694,6 +721,11 @@ class StacyOrchestrator:
         resultado_tarefa = self._processar_tarefa(intencao)
         if resultado_tarefa is not None:
             return resultado_tarefa
+
+        # O estado do ANPES é diagnóstico determinístico e não deve passar por IA/Web.
+        resultado_anpes = self._processar_anpes(mensagem)
+        if resultado_anpes is not None:
+            return resultado_anpes
 
         # CTAC/MEPO é contexto interno da trajetória: não passa por IA/Web.
         resultado_ctac = self._processar_ctac_mepo(mensagem)
