@@ -61,3 +61,20 @@ chmod +x stacy-voz.sh
 ```
 
 O atalho chama `python stacy.py --voz` e continua usando o mesmo CORE.
+
+
+## Ações nativas disponíveis nesta fase
+
+O roteador Android aceita apenas comandos explícitos e uma lista permitida de ações. Exemplos de teste:
+
+- `Abra as configurações do Android`
+- `Abra o calendário`
+- `Abra o WhatsApp`, `Abra o YouTube`, `Abra o Chrome`, `Abra o Gmail`, `Abra o Spotify` ou `Abra o Google Maps`
+- `Selecione um arquivo`
+- `Compartilhe: texto que você deseja compartilhar`
+
+O compartilhamento apenas abre o seletor do Android; o usuário escolhe o aplicativo e confirma o envio. Aplicativos não instalados, ações desconhecidas e pacotes fora da lista são recusados. Nesta etapa, criar eventos de calendário, agendar notificações e executar comandos arbitrários não está conectado ao roteador conversacional.
+
+## Validação obrigatória
+
+O CI valida compilação e testes automatizados, mas não comprova a instalação do Termux, as permissões de execução externa, a presença de cada aplicativo ou a experiência de voz no aparelho. Esses itens devem ser registrados no RBI de validação física antes do fechamento do núcleo.
