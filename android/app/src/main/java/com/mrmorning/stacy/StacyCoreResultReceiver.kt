@@ -30,7 +30,10 @@ class StacyCoreResultReceiver : BroadcastReceiver() {
                 return
             }
             StacyCoreBridge.complete(executionId)
-            CoreResultStore.publish(context, CoreResult(tipo, response, exitCode, stderr))
+            CoreResultStore.publish(
+                context,
+                CoreResult(tipo, response, exitCode, stderr, json.optJSONObject("acao_android")),
+            )
         } catch (_: Exception) {
             StacyCoreBridge.fail(executionId, "A STACY recebeu uma resposta inválida do CORE.")
         }
