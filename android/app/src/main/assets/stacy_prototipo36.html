@@ -890,6 +890,9 @@ requestAnimationFrame(animate);
   window.stacyNativeState=function(name){
     const key=String(name||'').toLowerCase();
     setState(stateMap[key]||key||'online');
+    if(['pensando','ouvindo','pesquisando','executando','thinking','listening','researching','executing'].includes(key)){
+      document.getElementById('app').classList.remove('has-response');
+    }
     const messageInput=document.getElementById('message');
     if(messageInput)messageInput.placeholder=key==='ouvindo'||key==='listening'?'Ouvindo…':'Digite ou fale...';
   };
@@ -968,7 +971,8 @@ requestAnimationFrame(animate);
     if(key==='compartilhar'){
       const response=document.getElementById('responseBubble');
       const text=response?response.textContent.trim():'';
-      if(window.Android && typeof Android.stacyShareText==='function' && text)Android.stacyShareText(text);
+      const hasResponse=document.getElementById('app').classList.contains('has-response');
+      if(window.Android && typeof Android.stacyShareText==='function' && text && hasResponse)Android.stacyShareText(text);
       else window.stacyNativeResponse('Não há resposta disponível para compartilhar.','erro');
       return;
     }
