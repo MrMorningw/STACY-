@@ -5,7 +5,7 @@ Não executa código arbitrário, shell, nem alterações no próprio núcleo.
 """
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, Iterable, Mapping, Optional
+from typing import Any, Callable, Iterable, Mapping, Optional
 
 VERSAO_PLANO = 1
 MAX_ETAPAS = 8
@@ -61,8 +61,6 @@ FERRAMENTAS = {
     },
 }
 
-RISCOS_VALIDOS = {RISCO_BAIXO, RISCO_MEDIO, RISCO_ALTO, RISCO_CRITICO}
-
 
 def _erro(codigo: str, detalhe: str = "") -> dict:
     resultado = {"status": "invalido", "executar": False, "motivo": codigo}
@@ -101,7 +99,7 @@ def validar_plano(plano: Any) -> dict:
         if etapa_id in ids:
             return _erro("id_de_etapa_duplicado", etapa_id)
         ids.add(etapa_id)
-        if ferramenta not in FERRAMENTAS:
+        if not isinstance(ferramenta, str) or ferramenta not in FERRAMENTAS:
             return _erro("ferramenta_nao_autorizada", str(ferramenta))
         if not isinstance(argumentos, dict) or len(argumentos) > MAX_ARGUMENTOS:
             return _erro("argumentos_invalidos", etapa_id)
@@ -137,10 +135,9 @@ def avaliar_plano(plano: Any, modo: str = MODO_ASSISTIDO) -> dict:
         etapa["id"] for etapa in validacao["etapas"]
         if etapa["risco"] != RISCO_BAIXO
     ]
-    if modo == MODO_ASSISTIDO:
-        # No modo assistido, qualquer efeito além de leitura/diagnóstico exige
-        # aprovação específica, mesmo que o risco seja classificado como médio.
-        pass
+    # Ambos os modos mantêm a mesma política conservadora nesta fase inicial;
+    # perfis de rotina pré-aprovada serão adicionados apenas com configuração
+    # confiável, separada dos planos produzidos pela IA.
 
     return {
         "status": "aguardando_confirmacao" if exige_confirmacao else "pronto",
