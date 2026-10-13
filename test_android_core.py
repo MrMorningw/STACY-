@@ -107,6 +107,26 @@ class AndroidCoreEntryPointTests(unittest.TestCase):
             self.assertEqual(payload["acao_android"], {"acao": "abrir_configuracoes"})
             self.assertNotIn("acao_android", payload["resposta"])
 
+    def test_research_sources_are_forwarded_only_with_https_urls(self):
+        with tempfile.TemporaryDirectory() as state_dir:
+            exit_code, stdout, _ = self._run(
+                "pesquise",
+                state_dir,
+                result={
+                    "tipo": "pesquisa",
+                    "resposta": "Resultado verificado.",
+                    "fontes": [
+                        {"titulo": "Fonte segura", "url": "https://example.com/source"},
+                        {"titulo": "Fonte insegura", "url": "javascript:alert(1)"},
+                    ],
+                },
+            )
+            payload = json.loads(stdout)
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(payload["fontes"], [
+                {"titulo": "Fonte segura", "url": "https://example.com/source"}
+            ])
+
     def test_api_key_environment_takes_precedence_over_private_file(self):
         with tempfile.TemporaryDirectory() as state_dir:
             Path(state_dir, "secrets.json").write_text(
