@@ -9,6 +9,7 @@ import fcntl
 import json
 import os
 from pathlib import Path
+import sys
 import time
 
 
@@ -59,22 +60,26 @@ def load_api_key():
     if not path.exists():
         return None
     if path.is_symlink():
-        raise ValueError("The private API-key file must not be a symbolic link.")
+        print("[STACY] O arquivo privado da chave não pode ser um link simbólico; recursos externos ficarão indisponíveis.", file=sys.stderr)
+        return None
 
     try:
         os.chmod(path, 0o600)
         with path.open("r", encoding="utf-8") as file:
             data = json.load(file)
-    except (OSError, UnicodeError, json.JSONDecodeError) as error:
-        raise ValueError("The private API-key file could not be read.") from error
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        print("[STACY] Não foi possível ler a configuração privada da chave; recursos locais continuarão disponíveis.", file=sys.stderr)
+        return None
 
     if not isinstance(data, dict):
-        raise ValueError("The private API-key file has an invalid format.")
+        print("[STACY] A configuração privada da chave tem formato inválido; recursos locais continuarão disponíveis.", file=sys.stderr)
+        return None
     key = data.get("GEMINI_API_KEY", data.get("gemini_api_key", ""))
     if key is None:
         return None
     if not isinstance(key, str):
-        raise ValueError("The Gemini API key must be a string.")
+        print("[STACY] A chave Gemini precisa ser texto; recursos locais continuarão disponíveis.", file=sys.stderr)
+        return None
     return key.strip() or None
 
 
@@ -123,6 +128,10 @@ def restore_session(orchestrator):
         orchestrator.ultima_decisao = last_decision
         orchestrator.entidade_contextual = entity_context
         for field, value in conversation_state.items():
+            # Keep the implementation's bounded history limit; never trust a
+            # persisted file to enlarge it.
+            if field == "limite":
+                continue
             setattr(orchestrator.conversa, field, value)
         orchestrator.conversa.historico = conversation_history[-orchestrator.conversa.limite:]
         return None
