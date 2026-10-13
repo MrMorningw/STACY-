@@ -746,10 +746,10 @@ document.getElementById("mic").onclick=()=>{
    window.stacyNativeState && window.stacyNativeState("erro");
  }
 };
-function appendStacyChatMessage(text,role,extraClass){
+function appendStacyChatMessage(text,role,extraClass,showConversation){
  const log=document.getElementById("stacyChatLog");
  if(!log)return null;
- document.getElementById("app").classList.add("chat-active");
+ if(showConversation)document.getElementById("app").classList.add("chat-active");
  const row=document.createElement("div");
  row.className="stacy-chat-row "+role+(extraClass?" "+extraClass:"");
  const bubble=document.createElement("div");
@@ -758,9 +758,29 @@ function appendStacyChatMessage(text,role,extraClass){
  row.appendChild(bubble);log.appendChild(row);log.scrollTop=log.scrollHeight;
  return row;
 }
+let stacyPhaseTimers=[];
+let stacyRequestActive=false;
+function clearStacyPhaseTimers(){
+ stacyPhaseTimers.forEach(id=>clearTimeout(id));stacyPhaseTimers=[];
+}
+function startStacyProcessingStages(message){
+ clearStacyPhaseTimers();stacyRequestActive=true;
+ window.stacyNativeState&&window.stacyNativeState("pensando");
+ const text=String(message||"").toLowerCase();
+ const likelyQuestion=/[?]|\\b(quem|qual|quais|quando|onde|como|por que|porque|quanto|pesquise|pesquisar|procure|busque|explique|resuma|compare)\\b/.test(text);
+ const stages=likelyQuestion?["pesquisando"]:["executando"];
+ stages.forEach((stage,index)=>{
+   stacyPhaseTimers.push(setTimeout(()=>{
+     if(stacyRequestActive)window.stacyNativeState&&window.stacyNativeState(stage);
+   },(index+1)*1200));
+ });
+}
 window.stacyChatSetPending=function(){
  const old=document.getElementById("stacyPendingReply");if(old)old.remove();
- const row=appendStacyChatMessage("Processando sua solicitação…","assistant","pending");
+ // Keep the home/orb screen visible on the first request. Once chat is open,
+ // subsequent requests show the animated three-dot bubble in the existing chat.
+ const chatIsOpen=document.getElementById("app").classList.contains("chat-active");
+ const row=appendStacyChatMessage("","assistant","pending",chatIsOpen);
  if(row)row.id="stacyPendingReply";
 };
 function sendComposerMessage(){
@@ -770,9 +790,10 @@ function sendComposerMessage(){
  if(selectedAttachmentNames.length)text+="\n\n[Anexos selecionados no dispositivo: "+selectedAttachmentNames.join(", ")+". O conteúdo dos arquivos não foi transmitido ao CORE nesta versão.]";
  if(window.Android && typeof Android.stacySend==="function"){
    message.value="";selectedAttachmentNames=[];updateAttachmentChip();closeQuickActions();document.getElementById("app").classList.remove("has-response");
-   appendStacyChatMessage(text,"user");
+   const chatIsOpen=document.getElementById("app").classList.contains("chat-active");
+   appendStacyChatMessage(text,"user","",chatIsOpen);
    window.stacyChatSetPending();
-   window.stacyNativeState && window.stacyNativeState("pensando");
+   startStacyProcessingStages(text);
    Android.stacySend(text);
  }else{
    window.stacyNativeResponse && window.stacyNativeResponse("A ponte nativa da STACY não está disponível.","erro");
@@ -989,6 +1010,7 @@ animationFrameId=requestAnimationFrame(animate);
     const pendingNow=document.getElementById('stacyPendingReply');
     if(key==='online' && pendingNow)return;
     if(['erro','error','offline'].includes(key)){
+      stacyRequestActive=false;clearStacyPhaseTimers();
       const pending=document.getElementById('stacyPendingReply');
       if(pending){pending.querySelector('.stacy-chat-bubble').textContent='Não foi possível concluir. Verifique o CORE/Termux ou tente novamente.';pending.classList.remove('pending');pending.id='';}
     }
@@ -1006,9 +1028,11 @@ animationFrameId=requestAnimationFrame(animate);
     const bubble=document.getElementById('responseBubble');
     if(bubble)bubble.textContent=text;
     document.getElementById('app').classList.add('has-response');
+    stacyRequestActive=false;clearStacyPhaseTimers();
     const pending=document.getElementById('stacyPendingReply');
     const log=document.getElementById('stacyChatLog');
     if(pending && log){
+      document.getElementById('app').classList.add('chat-active');
       const answer=pending.querySelector('.stacy-chat-bubble');
       if(answer)answer.textContent=text;
       pending.classList.remove('pending');pending.id='';pending.classList.add('assistant');
