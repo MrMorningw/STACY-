@@ -113,6 +113,32 @@ class AnpesTests(unittest.TestCase):
         self.assertEqual(result["resultados"][0]["motivo"], "falha_interna_do_executor")
         self.assertEqual(events[-1]["estado"], "falhou")
 
+    def test_core_intention_keeps_existing_authorized_contract(self):
+        result = anpes.avaliar_intencao({
+            "tipo": "tarefa",
+            "acao": "criar",
+            "origem": anpes.ORIGEM_CORE,
+        })
+        self.assertEqual(result["status"], anpes.STATUS_AUTORIZADA)
+        self.assertTrue(result["executar"])
+
+    def test_ai_intention_is_blocked_until_explicit_command(self):
+        result = anpes.avaliar_intencao({
+            "tipo": "memoria",
+            "acao": "memorizar",
+            "origem": anpes.ORIGEM_IA,
+        })
+        self.assertEqual(result["status"], anpes.STATUS_CONFIRMAR)
+        self.assertFalse(result["executar"])
+
+    def test_unknown_intention_origin_is_rejected(self):
+        result = anpes.avaliar_intencao({
+            "tipo": "tarefa",
+            "origem": "unknown",
+        })
+        self.assertEqual(result["status"], anpes.STATUS_INVALIDA)
+        self.assertFalse(result["executar"])
+
     def test_invalid_mode_is_rejected(self):
         result = anpes.avaliar_plano(plano(), modo="autonomia_total")
         self.assertEqual(result["status"], "invalido")
