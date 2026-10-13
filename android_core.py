@@ -31,6 +31,7 @@ def main(argv=None):
             from orchestrator import StacyOrchestrator
             from android_session import (
                 exclusive_session_lock,
+                load_api_key,
                 persist_session,
                 restore_session,
             )
@@ -39,7 +40,7 @@ def main(argv=None):
                 memoria = memory.carregar_memoria()
                 entidades = entity_store.carregar_entidades()
                 orchestrator = StacyOrchestrator(
-                    api_key=os.environ.get("GEMINI_API_KEY"),
+                    api_key=load_api_key(),
                     memoria=memoria,
                     entidades=entidades,
                 )
