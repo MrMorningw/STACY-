@@ -76,13 +76,16 @@ class MainActivity : ComponentActivity() {
         CoreResultStore.subscribe { result ->
             runOnUiThread {
                 if (result.response.isNotBlank()) {
+                    // Keep the ViewModel and the visible WebView in sync with the same CORE result.
+                    vm.onCoreResponse(result)
                     if (voiceEnabled) textToSpeech.speak(result.response)
                     webResponse(result.response, result.tipo)
                 } else if (result.exitCode != 0) {
-                    webResponse(
-                        result.stderr.ifBlank { "O CORE encerrou a execução com erro." },
-                        "erro",
-                    )
+                    val error = result.stderr.ifBlank {
+                        "O CORE encerrou a execução com erro."
+                    }
+                    vm.onCoreError(error)
+                    webResponse(error, "erro")
                 }
             }
         }
