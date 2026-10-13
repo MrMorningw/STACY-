@@ -62,6 +62,35 @@ FERRAMENTAS = {
 }
 
 
+
+# Contrato compatível com o gate de autonomia que o CORE já utiliza.
+# Mantém a política histórica: intenções extraídas pela IA não executam
+# diretamente; comandos determinísticos do CORE seguem pelo fluxo existente.
+ORIGEM_CORE = "core"
+ORIGEM_IA = "ia"
+STATUS_AUTORIZADA = "autorizada"
+STATUS_CONFIRMAR = "confirmar"
+STATUS_INVALIDA = "invalida"
+
+
+def avaliar_intencao(intencao: Any) -> dict:
+    """Avalia uma intenção do CORE usando o gate central do ANPES."""
+    if not isinstance(intencao, dict):
+        return {"status": STATUS_INVALIDA, "executar": False, "motivo": "intencao_invalida"}
+
+    tipo = intencao.get("tipo")
+    if tipo not in {"tarefa", "memoria"}:
+        return {"status": STATUS_INVALIDA, "executar": False, "motivo": "tipo_nao_executavel"}
+
+    origem = intencao.get("origem", ORIGEM_CORE)
+    if origem == ORIGEM_IA:
+        return {"status": STATUS_CONFIRMAR, "executar": False, "motivo": "acao_originada_por_ia_requer_confirmacao"}
+    if origem != ORIGEM_CORE:
+        return {"status": STATUS_INVALIDA, "executar": False, "motivo": "origem_nao_autorizada"}
+
+    return {"status": STATUS_AUTORIZADA, "executar": True, "motivo": "acao_deterministica_do_core"}
+
+
 def _erro(codigo: str, detalhe: str = "") -> dict:
     resultado = {"status": "invalido", "executar": False, "motivo": codigo}
     if detalhe:
