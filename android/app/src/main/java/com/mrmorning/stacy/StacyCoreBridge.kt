@@ -64,8 +64,13 @@ class StacyCoreBridge(private val context: Context) {
             val callback = Intent(context, StacyCoreResultReceiver::class.java).apply {
                 putExtra(StacyCoreResultReceiver.EXTRA_EXECUTION_ID, executionId)
             }
-            val flags = PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_UPDATE_CURRENT or
-                if (android.os.Build.VERSION.SDK_INT >= 23) PendingIntent.FLAG_IMMUTABLE else 0
+            // Termux must be able to attach its result bundle to this PendingIntent.
+            // An immutable token can launch the command but prevents delivery of the callback data
+            // on modern Android, leaving the UI stuck in THINKING until timeout.
+            val resultMutability =
+                if (android.os.Build.VERSION.SDK_INT >= 31) PendingIntent.FLAG_MUTABLE else 0
+            val flags = PendingIntent.FLAG_ONE_SHOT or
+                PendingIntent.FLAG_UPDATE_CURRENT or resultMutability
             val pendingIntent = PendingIntent.getBroadcast(context, executionId, callback, flags)
             val command = """
                 ROOT="${'$'}HOME/stacy"

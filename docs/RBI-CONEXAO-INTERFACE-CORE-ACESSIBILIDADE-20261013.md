@@ -74,3 +74,11 @@ Após atualizar, executar a matriz de testes no aparelho:
 - **Limite de anexos nesta etapa:** o CORE ainda recebe texto pela ponte atual; os bytes dos arquivos não são transmitidos ao núcleo. A interface informa isso para não sugerir análise de imagem/documento que ainda não existe.
 - Adicionadas as seções laterais **Ferramentas** e **Permissões**. Ferramentas reúne calendário, configurações, compartilhamento e verificação do CORE; Permissões direciona ao painel real de permissões do Android.
 - Próximo requisito técnico: implementar transporte de anexos seguro até o CORE e validar no dispositivo. Não declarar essa parte concluída antes do teste.
+
+
+## 7. Correção prioritária do retorno do CORE — 13/10/2026
+
+- **Causa provável do estado “pensando” sem resposta:** o `PendingIntent` entregue ao Termux estava marcado como `FLAG_IMMUTABLE`. O serviço do Termux precisa anexar o bundle de resultado ao callback; em Android moderno, a imutabilidade pode impedir a entrega dos dados de retorno, deixando a interface sem resposta até o timeout.
+- **Correção:** o callback agora usa `FLAG_MUTABLE` a partir do Android 12 (API 31), mantendo `FLAG_ONE_SHOT` e `FLAG_UPDATE_CURRENT`. Em versões anteriores, usa apenas os flags compatíveis.
+- **Próxima versão:** `0.1.9`, `versionCode 10`.
+- **Validação obrigatória:** compilar, executar os testes e confirmar publicação assinada; depois testar no aparelho o ciclo comando → Termux/Python → broadcast com JSON → resposta na interface. A causa é tecnicamente plausível e a correção foi aplicada, mas o teste físico ainda é necessário para confirmar a causa no dispositivo.
