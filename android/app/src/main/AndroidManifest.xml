@@ -52,6 +52,11 @@
             android:name=".StacyCoreResultReceiver"
             android:exported="false" />
 
+        <!-- Receives visual-only phase signals from the Termux CORE process. -->
+        <receiver
+            android:name=".StacyCorePhaseReceiver"
+            android:exported="true" />
+
         <service
             android:name=".StacyVoiceInteractionService"
             android:exported="true"
