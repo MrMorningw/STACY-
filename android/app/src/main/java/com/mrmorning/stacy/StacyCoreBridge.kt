@@ -36,16 +36,17 @@ class StacyCoreBridge(private val context: Context) {
     }
 
     private fun startNext() {
-        val request: Request
-        val executionId: Int
-        synchronized(queue) {
+        val next = synchronized(queue) {
             if (activeExecutionId != null || queue.isEmpty()) return
-            request = queue.removeFirst()
-            executionId = NEXT_ID.getAndIncrement()
+            val request = queue.removeFirst()
+            val executionId = NEXT_ID.getAndIncrement()
             activeExecutionId = executionId
             callbacks[executionId] = request.onError
             activeBridges[executionId] = this
+            request to executionId
         }
+        val request = next.first
+        val executionId = next.second
 
         try {
             val callback = Intent(context, StacyCoreResultReceiver::class.java).apply {
