@@ -23,7 +23,22 @@ A interface Android conversa com o STACY CORE Python por meio do serviço de com
    python -m pip install -r requirements.txt
    ```
 
-6. Abra a STACY e envie uma mensagem simples. Se o núcleo ou uma dependência estiver ausente, a ponte Android deve devolver uma mensagem de diagnóstico.
+6. Para habilitar os recursos que usam Gemini, crie `~/.stacy/secrets.json` no Termux com o conteúdo abaixo, substituindo o valor pela sua chave privada:
+
+   ```json
+   {"GEMINI_API_KEY":"SUA_CHAVE_PRIVADA"}
+   ```
+
+   Restrinja as permissões do arquivo e da pasta:
+
+   ```bash
+   chmod 700 ~/.stacy
+   chmod 600 ~/.stacy/secrets.json
+   ```
+
+   A STACY também aceita a variável de ambiente `GEMINI_API_KEY`, que tem precedência sobre o arquivo. Nunca coloque a chave no repositório, no APK, em capturas de tela ou em mensagens.
+
+7. Abra a STACY e envie uma mensagem simples. Se o núcleo ou uma dependência estiver ausente, a ponte Android deve devolver uma mensagem de diagnóstico.
 
 A chave `GEMINI_API_KEY` é opcional para os fluxos locais; funcionalidades que dependem da API de IA precisam da chave configurada no ambiente do Termux. Nunca a publique no repositório.
 
