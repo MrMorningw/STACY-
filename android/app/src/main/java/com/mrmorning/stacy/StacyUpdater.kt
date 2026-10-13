@@ -35,19 +35,46 @@ class StacyUpdater(
             try {
                 val release = fetchLatestRelease()
                 val asset = findApkAsset(release)
-                    ?: throw IllegalStateException("A versão publicada não possui um APK STACY.")
-                asset.put("signingCertificateSha256", release.optString("signingCertificateSha256", ""))
+                    ?: throw IllegalStateException("Canal inválido: nenhum APK STACY foi publicado.")
+                val publishedCode = release.optInt("versionCode", -1)
                 val assetVersionCode = asset.optInt("version_code", -1)
-                val currentVersionCode = currentVersionCode()
+                val publishedName = release.optString("versionName", "").trim()
+                val packageName = release.optString("packageName", "").trim()
+                val publishedDigest = release.optString("sha256", "").trim().lowercase()
+                val assetDigest = asset.optString("digest", "").removePrefix("sha256:").trim().lowercase()
+                val certificate = release.optString("signingCertificateSha256", "").replace(":", "").trim().lowercase()
 
-                if (assetVersionCode > 0 && assetVersionCode <= currentVersionCode) {
-                    onState("A STACY já está atualizada.")
+                if (publishedCode <= 0 || assetVersionCode != publishedCode) {
+                    throw IllegalStateException("Canal inconsistente: versionCode do manifesto e do APK não coincidem.")
+                }
+                if (publishedName.isBlank() || packageName != context.packageName) {
+                    throw IllegalStateException("Canal inválido: identidade ou versão do pacote não corresponde à STACY.")
+                }
+                if (!publishedDigest.matches(Regex("[a-f0-9]{64}")) || publishedDigest != assetDigest) {
+                    throw IllegalStateException("Canal inválido: SHA-256 do manifesto e do APK não coincidem.")
+                }
+                if (!certificate.matches(Regex("[a-f0-9]{64}"))) {
+                    throw IllegalStateException("Canal inválido: certificado oficial não foi publicado corretamente.")
+                }
+                asset.put("signingCertificateSha256", certificate)
+                val currentCode = currentVersionCode()
+                val currentName = currentVersionName()
+
+                if (publishedCode == currentCode && publishedName == currentName) {
+                    onState("Verificação concluída: instalada $currentName (código $currentCode); canal oficial $publishedName (código $publishedCode). Não há versão mais nova publicada.")
                     return@execute
                 }
+                if (publishedCode < currentCode) {
+                    throw IllegalStateException("Canal desatualizado: instalada $currentName (código $currentCode), mas o canal publica $publishedName (código $publishedCode). Não é seguro afirmar que a STACY está atualizada.")
+                }
+                if (publishedCode == currentCode && publishedName != currentName) {
+                    throw IllegalStateException("Canal inconsistente: o código instalado coincide, mas o nome da versão difere (instalada $currentName; publicada $publishedName).")
+                }
 
+                onState("Nova versão confirmada: $currentName → $publishedName. Baixando e validando pacote…")
                 val file = downloadApk(asset)
-                validateApk(file, asset, assetVersionCode, currentVersionCode)
-                onState("Atualização pronta. Abrindo o instalador…")
+                validateApk(file, asset, assetVersionCode, currentCode)
+                onState("Integridade e assinatura confirmadas para $publishedName. Abrindo instalador do Android…")
                 installApk(file)
             } catch (e: Exception) {
                 onState("Atualização indisponível: ${friendlyError(e)}")
@@ -212,15 +239,22 @@ class StacyUpdater(
         })
     }
 
-    private fun currentVersionCode(): Long =
+    private fun currentVersionCode(): Long = installedPackageInfo().let { info ->
+        if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else info.versionCode.toLong()
+    }
+
+    private fun currentVersionName(): String =
+        installedPackageInfo().versionName?.takeIf { it.isNotBlank() } ?: "desconhecida"
+
+    private fun installedPackageInfo() =
         if (Build.VERSION.SDK_INT >= 33) {
             context.packageManager.getPackageInfo(
                 context.packageName,
                 PackageManager.PackageInfoFlags.of(0),
-            ).longVersionCode
+            )
         } else {
             @Suppress("DEPRECATION")
-            context.packageManager.getPackageInfo(context.packageName, 0).versionCode.toLong()
+            context.packageManager.getPackageInfo(context.packageName, 0)
         }
 
     private fun sha256(file: File): String {
