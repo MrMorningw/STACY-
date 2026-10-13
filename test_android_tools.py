@@ -29,7 +29,7 @@ class AndroidActionParserTests(unittest.TestCase):
     def test_share_requires_explicit_colon_and_keeps_text(self):
         self.assertEqual(
             detectar_acao_android("Compartilhe: Olá, tudo bem?"),
-            {"acao": "compartilhar_texto", "texto": "olá, tudo bem"},
+            {"acao": "compartilhar_texto", "texto": "Olá, tudo bem?"},
         )
         self.assertIsNone(detectar_acao_android("Quais aplicativos posso compartilhar?"))
 
