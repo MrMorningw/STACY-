@@ -118,6 +118,15 @@ class AnpesTests(unittest.TestCase):
         self.assertEqual(result["status"], "invalido")
         self.assertEqual(result["motivo"], "modo_de_autonomia_invalido")
 
+    def test_non_string_tool_identifier_is_rejected_without_crashing(self):
+        result = anpes.validar_plano(plano([{
+            "id": "bad-tool",
+            "ferramenta": [],
+            "argumentos": {},
+        }]))
+        self.assertEqual(result["status"], "invalido")
+        self.assertEqual(result["motivo"], "ferramenta_nao_autorizada")
+
     def test_invalid_plan_is_rejected(self):
         self.assertEqual(anpes.validar_plano(None)["status"], "invalido")
 
