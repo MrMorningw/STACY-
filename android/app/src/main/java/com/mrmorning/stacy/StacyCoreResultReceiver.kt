@@ -29,6 +29,7 @@ class StacyCoreResultReceiver : BroadcastReceiver() {
                 StacyCoreBridge.fail(executionId, "O CORE concluiu sem retornar uma resposta.")
                 return
             }
+            StacyCoreBridge.complete(executionId)
             CoreResultStore.publish(context, CoreResult(tipo, response, exitCode, stderr))
         } catch (_: Exception) {
             StacyCoreBridge.fail(executionId, "A STACY recebeu uma resposta inválida do CORE.")
