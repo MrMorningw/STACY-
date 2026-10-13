@@ -303,8 +303,10 @@ class StacyOrchestrator:
         self,
         api_key,
         memoria,
-        entidades
+        entidades,
+        phase_callback=None,
     ):
+        self.phase_callback = phase_callback
         self.api_key = api_key
         self.memoria = memoria
         self.entidades = entidades
@@ -318,6 +320,15 @@ class StacyOrchestrator:
                 self.entidades
             )
         )
+
+    def _emit_phase(self, state):
+        callback = self.phase_callback
+        if callback is not None:
+            try:
+                callback(state)
+            except Exception:
+                # UI telemetry must never break a CORE request.
+                pass
 
     def processar(self, mensagem):
         resultado = self._processar_interno(mensagem)
@@ -998,6 +1009,9 @@ class StacyOrchestrator:
             }
 
         if rota == ROTA_PESQUISA_EXTERNA:
+            # Signal the UI only after the CORE router has actually selected
+            # external research, never by guessing from the user's wording.
+            self._emit_phase("pesquisando")
             # O histórico já carrega a consulta anterior; a ferramenta deve
             # receber a mensagem atual intacta para preservar a continuidade
             # sem reescrever a fala do usuário.
@@ -1170,6 +1184,7 @@ class StacyOrchestrator:
                     "argumentos": {"intencao": intencao},
                 }],
             }
+            self._emit_phase("executando")
             execucao_anpes = self._executar_plano_anpes(
                 plano_intencao,
                 etapas_aprovadas={"intencao-core"},
