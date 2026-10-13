@@ -113,6 +113,14 @@ class AnpesTests(unittest.TestCase):
         self.assertEqual(result["resultados"][0]["motivo"], "falha_interna_do_executor")
         self.assertEqual(events[-1]["estado"], "falhou")
 
+    def test_status_reports_actual_integration_limits(self):
+        status = anpes.estado()
+        self.assertEqual(status["politica_autonomia"], "integrada_ao_core")
+        self.assertTrue(status["simulacao_padrao"])
+        self.assertEqual(status["execucao_por_ferramentas"], "requer_executores_registrados")
+        self.assertFalse(status["auto_modificacao"])
+        self.assertFalse(status["apk_autossuficiente"])
+
     def test_core_intention_keeps_existing_authorized_contract(self):
         result = anpes.avaliar_intencao({
             "tipo": "tarefa",
