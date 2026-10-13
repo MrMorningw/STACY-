@@ -705,8 +705,9 @@ function resize(){
 }
 addEventListener("resize",resize);resize();
 
-let last=performance.now(),time=0;
+let last=performance.now(),time=0,animationFrameId=null,animationsEnabled=true;
 function animate(now){
+ if(!animationsEnabled){animationFrameId=null;return;}
  const dt=Math.min(.05,(now-last)/1000);last=now;time+=dt;
  phaseClock+=dt;
  if(state==='pesquisando'||state==='executando'){
@@ -756,10 +757,15 @@ function animate(now){
  em.opacity=.24+current.energy*.28;
 
  renderer.render(scene,camera);
- requestAnimationFrame(animate);
+ animationFrameId=requestAnimationFrame(animate);
 }
+window.stacySetAnimationsEnabled=function(enabled){
+ animationsEnabled=Boolean(enabled);
+ if(animationsEnabled && animationFrameId===null){last=performance.now();animationFrameId=requestAnimationFrame(animate);}
+ else if(!animationsEnabled && animationFrameId!==null){cancelAnimationFrame(animationFrameId);animationFrameId=null;}
+};
 setState("online");
-requestAnimationFrame(animate);
+animationFrameId=requestAnimationFrame(animate);
 </script>
 
 <!-- STACY SIDEBAR -->
@@ -937,6 +943,7 @@ requestAnimationFrame(animate);
     if(key==='animacoes'){
       const disabled=!document.body.classList.contains('stacy-no-animations');
       document.body.classList.toggle('stacy-no-animations',disabled);
+      if(typeof window.stacySetAnimationsEnabled==='function')window.stacySetAnimationsEnabled(!disabled);
       const label=document.getElementById('animSetting');
       if(label)label.textContent=disabled?'DESATIVADAS':'ATIVAS';
       return;
