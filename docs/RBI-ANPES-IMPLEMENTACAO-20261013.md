@@ -2,6 +2,7 @@
 
 **Data:** 13/10/2026  
 **Branch de trabalho:** `stacy-anpes-core-20261013`  
+**Integração atual:** política de autonomia conectada ao `StacyOrchestrator` por meio do contrato compatível `autonomy.py`; consulta determinística de estado do ANPES adicionada.
 **Base:** commit `9c6bafe4cdd92c0a3e1639a40ac83e7b3caf18bd` da branch de integração Android ↔ CORE.  
 **Objetivo:** evoluir a STACY para uma assistente pessoal capaz de planejar, executar, testar e verificar tarefas autorizadas, preservando o CORE, os MPEFs e a identidade visual existentes.
 
@@ -21,7 +22,7 @@ A IA pode sugerir um plano, mas não pode autorizar a si mesma nem transformar t
 
 ## 3. Limites desta entrega
 
-Esta etapa é uma base testável de política e planejamento. **Ainda não conecta ANPES ao `StacyOrchestrator`, à ponte Kotlin ou aos executores reais do Android.** Os nomes de ferramenta no catálogo representam capacidades permitidas para futura integração, não prova de que todas já estejam operacionais. A execução real só acontece quando o runtime fornece handlers explicitamente.
+A política de autorização do ANPES já está conectada ao caminho existente do `StacyOrchestrator`: `orchestrator.py` chama `autonomy.avaliar_execucao`, e `autonomy.py` delega ao ANPES preservando o contrato anterior. O comando determinístico `status do ANPES` também expõe o estado real. **A execução genérica de planos ainda não está ligada à ponte Kotlin nem a executores reais do Android.** Os nomes de ferramenta no catálogo representam capacidades permitidas para futura integração, não prova de que todas já estejam operacionais. A execução de plano só acontece quando o runtime fornece handlers explicitamente.
 
 O teste automatizado não substitui compilação Android nem teste físico. A branch não deve ser mesclada nem o APK declarado final por causa desta entrega isolada.
 
@@ -35,10 +36,11 @@ O teste automatizado não substitui compilação Android nem teste físico. A br
 - [ ] Executar a suíte completa Python e confirmar CI no commit desta branch.
 
 ### Fase B — Integração com o CORE
-- [ ] Inspecionar e escolher o ponto único de entrada do `StacyOrchestrator`.
-- [ ] Encaminhar planos validados sem quebrar os caminhos atuais de conversa, memória, pesquisa e tarefas.
-- [ ] Ligar somente executores existentes, com contratos tipados e retorno real.
-- [ ] Testar regressão, ações pendentes, concorrência e recuperação de sessão.
+- [x] Inspecionar e escolher o ponto único do gate de autonomia existente.
+- [x] Delegar o gate histórico ao ANPES preservando o contrato público de `autonomy.py`.
+- [x] Adicionar consulta determinística de estado do ANPES ao `StacyOrchestrator`.
+- [ ] Ligar planos genéricos apenas a executores reais e explicitamente registrados.
+- [ ] Testar regressão, ações pendentes, concorrência e recuperação de sessão após a integração completa.
 
 ### Fase C — Painel Núcleo STACY
 - [ ] Mostrar estado real do CORE/ANPES, tarefas, aprovações, testes e histórico.
@@ -69,4 +71,4 @@ O teste automatizado não substitui compilação Android nem teste físico. A br
 
 ## 6. Estado atual
 
-**Em implementação — primeira camada isolada criada.** A CI desta nova branch ainda precisa ser verificada. Nenhuma afirmação de autonomia plena, integração Android concluída ou APK autossuficiente é feita neste relatório.
+**Em implementação — gate de autonomia integrado ao CORE e consulta de estado exposta.** A CI Python/regressão do commit `8283357dc27d0db6d3ed5bfca55d2d35881e6cff` concluiu com sucesso antes das alterações subsequentes; é necessária nova execução para validar a versão mais recente. Nenhuma afirmação de autonomia plena, integração Android concluída ou APK autossuficiente é feita neste relatório.
