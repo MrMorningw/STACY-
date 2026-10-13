@@ -222,6 +222,32 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+
+        @JavascriptInterface
+        fun stacyOpenAndroidSettings() {
+            runOnUiThread { reportAutomationOutcome(androidAutomation.openSettings(), "Configurações do Android abertas.") }
+        }
+
+        @JavascriptInterface
+        fun stacyOpenCalendar() {
+            runOnUiThread { reportAutomationOutcome(androidAutomation.openCalendar(), "Calendário do Android aberto.") }
+        }
+
+        @JavascriptInterface
+        fun stacyShareText(text: String) {
+            runOnUiThread { reportAutomationOutcome(androidAutomation.shareText(text, "Compartilhar pela STACY"), "Menu de compartilhamento aberto.") }
+        }
+    }
+
+    private fun reportAutomationOutcome(outcome: AutomationResult, successMessage: String) {
+        val message = when (outcome) {
+            is AutomationResult.Success -> successMessage
+            is AutomationResult.Failure -> outcome.message
+        }
+        if (outcome is AutomationResult.Success) vm.addAssistantMessage(message) else vm.onCoreError(message)
+        if (voiceEnabled) textToSpeech.speak(message)
+        webResponse(message, if (outcome is AutomationResult.Success) "resposta" else "erro")
+        webState(if (outcome is AutomationResult.Success) "online" else "erro")
     }
 
     private fun webState(state: String) {
