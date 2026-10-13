@@ -22,7 +22,7 @@ A IA pode sugerir um plano, mas não pode autorizar a si mesma nem transformar t
 
 ## 3. Limites desta entrega
 
-A política de autorização do ANPES já está conectada ao caminho existente do `StacyOrchestrator`: `orchestrator.py` chama `autonomy.avaliar_execucao`, e `autonomy.py` delega ao ANPES preservando o contrato anterior. O comando determinístico `status do ANPES` também expõe o estado real. **A execução genérica de planos ainda não está ligada à ponte Kotlin nem a executores reais do Android.** Os nomes de ferramenta no catálogo representam capacidades permitidas para futura integração, não prova de que todas já estejam operacionais. A execução de plano só acontece quando o runtime fornece handlers explicitamente.
+A política de autorização do ANPES está conectada ao caminho existente do `StacyOrchestrator`: `autonomy.py` delega ao ANPES preservando o contrato anterior. O orquestrador agora executa planos por um runtime restrito com dois handlers reais: diagnóstico de estado e delegação de intenções que já passaram pelo gate determinístico do CORE. As ações atuais de tarefas/memória passam pelo executor ANPES sem substituir os handlers funcionais existentes. **As ferramentas genéricas de Android, alteração de código, testes acionados pelo app e auto-modificação não estão registradas como executores operacionais.** A integração continua dependente do Termux e precisa de validação no aparelho.
 
 O teste automatizado não substitui compilação Android nem teste físico. A branch não deve ser mesclada nem o APK declarado final por causa desta entrega isolada.
 
@@ -39,8 +39,11 @@ O teste automatizado não substitui compilação Android nem teste físico. A br
 - [x] Inspecionar e escolher o ponto único do gate de autonomia existente.
 - [x] Delegar o gate histórico ao ANPES preservando o contrato público de `autonomy.py`.
 - [x] Adicionar consulta determinística de estado do ANPES ao `StacyOrchestrator`.
-- [ ] Ligar planos genéricos apenas a executores reais e explicitamente registrados.
-- [ ] Testar regressão, ações pendentes, concorrência e recuperação de sessão após a integração completa.
+- [x] Registrar executores restritos para diagnóstico e intenções autorizadas pelo CORE.
+- [x] Encaminhar intenções de tarefa/memória pelo executor ANPES, preservando handlers legados e respostas.
+- [x] Adicionar testes de integração do runtime ANPES.
+- [ ] Ligar ferramentas genéricas Android e outras capacidades uma a uma.
+- [ ] Testar regressão, ações pendentes, concorrência e recuperação de sessão no aparelho.
 
 ### Fase C — Painel Núcleo STACY
 - [ ] Mostrar estado real do CORE/ANPES, tarefas, aprovações, testes e histórico.
@@ -71,4 +74,4 @@ O teste automatizado não substitui compilação Android nem teste físico. A br
 
 ## 6. Estado atual
 
-**Em implementação — gate de autonomia integrado ao CORE e consulta de estado exposta.** A CI Python/regressão do commit `8283357dc27d0db6d3ed5bfca55d2d35881e6cff` concluiu com sucesso antes das alterações subsequentes; é necessária nova execução para validar a versão mais recente. Nenhuma afirmação de autonomia plena, integração Android concluída ou APK autossuficiente é feita neste relatório.
+**Em implementação — runtime restrito integrado ao CORE.** O gate, a consulta de estado e a execução de intenções autorizadas usam o ANPES; a CI desta atualização ainda precisa ser executada. Nenhuma afirmação de autonomia plena, integração Android concluída ou APK autossuficiente é feita neste relatório.
