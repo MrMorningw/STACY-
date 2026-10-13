@@ -10,6 +10,12 @@
 
     <queries>
         <package android:name="com.termux" />
+        <package android:name="com.whatsapp" />
+        <package android:name="com.google.android.youtube" />
+        <package android:name="com.android.chrome" />
+        <package android:name="com.google.android.gm" />
+        <package android:name="com.spotify.music" />
+        <package android:name="com.google.android.apps.maps" />
         <intent>
             <action android:name="android.speech.RecognitionService" />
         </intent>

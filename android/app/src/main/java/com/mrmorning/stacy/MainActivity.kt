@@ -17,6 +17,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var voiceInput: AndroidVoiceInput
     private lateinit var coreBridge: StacyCoreBridge
     private lateinit var textToSpeech: AndroidTextToSpeech
+    private lateinit var androidAutomation: StacyAndroidAutomation
     private lateinit var webView: WebView
     private lateinit var vm: StacyViewModel
     private var voiceEnabled = true
@@ -34,6 +35,7 @@ class MainActivity : ComponentActivity() {
 
         vm = ViewModelProvider(this)[StacyViewModel::class.java]
         coreBridge = StacyCoreBridge(this)
+        androidAutomation = AndroidAutomation(this)
         textToSpeech = AndroidTextToSpeech(this)
         updater = StacyUpdater(this) { status ->
             runOnUiThread { webUpdateStatus(status) }
@@ -68,6 +70,7 @@ class MainActivity : ComponentActivity() {
                     runOnUiThread {
                         vm.onCoreError(error)
                         webResponse(error, "erro")
+                        webState("erro")
                     }
                 },
             )
@@ -75,14 +78,22 @@ class MainActivity : ComponentActivity() {
 
         CoreResultStore.subscribe { result ->
             runOnUiThread {
-                if (result.response.isNotBlank()) {
+                val action = result.androidAction
+                if (action != null) {
+                    webState("executando")
+                    handleAndroidAction(action)
+                } else if (result.response.isNotBlank()) {
+                    vm.onCoreResponse(result)
                     if (voiceEnabled) textToSpeech.speak(result.response)
-                    webResponse(result.response, result.tipo)
+                    webResponse(formatResponseWithSources(result), result.tipo)
+                    webState(if (result.tipo == "erro") "erro" else "online")
                 } else if (result.exitCode != 0) {
-                    webResponse(
-                        result.stderr.ifBlank { "O CORE encerrou a execução com erro." },
-                        "erro",
-                    )
+                    val error = result.stderr.ifBlank {
+                        "O CORE encerrou a execução com erro."
+                    }
+                    vm.onCoreError(error)
+                    webResponse(error, "erro")
+                    webState("erro")
                 }
             }
         }
@@ -98,6 +109,76 @@ class MainActivity : ComponentActivity() {
             loadUrl("file:///android_asset/stacy_prototipo36.html")
         }
         setContentView(webView)
+    }
+
+    private fun formatResponseWithSources(result: CoreResult): String {
+        val sources = result.fontes ?: return result.response
+        val lines = (0 until sources.length()).mapNotNull { index ->
+            val source = sources.optJSONObject(index) ?: return@mapNotNull null
+            val title = source.optString("titulo", "Fonte").take(180)
+            val url = source.optString("url")
+            if (!url.startsWith("https://")) null else "${title}\n$url"
+        }
+        return if (lines.isEmpty()) result.response
+        else result.response + "\n\nFontes consultadas:\n" + lines.joinToString("\n\n")
+    }
+
+    private fun handleAndroidAction(action: JSONObject) {
+        val operation = action.optString("acao")
+        val outcome = when (operation) {
+            "abrir_configuracoes" -> androidAutomation.openSettings()
+            "abrir_calendario" -> androidAutomation.openCalendar()
+            "abrir_aplicativo" -> {
+                val packageName = action.optString("pacote")
+                if (packageName !in setOf(
+                        "com.whatsapp",
+                        "com.google.android.youtube",
+                        "com.android.chrome",
+                        "com.google.android.gm",
+                        "com.spotify.music",
+                        "com.google.android.apps.maps",
+                    )
+                ) {
+                    AutomationResult.Failure(
+                        "APP_NOT_ALLOWED",
+                        "Esse aplicativo não está na lista de ações autorizadas da STACY.",
+                    )
+                } else {
+                    androidAutomation.openApplication(packageName)
+                }
+            }
+            "selecionar_arquivo" ->
+                androidAutomation.pickFile(action.optString("mime_type", "*/*"))
+            "compartilhar_texto" ->
+                androidAutomation.shareText(action.optString("texto"), "Compartilhar pela STACY")
+            else -> AutomationResult.Failure(
+                "UNKNOWN_ANDROID_ACTION",
+                "A STACY recusou uma ação Android desconhecida.",
+            )
+        }
+
+        when (outcome) {
+            is AutomationResult.Success -> {
+                val message = when (operation) {
+                    "abrir_configuracoes" -> "Configurações do Android abertas, senhor."
+                    "abrir_calendario" -> "Calendário aberto, senhor."
+                    "abrir_aplicativo" -> "Solicitei a abertura de ${action.optString("nome", "aplicativo")}, senhor."
+                    "selecionar_arquivo" -> "Seletor de arquivos aberto. Escolha o arquivo desejado, senhor."
+                    "compartilhar_texto" -> "Menu de compartilhamento aberto. Escolha o aplicativo e confirme o envio, senhor."
+                    else -> outcome.message
+                }
+                vm.addAssistantMessage(message)
+                if (voiceEnabled) textToSpeech.speak(message)
+                webResponse(message, "resposta")
+                webState("online")
+            }
+            is AutomationResult.Failure -> {
+                vm.onCoreError(outcome.message)
+                if (voiceEnabled) textToSpeech.speak(outcome.message)
+                webResponse(outcome.message, "erro")
+                webState("erro")
+            }
+        }
     }
 
     inner class StacyJsBridge {
