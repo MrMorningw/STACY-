@@ -48,6 +48,7 @@ jobs:
           retention-days: 7
 
       - name: Publish signed STACY update channel
+        if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           STACY_KEYSTORE_BASE64: ${{ secrets.STACY_KEYSTORE_BASE64 }}
           STACY_KEYSTORE_PASSWORD: ${{ secrets.STACY_KEYSTORE_PASSWORD }}
