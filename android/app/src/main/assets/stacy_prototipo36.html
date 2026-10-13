@@ -768,7 +768,7 @@ function startStacyProcessingStages(message){
  window.stacyNativeState&&window.stacyNativeState("pensando");
  const text=String(message||"").toLowerCase();
  const likelyQuestion=/[?]|\\b(quem|qual|quais|quando|onde|como|por que|porque|quanto|pesquise|pesquisar|procure|busque|explique|resuma|compare)\\b/.test(text);
- const stages=likelyQuestion?["pensando","pesquisando"]:["pensando","executando"];
+ const stages=likelyQuestion?["pesquisando"]:["executando"];
  stages.forEach((stage,index)=>{
    stacyPhaseTimers.push(setTimeout(()=>{
      if(stacyRequestActive)window.stacyNativeState&&window.stacyNativeState(stage);
