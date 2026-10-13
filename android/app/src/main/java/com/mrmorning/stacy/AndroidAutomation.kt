@@ -20,6 +20,7 @@ sealed interface AutomationResult {
 interface StacyAndroidAutomation {
     fun openApplication(packageName: String): AutomationResult
     fun openSettings(): AutomationResult
+    fun openCalendar(): AutomationResult
     fun createCalendarEvent(
         title: String,
         startMillis: Long,
@@ -52,6 +53,9 @@ class AndroidAutomation(
 
     override fun openSettings(): AutomationResult =
         startActivity(Intent(Settings.ACTION_SETTINGS))
+
+    override fun openCalendar(): AutomationResult =
+        startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_CALENDAR))
 
     override fun createCalendarEvent(
         title: String,
