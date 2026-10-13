@@ -33,7 +33,7 @@ Preservar fundo preto, neon laranja, átomo/orbe com núcleo “S”, Space Stac
 | Contexto da conversa | Continuidade entre turnos | O orquestrador mantém contexto em memória do processo; Android inicia um novo processo por mensagem | Persistir estado de sessão com validação, gravação atômica e bloqueio contra chamadas concorrentes |
 | Memória pessoal | Persistente, visível e controlável | `memory.py` grava memória persistente; contexto conversacional é separado | Testar leitura, gravação, exclusão e isolamento de contexto no Android |
 | Ferramentas | A IA propõe; o CORE valida; a ferramenta executa | Tarefas/memória existem; `AndroidAutomation.kt` contém ações nativas, mas a ligação ponta a ponta ainda precisa ser provada | Contrato de ferramenta tipado, validação de argumentos, confirmação quando necessária e teste do resultado real |
-| Pesquisa | Fontes verificáveis e falha explícita | O caminho de pesquisa externa existe e tem resposta de indisponibilidade | Confirmar fontes reais e que falhas não sejam apresentadas como pesquisa concluída |
+| Pesquisa | Fontes verificáveis e falha explícita | O caminho de pesquisa externa existe; a ponte Android agora encaminha até cinco fontes com URL HTTPS para a interface | Confirmar fontes reais e que falhas não sejam apresentadas como pesquisa concluída |
 | Voz | Ouvir, entender, responder e refletir o estado real | Entrada/saída de voz existe no app; acionamento por palavra-chave/assistente padrão não está provado | Testes em dispositivo real, permissões, interrupção, fallback para texto e botão lateral |
 | Interface reativa | Painéis e estados ligados ao sistema real | HUD WebView e páginas de navegação existem | Cada painel deve mostrar dados reais ou declarar claramente que ainda não está conectado |
 | Ações Android | Abrir apps/configurações, calendário, notificações e compartilhamento | Há implementações nativas de ações, mas o despacho a partir do CORE precisa ser confirmado | Teste por ação, permissões, cancelamento e retorno de sucesso/erro |
@@ -76,7 +76,7 @@ Regras:
 
 ## 5. Estado do trabalho nesta rodada
 
-A branch `stacy-core-integration-final-20261012` contém uma primeira etapa de integração: entrada JSON do CORE, sincronização de resposta, persistência privada de sessão entre processos, leitura da chave Gemini em configuração privada, roteamento nativo restrito a ações explícitas e fila serializada para preservar a ordem das respostas.
+A branch `stacy-core-integration-final-20261012` contém uma primeira etapa de integração: entrada JSON do CORE, sincronização de resposta, persistência privada de sessão entre processos, leitura da chave Gemini em configuração privada, roteamento nativo restrito a ações explícitas, fila serializada para preservar a ordem das respostas e encaminhamento filtrado das fontes HTTPS da pesquisa.
 
 **Ainda não declarar o núcleo encerrado:** a validação da versão mais recente precisa concluir, as alterações ainda precisam ser integradas à `main`, e os testes físicos de Android não podem ser substituídos por CI.
 
