@@ -29,6 +29,7 @@ def main(argv=None):
             import entity_store
             import memory
             from orchestrator import StacyOrchestrator
+            from android_tools import detectar_acao_android
             from android_session import (
                 exclusive_session_lock,
                 load_api_key,
@@ -46,7 +47,24 @@ def main(argv=None):
                 )
                 warning = restore_session(orchestrator)
                 try:
-                    result = orchestrator.processar(message)
+                    android_action = None
+                    if (
+                        orchestrator.acao_pendente is None
+                        and orchestrator.conversa.intencao_pendente is None
+                    ):
+                        android_action = detectar_acao_android(message)
+
+                    if android_action is not None:
+                        orchestrator.conversa.registrar_mensagem(message)
+                        result = orchestrator._registrar_resultado_conversa({
+                            "tipo": "acao_android",
+                            "resposta": "Solicitação de ação Android recebida.",
+                            "acao": {"tipo": "android", **android_action},
+                            "rota": "interno",
+                        })
+                        result["acao_android"] = android_action
+                    else:
+                        result = orchestrator.processar(message)
                 except Exception:
                     traceback.print_exc(file=sys.stderr)
                     # Never replay a possibly half-completed confirmation action.
@@ -74,7 +92,10 @@ def main(argv=None):
             kind = "erro"
         if warning:
             response = f"{warning}\n\n{response}"
-        _emit({"tipo": kind, "resposta": response})
+        payload = {"tipo": kind, "resposta": response}
+        if isinstance(result, dict) and isinstance(result.get("acao_android"), dict):
+            payload["acao_android"] = result["acao_android"]
+        _emit(payload)
     except Exception:
         traceback.print_exc(file=sys.stderr)
         _emit({
