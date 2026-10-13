@@ -7,6 +7,7 @@ Python process for each Android message.
 import contextlib
 import json
 import os
+import subprocess
 import sys
 import traceback
 
@@ -16,8 +17,36 @@ def _emit(payload):
     sys.stdout.flush()
 
 
+def _report_android_phase(execution_id, state):
+    if execution_id is None or state not in {"pesquisando", "executando", "pensando"}:
+        return
+    try:
+        subprocess.run(
+            [
+                "/system/bin/am", "broadcast",
+                "-n", "com.mrmorning.stacy/.StacyCorePhaseReceiver",
+                "-a", "com.mrmorning.stacy.CORE_PHASE",
+                "--ei", "execution_id", str(execution_id),
+                "--es", "state", state,
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=1.5,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        # Phase telemetry is best-effort; the actual JSON result remains authoritative.
+        pass
+
+
 def main(argv=None):
-    args = sys.argv[1:] if argv is None else argv
+    args = list(sys.argv[1:] if argv is None else argv)
+    execution_id = None
+    if args and args[0].startswith("--execution-id="):
+        try:
+            execution_id = int(args.pop(0).split("=", 1)[1])
+        except ValueError:
+            execution_id = None
     message = " ".join(str(arg) for arg in args).strip()
     if not message:
         _emit({"tipo": "erro", "resposta": "A mensagem recebida está vazia."})
@@ -44,6 +73,7 @@ def main(argv=None):
                     api_key=load_api_key(),
                     memoria=memoria,
                     entidades=entidades,
+                    phase_callback=lambda state: _report_android_phase(execution_id, state),
                 )
                 warning = restore_session(orchestrator)
                 try:
