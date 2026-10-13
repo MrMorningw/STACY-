@@ -36,8 +36,8 @@ class StacyUpdater(
                 val release = fetchLatestRelease()
                 val asset = findApkAsset(release)
                     ?: throw IllegalStateException("Canal inválido: nenhum APK STACY foi publicado.")
-                val publishedCode = release.optInt("versionCode", -1)
-                val assetVersionCode = asset.optInt("version_code", -1)
+                val publishedCode = release.optLong("versionCode", -1L)
+                val assetVersionCode = asset.optLong("version_code", -1L)
                 val publishedName = release.optString("versionName", "").trim()
                 val packageName = release.optString("packageName", "").trim()
                 val publishedDigest = release.optString("sha256", "").trim().lowercase()
@@ -160,7 +160,7 @@ class StacyUpdater(
         return target
     }
 
-    private fun validateApk(file: File, asset: JSONObject, assetVersionCode: Int, currentVersionCode: Long) {
+    private fun validateApk(file: File, asset: JSONObject, assetVersionCode: Long, currentVersionCode: Long) {
         val expectedDigest = asset.optString("digest", "")
             .removePrefix("sha256:")
             .lowercase()
@@ -210,7 +210,7 @@ class StacyUpdater(
             @Suppress("DEPRECATION")
             archiveInfo.versionCode.toLong()
         }
-        if (assetVersionCode > 0 && downloadedVersionCode != assetVersionCode.toLong()) {
+        if (assetVersionCode > 0L && downloadedVersionCode != assetVersionCode) {
             throw SecurityException("A versão do APK não corresponde à versão publicada.")
         }
         if (downloadedVersionCode <= currentVersionCode) {
