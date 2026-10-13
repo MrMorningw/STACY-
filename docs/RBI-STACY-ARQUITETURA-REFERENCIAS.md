@@ -76,7 +76,7 @@ Regras:
 
 ## 5. Estado do trabalho nesta rodada
 
-A branch `stacy-core-integration-final-20261012` contém uma primeira etapa de integração: entrada JSON do CORE, sincronização do estado/resposta Android, testes de protocolo e persistência privada de sessão entre processos, além de leitura da chave Gemini a partir de configuração local privada.
+A branch `stacy-core-integration-final-20261012` contém uma primeira etapa de integração: entrada JSON do CORE, sincronização de resposta, persistência privada de sessão entre processos, leitura da chave Gemini em configuração privada, roteamento nativo restrito a ações explícitas e fila serializada para preservar a ordem das respostas.
 
 **Ainda não declarar o núcleo encerrado:** a validação da versão mais recente precisa concluir, as alterações ainda precisam ser integradas à `main`, e os testes físicos de Android não podem ser substituídos por CI.
 
