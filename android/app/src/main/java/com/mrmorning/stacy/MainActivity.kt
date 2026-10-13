@@ -103,7 +103,14 @@ class MainActivity : ComponentActivity() {
                     vm.onCoreResponse(result)
                     if (voiceEnabled) textToSpeech.speak(result.response)
                     webResponse(formatResponseWithSources(result), result.tipo)
-                    webState(if (result.tipo == "erro") "erro" else "online")
+                    if (result.tipo == "erro") {
+                        webState("erro")
+                    } else {
+                        webState("respondendo")
+                        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                            webState("online")
+                        }, 1400L)
+                    }
                 } else if (result.exitCode != 0) {
                     val error = result.stderr.ifBlank {
                         "O CORE encerrou a execução com erro."
