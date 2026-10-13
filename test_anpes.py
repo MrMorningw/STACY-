@@ -1,0 +1,126 @@
+import unittest
+
+import anpes
+
+
+def plano(etapas=None):
+    return {
+        "versao": anpes.VERSAO_PLANO,
+        "titulo": "Diagnóstico do núcleo",
+        "etapas": etapas if etapas is not None else [
+            {
+                "id": "estado",
+                "ferramenta": "diagnostico.status",
+                "argumentos": {},
+            }
+        ],
+    }
+
+
+class AnpesTests(unittest.TestCase):
+    def test_read_only_plan_is_ready_but_not_executed(self):
+        resultado = anpes.avaliar_plano(plano())
+        self.assertEqual(resultado["status"], "pronto")
+        self.assertFalse(resultado["executar"])
+
+    def test_unknown_tool_is_rejected(self):
+        resultado = anpes.validar_plano(plano([{
+            "id": "shell",
+            "ferramenta": "terminal.executar_shell",
+            "argumentos": {"comando": "echo unsafe"},
+        }]))
+        self.assertEqual(resultado["status"], "invalido")
+        self.assertEqual(resultado["motivo"], "ferramenta_nao_autorizada")
+
+    def test_plan_step_limit_is_enforced(self):
+        steps = [
+            {"id": f"step-{i}", "ferramenta": "diagnostico.status", "argumentos": {}}
+            for i in range(anpes.MAX_ETAPAS + 1)
+        ]
+        resultado = anpes.validar_plano(plano(steps))
+        self.assertEqual(resultado["motivo"], "limite_de_etapas_excedido")
+
+    def test_duplicate_step_ids_are_rejected(self):
+        step = {"id": "same", "ferramenta": "diagnostico.status", "argumentos": {}}
+        resultado = anpes.validar_plano(plano([step, step]))
+        self.assertEqual(resultado["motivo"], "id_de_etapa_duplicado")
+
+    def test_medium_risk_requires_explicit_approval(self):
+        result = anpes.avaliar_plano(plano([{
+            "id": "open",
+            "ferramenta": "android.abrir_app",
+            "argumentos": {"app": "calculadora"},
+        }]))
+        self.assertEqual(result["status"], "aguardando_confirmacao")
+        self.assertEqual(result["etapas_que_exigem_confirmacao"], ["open"])
+
+    def test_unconnected_executor_is_reported(self):
+        result = anpes.executar_plano(plano(), executores={})
+        self.assertEqual(result["status"], "indisponivel")
+        self.assertEqual(result["motivo"], "executor_nao_conectado")
+
+    def test_simulation_never_calls_executor(self):
+        calls = []
+        result = anpes.executar_plano(
+            plano(),
+            executores={"diagnostico.status": lambda args: calls.append(args)},
+        )
+        self.assertEqual(result["status"], "simulacao")
+        self.assertEqual(calls, [])
+
+    def test_execution_requires_approval_for_medium_risk(self):
+        calls = []
+        plan = plano([{
+            "id": "open",
+            "ferramenta": "android.abrir_app",
+            "argumentos": {"app": "calculadora"},
+        }])
+        result = anpes.executar_plano(
+            plan,
+            executores={"android.abrir_app": lambda args: calls.append(args) or {"ok": True}},
+            simulacao=False,
+        )
+        self.assertEqual(result["status"], "aguardando_confirmacao")
+        self.assertEqual(calls, [])
+
+    def test_approved_execution_returns_handler_result(self):
+        calls = []
+        plan = plano([{
+            "id": "open",
+            "ferramenta": "android.abrir_app",
+            "argumentos": {"app": "calculadora"},
+        }])
+        result = anpes.executar_plano(
+            plan,
+            executores={"android.abrir_app": lambda args: calls.append(args) or {"ok": True}},
+            etapas_aprovadas={"open"},
+            simulacao=False,
+        )
+        self.assertEqual(result["status"], "concluido")
+        self.assertEqual(result["resultados"][0]["resultado"], {"ok": True})
+        self.assertEqual(len(calls), 1)
+
+    def test_executor_exception_is_sanitized_and_stops_plan(self):
+        events = []
+        result = anpes.executar_plano(
+            plano(),
+            executores={"diagnostico.status": lambda args: (_ for _ in ()).throw(RuntimeError("secret path"))},
+            simulacao=False,
+            auditoria=events.append,
+        )
+        self.assertEqual(result["status"], "falhou")
+        self.assertNotIn("secret path", str(result))
+        self.assertEqual(result["resultados"][0]["motivo"], "falha_interna_do_executor")
+        self.assertEqual(events[-1]["estado"], "falhou")
+
+    def test_invalid_mode_is_rejected(self):
+        result = anpes.avaliar_plano(plano(), modo="autonomia_total")
+        self.assertEqual(result["status"], "invalido")
+        self.assertEqual(result["motivo"], "modo_de_autonomia_invalido")
+
+    def test_invalid_plan_is_rejected(self):
+        self.assertEqual(anpes.validar_plano(None)["status"], "invalido")
+
+
+if __name__ == "__main__":
+    unittest.main()
