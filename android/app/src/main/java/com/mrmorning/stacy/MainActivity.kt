@@ -85,7 +85,7 @@ class MainActivity : ComponentActivity() {
                 } else if (result.response.isNotBlank()) {
                     vm.onCoreResponse(result)
                     if (voiceEnabled) textToSpeech.speak(result.response)
-                    webResponse(result.response, result.tipo)
+                    webResponse(formatResponseWithSources(result), result.tipo)
                     webState(if (result.tipo == "erro") "erro" else "online")
                 } else if (result.exitCode != 0) {
                     val error = result.stderr.ifBlank {
@@ -109,6 +109,18 @@ class MainActivity : ComponentActivity() {
             loadUrl("file:///android_asset/stacy_prototipo36.html")
         }
         setContentView(webView)
+    }
+
+    private fun formatResponseWithSources(result: CoreResult): String {
+        val sources = result.fontes ?: return result.response
+        val lines = (0 until sources.length()).mapNotNull { index ->
+            val source = sources.optJSONObject(index) ?: return@mapNotNull null
+            val title = source.optString("titulo", "Fonte").take(180)
+            val url = source.optString("url")
+            if (!url.startsWith("https://")) null else "${title}\n$url"
+        }
+        return if (lines.isEmpty()) result.response
+        else result.response + "\n\nFontes consultadas:\n" + lines.joinToString("\n\n")
     }
 
     private fun handleAndroidAction(action: JSONObject) {
