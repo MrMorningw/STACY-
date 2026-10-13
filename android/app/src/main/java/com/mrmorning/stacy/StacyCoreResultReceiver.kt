@@ -31,7 +31,14 @@ class StacyCoreResultReceiver : BroadcastReceiver() {
             }
             CoreResultStore.publish(
                 context,
-                CoreResult(tipo, response, exitCode, stderr, json.optJSONObject("acao_android")),
+                CoreResult(
+                    tipo,
+                    response,
+                    exitCode,
+                    stderr,
+                    json.optJSONObject("acao_android"),
+                    json.optJSONArray("fontes"),
+                ),
             ) {
                 StacyCoreBridge.complete(executionId)
             }
