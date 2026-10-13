@@ -4,6 +4,8 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Handler
+import android.os.Looper
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.ArrayDeque
@@ -18,6 +20,8 @@ class StacyCoreBridge(private val context: Context) {
     )
 
     private val queue = ArrayDeque<Request>()
+    private val timeoutHandler = Handler(Looper.getMainLooper())
+    private val pendingTimeouts = ConcurrentHashMap<Int, Runnable>()
     private var activeExecutionId: Int? = null
 
     fun process(message: String, onQueued: () -> Unit = {}, onError: (String) -> Unit = {}) {
@@ -47,6 +51,14 @@ class StacyCoreBridge(private val context: Context) {
         }
         val request = next.first
         val executionId = next.second
+        val timeout = Runnable {
+            fail(
+                executionId,
+                "O núcleo STACY não respondeu em 90 segundos. Verifique o Termux e tente novamente.",
+            )
+        }
+        pendingTimeouts[executionId] = timeout
+        timeoutHandler.postDelayed(timeout, CORE_TIMEOUT_MS)
 
         try {
             val callback = Intent(context, StacyCoreResultReceiver::class.java).apply {
@@ -94,6 +106,7 @@ class StacyCoreBridge(private val context: Context) {
     }
 
     private fun finish(executionId: Int) {
+        pendingTimeouts.remove(executionId)?.let(timeoutHandler::removeCallbacks)
         synchronized(queue) {
             if (activeExecutionId == executionId) activeExecutionId = null
         }
@@ -101,6 +114,7 @@ class StacyCoreBridge(private val context: Context) {
     }
 
     companion object {
+        private const val CORE_TIMEOUT_MS = 90_000L
         private val NEXT_ID = AtomicInteger(1000)
         private val callbacks = ConcurrentHashMap<Int, (String) -> Unit>()
         private val activeBridges = ConcurrentHashMap<Int, StacyCoreBridge>()
