@@ -28,6 +28,12 @@ class AndroidCoreEntryPointTests(unittest.TestCase):
                 self.entidade_contextual = None
                 self.conversa = ConversationState()
 
+            def _registrar_resultado_conversa(self, result):
+                if result.get("resposta"):
+                    self.conversa.registrar_resposta(result["resposta"])
+                self.conversa.registrar_rota("interno")
+                return result
+
             def processar(self, text):
                 if raised is not None:
                     raise raised
@@ -91,6 +97,15 @@ class AndroidCoreEntryPointTests(unittest.TestCase):
             self.assertIn("interrompida com segurança", payload["resposta"])
             self.assertNotIn("detalhe interno privado", stdout)
             self.assertIn("detalhe interno privado", stderr)
+
+    def test_explicit_android_action_is_emitted_as_structured_payload(self):
+        with tempfile.TemporaryDirectory() as state_dir:
+            exit_code, stdout, _ = self._run("abra as configurações do Android", state_dir)
+            payload = json.loads(stdout)
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(payload["tipo"], "acao_android")
+            self.assertEqual(payload["acao_android"], {"acao": "abrir_configuracoes"})
+            self.assertNotIn("acao_android", payload["resposta"])
 
     def test_api_key_environment_takes_precedence_over_private_file(self):
         with tempfile.TemporaryDirectory() as state_dir:
