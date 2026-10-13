@@ -4,6 +4,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.pm.PackageManager
 import android.content.Intent
+import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -86,6 +87,7 @@ data class CoreResult(
     val response: String,
     val exitCode: Int,
     val stderr: String,
+    val androidAction: JSONObject? = null,
 )
 
 object CoreResultStore {
