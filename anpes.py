@@ -27,6 +27,10 @@ FERRAMENTAS = {
         "risco": RISCO_BAIXO,
         "descricao": "Consultar o estado operacional da STACY.",
     },
+    "core.executar_intencao": {
+        "risco": RISCO_MEDIO,
+        "descricao": "Delegar uma intenção já autorizada pelo gate determinístico do CORE.",
+    },
     "diagnostico.executar_testes": {
         "risco": RISCO_BAIXO,
         "descricao": "Executar uma suíte de testes previamente definida.",
@@ -100,7 +104,7 @@ def estado() -> dict:
         "validacao_planos": "disponivel",
         "simulacao_padrao": True,
         "limite_etapas": MAX_ETAPAS,
-        "execucao_por_ferramentas": "requer_executores_registrados",
+        "execucao_por_ferramentas": "executores_core_de_status_e_intencao_registrados",
         "auto_modificacao": False,
         "shell_arbitrario": False,
         "apk_autossuficiente": False,
