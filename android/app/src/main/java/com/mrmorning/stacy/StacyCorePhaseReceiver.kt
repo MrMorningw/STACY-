@@ -3,6 +3,8 @@ package com.mrmorning.stacy
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
 
 /**
  * Accepts visual-only lifecycle events emitted by the CORE running in Termux.
@@ -41,7 +43,7 @@ object CorePhaseStore {
     }
 
     fun publish(context: Context, state: String) {
-        context.mainExecutor.execute {
+        Handler(Looper.getMainLooper()).post {
             listener?.invoke(state)
         }
     }
