@@ -67,3 +67,10 @@ Após atualizar, executar a matriz de testes no aparelho:
 6. Provocar uma falha controlada de resposta e confirmar que o timeout libera a fila sem travar a interface.
 
 **Limite importante:** a conexão com o CORE existe via Termux; a autonomia plena e a execução autossuficiente dentro do APK não estão declaradas concluídas.
+
+## 6. Etapa de reorganização funcional — em desenvolvimento
+
+- O botão **+** passa a oferecer câmera, fotos/imagens e arquivos, usando o seletor de arquivos do WebView/Android e exibindo os nomes selecionados.
+- **Limite de anexos nesta etapa:** o CORE ainda recebe texto pela ponte atual; os bytes dos arquivos não são transmitidos ao núcleo. A interface informa isso para não sugerir análise de imagem/documento que ainda não existe.
+- Adicionadas as seções laterais **Ferramentas** e **Permissões**. Ferramentas reúne calendário, configurações, compartilhamento e verificação do CORE; Permissões direciona ao painel real de permissões do Android.
+- Próximo requisito técnico: implementar transporte de anexos seguro até o CORE e validar no dispositivo. Não declarar essa parte concluída antes do teste.
