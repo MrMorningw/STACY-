@@ -18,10 +18,15 @@ APP_ALIASES = {
 }
 
 
-def _normalize(text):
+def _fold(text):
     text = unicodedata.normalize("NFD", (text or "").strip().lower())
-    text = "".join(ch for ch in text if unicodedata.category(ch) != "Mn")
-    return " ".join(text.split()).rstrip("?!.,;: ")
+    return "".join(ch for ch in text if unicodedata.category(ch) != "Mn")
+
+
+def _normalize(text):
+    text = _fold(text)
+    text = re.sub(r"[?!.,;]+", " ", text)
+    return " ".join(text.split()).rstrip(": ")
 
 
 def detectar_acao_android(mensagem):
@@ -57,11 +62,16 @@ def detectar_acao_android(mensagem):
     }:
         return {"acao": "selecionar_arquivo", "mime_type": "*/*"}
 
-    share_match = re.fullmatch(r"(?:compartilhe|compartilhar|compartilhe o texto):\s*(.+)", texto)
+    folded_original = _fold(mensagem)
+    share_match = re.fullmatch(
+        r"(?:compartilhe|compartilhar|compartilhe o texto)\s*:\s*(.+)",
+        folded_original,
+        flags=re.DOTALL,
+    )
     if share_match:
-        content = share_match.group(1).strip()
-        if content:
-            return {"acao": "compartilhar_texto", "texto": content}
+        original_content = mensagem.split(":", 1)[1].strip()
+        if original_content:
+            return {"acao": "compartilhar_texto", "texto": original_content}
 
     match = re.fullmatch(
         r"(?:por favor )?(?:abra|abrir|abre|inicie|iniciar) "
