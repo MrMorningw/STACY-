@@ -819,7 +819,7 @@ requestAnimationFrame(animate);
 })();
 </script>
 
-<div class="stacy-section-view" id="stacySectionView" aria-hidden="true">
+<div class="stacy-section-view" id="stacySectionView" aria-hidden="true" inert>
   <div class="stacy-section-top">
     <button class="stacy-section-back" id="stacySectionBack" aria-label="Voltar">‹</button>
     <div>
@@ -858,6 +858,7 @@ requestAnimationFrame(animate);
     view.setAttribute('aria-hidden','false');
     view.inert=false;
     document.body.classList.add('stacy-section-active');
+    back.focus();
   }
   window.stacyOpenPage = openPage;
   function closePage(){
