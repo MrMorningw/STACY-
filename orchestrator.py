@@ -17,6 +17,7 @@ import cortex
 import ctac
 import mepo
 import orchestration
+import anpes
 import autonomy
 
 
@@ -326,6 +327,33 @@ class StacyOrchestrator:
         )
 
 
+    def _executar_intencao_anpes(self, argumentos):
+        """Executa somente uma intenção já aprovada pelo gate do CORE."""
+        intencao = argumentos.get("intencao")
+        resultado = self._processar_intencao(intencao)
+        return {
+            "tratada": resultado is not None,
+            "resultado": resultado,
+        }
+
+    def _executar_plano_anpes(
+        self,
+        plano,
+        *,
+        etapas_aprovadas=(),
+        simulacao=True,
+    ):
+        """Runtime restrito: somente diagnóstico e intenção autorizada do CORE."""
+        return anpes.executar_plano(
+            plano,
+            executores={
+                "diagnostico.status": lambda _argumentos: autonomy.anpes_estado(),
+                "core.executar_intencao": self._executar_intencao_anpes,
+            },
+            etapas_aprovadas=etapas_aprovadas,
+            simulacao=simulacao,
+        )
+
     def _processar_anpes(self, mensagem):
         texto = _normalizar_rota(mensagem)
         consultas = {
@@ -337,13 +365,32 @@ class StacyOrchestrator:
         if texto not in consultas:
             return None
 
-        estado = autonomy.anpes_estado()
+        plano_status = {
+            "versao": anpes.VERSAO_PLANO,
+            "titulo": "Consultar estado do ANPES",
+            "etapas": [{
+                "id": "status",
+                "ferramenta": "diagnostico.status",
+                "argumentos": {},
+            }],
+        }
+        execucao_status = self._executar_plano_anpes(
+            plano_status,
+            simulacao=False,
+        )
+        if execucao_status.get("status") != "concluido":
+            return {
+                "tipo": "erro_anpes",
+                "resposta": "Não consegui consultar o estado do ANPES com segurança, senhor.",
+                "rota": ROTA_INTERNA,
+            }
+        estado = execucao_status["resultados"][0]["resultado"]
         resposta = (
-            "ANPES está integrado ao gate de autonomia do CORE, senhor. "
-            "A validação de planos está disponível, com simulação por padrão "
-            "e limite de oito etapas. A execução de planos ainda exige "
-            "executores explicitamente registrados; esta consulta não executa "
-            "ações. O núcleo não executa shell arbitrário nem se modifica sozinho."
+            "ANPES está integrado ao gate de autonomia e ao executor restrito "
+            "do CORE, senhor. Planos usam simulação por padrão; intenções "
+            "determinísticas só são executadas depois da autorização do CORE. "
+            "A execução genérica de ferramentas Android, alterações de código "
+            "e auto-modificação continuam desativadas. Não há shell arbitrário."
         )
         return {
             "tipo": "anpes_status",
@@ -1093,29 +1140,62 @@ class StacyOrchestrator:
             autorizacao = autonomy.avaliar_execucao(
                 intencao
             )
-            if (
-                intencao.get("origem") == autonomy.ORIGEM_IA
-                and not autorizacao.get("executar")
-            ):
-                return {
-                    "tipo": "confirmacao_autonomia",
-                    "resposta": (
+            if not autorizacao.get("executar"):
+                if intencao.get("origem") == autonomy.ORIGEM_IA:
+                    resposta_autorizacao = (
                         "Identifiquei uma ação pela IA local, senhor, "
                         "mas não vou executá-la automaticamente. "
                         "Se desejar a execução, repita o pedido de forma "
                         "explícita como comando da STACY."
-                    ),
+                    )
+                else:
+                    resposta_autorizacao = (
+                        "A intenção não passou pela política de autorização "
+                        "do ANPES, senhor. A execução foi bloqueada."
+                    )
+                return {
+                    "tipo": "confirmacao_autonomia",
+                    "resposta": resposta_autorizacao,
                     "intencao": intencao,
                     "autonomia": autorizacao,
                     "rota": ROTA_INTERNA
                 }
 
-            resultado_intencao = self._processar_intencao(
-                intencao
+            plano_intencao = {
+                "versao": anpes.VERSAO_PLANO,
+                "titulo": "Executar intenção autorizada do CORE",
+                "etapas": [{
+                    "id": "intencao-core",
+                    "ferramenta": "core.executar_intencao",
+                    "argumentos": {"intencao": intencao},
+                }],
+            }
+            execucao_anpes = self._executar_plano_anpes(
+                plano_intencao,
+                etapas_aprovadas={"intencao-core"},
+                simulacao=False,
             )
+            if execucao_anpes.get("status") != "concluido":
+                return {
+                    "tipo": "erro_anpes",
+                    "resposta": (
+                        "A execução foi interrompida pelo ANPES com segurança, senhor. "
+                        "Nenhuma conclusão de sucesso foi presumida."
+                    ),
+                    "anpes": {
+                        "status": execucao_anpes.get("status"),
+                        "motivo": execucao_anpes.get("motivo"),
+                    },
+                    "rota": ROTA_INTERNA,
+                }
 
+            envelope = execucao_anpes["resultados"][0].get("resultado")
+            resultado_intencao = (
+                envelope.get("resultado")
+                if isinstance(envelope, dict) and envelope.get("tratada")
+                else None
+            )
             if resultado_intencao is not None:
-
                 return resultado_intencao
 
         # Se chegou aqui, a rota definida é IA local. A pesquisa externa

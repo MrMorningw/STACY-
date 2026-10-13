@@ -114,6 +114,41 @@ class AnpesTests(unittest.TestCase):
         self.assertEqual(result["resultados"][0]["motivo"], "falha_interna_do_executor")
         self.assertEqual(events[-1]["estado"], "falhou")
 
+    def test_orchestrator_executes_status_through_anpes_runtime(self):
+        core = orchestrator.StacyOrchestrator.__new__(orchestrator.StacyOrchestrator)
+        result = core._executar_plano_anpes({
+            "versao": anpes.VERSAO_PLANO,
+            "titulo": "Estado",
+            "etapas": [{
+                "id": "status",
+                "ferramenta": "diagnostico.status",
+                "argumentos": {},
+            }],
+        }, simulacao=False)
+        self.assertEqual(result["status"], "concluido")
+        self.assertEqual(
+            result["resultados"][0]["resultado"]["politica_autonomia"],
+            "integrada_ao_core",
+        )
+
+    def test_orchestrator_runs_authorized_intention_through_anpes(self):
+        core = orchestrator.StacyOrchestrator.__new__(orchestrator.StacyOrchestrator)
+        core._processar_intencao = lambda intention: {"tipo": "tarefa_criada", "ok": True}
+        result = core._executar_plano_anpes({
+            "versao": anpes.VERSAO_PLANO,
+            "titulo": "Intenção autorizada",
+            "etapas": [{
+                "id": "intencao-core",
+                "ferramenta": "core.executar_intencao",
+                "argumentos": {"intencao": {"tipo": "tarefa"}},
+            }],
+        }, etapas_aprovadas={"intencao-core"}, simulacao=False)
+        self.assertEqual(result["status"], "concluido")
+        self.assertEqual(
+            result["resultados"][0]["resultado"]["resultado"]["tipo"],
+            "tarefa_criada",
+        )
+
     def test_orchestrator_exposes_deterministic_anpes_status(self):
         core = orchestrator.StacyOrchestrator.__new__(orchestrator.StacyOrchestrator)
         result = core._processar_anpes("status do ANPES")
@@ -129,7 +164,7 @@ class AnpesTests(unittest.TestCase):
         status = anpes.estado()
         self.assertEqual(status["politica_autonomia"], "integrada_ao_core")
         self.assertTrue(status["simulacao_padrao"])
-        self.assertEqual(status["execucao_por_ferramentas"], "requer_executores_registrados")
+        self.assertEqual(status["execucao_por_ferramentas"], "executores_core_de_status_e_intencao_registrados")
         self.assertFalse(status["auto_modificacao"])
         self.assertFalse(status["apk_autossuficiente"])
 
