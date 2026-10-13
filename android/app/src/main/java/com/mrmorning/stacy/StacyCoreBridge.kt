@@ -23,21 +23,21 @@ class StacyCoreBridge(private val context: Context) {
             if (android.os.Build.VERSION.SDK_INT >= 23) PendingIntent.FLAG_IMMUTABLE else 0
         val pendingIntent = PendingIntent.getBroadcast(context, executionId, callback, flags)
         val command = """
-            ROOT="$HOME/stacy"
-            if [ ! -d "$ROOT" ] || [ ! -f "$ROOT/android/termux_widget/stacy-android.sh" ]; then
-              printf '%s\\n' '{"tipo":"erro","resposta":"O núcleo Python não foi encontrado em ~/stacy. Instale o repositório STACY no Termux e tente novamente."}'
+            ROOT="${'$'}HOME/stacy"
+            if [ ! -d "${'$'}ROOT" ] || [ ! -f "${'$'}ROOT/android/termux_widget/stacy-android.sh" ]; then
+              printf '%s\n' '{"tipo":"erro","resposta":"O núcleo Python não foi encontrado em ~/stacy. Instale o repositório STACY no Termux e tente novamente."}'
               exit 0
             fi
             if ! command -v python >/dev/null 2>&1; then
-              printf '%s\\n' '{"tipo":"erro","resposta":"O Python não está instalado no Termux. Instale Python e tente novamente."}'
+              printf '%s\n' '{"tipo":"erro","resposta":"O Python não está instalado no Termux. Instale Python e tente novamente."}'
               exit 0
             fi
             if ! python -c 'import requests' >/dev/null 2>&1; then
-              printf '%s\\n' '{"tipo":"erro","resposta":"Falta uma dependência do núcleo. No Termux, execute: python -m pip install -r requirements.txt"}'
+              printf '%s\n' '{"tipo":"erro","resposta":"Falta uma dependência do núcleo. No Termux, execute: python -m pip install -r requirements.txt"}'
               exit 0
             fi
-            cd "$ROOT"
-            exec bash "$ROOT/android/termux_widget/stacy-android.sh" "$1"
+            cd "${'$'}ROOT"
+            exec bash "${'$'}ROOT/android/termux_widget/stacy-android.sh" "${'$'}1"
         """.trimIndent()
         val intent = Intent().apply {
             setClassName("com.termux", "com.termux.app.RunCommandService")
