@@ -164,7 +164,7 @@ class AnpesTests(unittest.TestCase):
         status = anpes.estado()
         self.assertEqual(status["politica_autonomia"], "integrada_ao_core")
         self.assertTrue(status["simulacao_padrao"])
-        self.assertEqual(status["execucao_por_ferramentas"], "requer_executores_registrados")
+        self.assertEqual(status["execucao_por_ferramentas"], "executores_core_de_status_e_intencao_registrados")
         self.assertFalse(status["auto_modificacao"])
         self.assertFalse(status["apk_autossuficiente"])
 
