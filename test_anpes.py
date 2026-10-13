@@ -1,6 +1,7 @@
 import unittest
 
 import anpes
+import orchestrator
 
 
 def plano(etapas=None):
@@ -112,6 +113,17 @@ class AnpesTests(unittest.TestCase):
         self.assertNotIn("secret path", str(result))
         self.assertEqual(result["resultados"][0]["motivo"], "falha_interna_do_executor")
         self.assertEqual(events[-1]["estado"], "falhou")
+
+    def test_orchestrator_exposes_deterministic_anpes_status(self):
+        core = orchestrator.StacyOrchestrator.__new__(orchestrator.StacyOrchestrator)
+        result = core._processar_anpes("status do ANPES")
+        self.assertEqual(result["tipo"], "anpes_status")
+        self.assertEqual(result["rota"], orchestrator.ROTA_INTERNA)
+        self.assertEqual(result["anpes"]["politica_autonomia"], "integrada_ao_core")
+
+    def test_orchestrator_does_not_capture_unrelated_messages_as_status(self):
+        core = orchestrator.StacyOrchestrator.__new__(orchestrator.StacyOrchestrator)
+        self.assertIsNone(core._processar_anpes("qual é a previsão do tempo"))
 
     def test_status_reports_actual_integration_limits(self):
         status = anpes.estado()
