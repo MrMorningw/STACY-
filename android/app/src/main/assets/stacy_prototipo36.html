@@ -801,6 +801,7 @@ requestAnimationFrame(animate);
     drawer.classList.toggle('open',v);
     back.classList.toggle('open',v);
     drawer.setAttribute('aria-hidden',String(!v));
+    drawer.inert=!v;
   }
   window.STACYToggleDrawer=()=>setOpen(!drawer.classList.contains('open'));
   const menuBtn=document.getElementById('menuBtn');
@@ -887,6 +888,8 @@ requestAnimationFrame(animate);
   window.stacyNativeState=function(name){
     const key=String(name||'').toLowerCase();
     setState(stateMap[key]||key||'online');
+    const messageInput=document.getElementById('message');
+    if(messageInput)messageInput.placeholder=key==='ouvindo'||key==='listening'?'Ouvindo…':'Digite ou fale...';
   };
   window.stacyNativeResponse=function(response,tipo){
     const text=String(response||'').trim();
