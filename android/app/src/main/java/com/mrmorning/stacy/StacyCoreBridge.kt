@@ -51,8 +51,13 @@ class StacyCoreBridge(private val context: Context) {
     companion object {
         private val NEXT_ID = AtomicInteger(1000)
         private val callbacks = ConcurrentHashMap<Int, (String) -> Unit>()
+
         fun fail(executionId: Int, message: String) {
             callbacks.remove(executionId)?.invoke(message)
+        }
+
+        fun complete(executionId: Int) {
+            callbacks.remove(executionId)
         }
     }
 }
