@@ -16,6 +16,9 @@
   --white:#f5efe9;
 }
 *{box-sizing:border-box}
+button,input{touch-action:manipulation}
+button:focus-visible,input:focus-visible,[tabindex]:focus-visible{outline:2px solid #ffb36d;outline-offset:3px}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-family:'STACY SpaceStacked',Arial,Helvetica,sans-serif;color:var(--white)}
 button,input{font:inherit}
 #app{position:relative;width:100%;height:100%;overflow:hidden;background:#000}
@@ -64,13 +67,13 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
   box-shadow:0 0 22px rgba(255,116,24,.06),inset 0 0 16px rgba(255,116,24,.025)
 }
 .iconBtn{
-  flex:0 0 42px;width:42px;height:42px;border-radius:12px;border:1px solid rgba(255,116,24,.32);
+  flex:0 0 44px;width:44px;height:44px;border-radius:12px;border:1px solid rgba(255,116,24,.32);
   background:rgba(255,116,24,.045);color:var(--orange);cursor:pointer;font-size:25px;line-height:1
 }
 #message{min-width:0;flex:1;height:42px;border:0;outline:0;background:transparent;color:#eee8e2;font-size:14px}
 #message::placeholder{color:#70675f}
 .send{
-  width:42px;height:42px;border:0;border-radius:12px;background:var(--orange);
+  width:44px;height:44px;border:0;border-radius:12px;background:var(--orange);
   color:#180b03;font-size:18px;font-weight:bold;cursor:pointer
 }
 /* menu lateral */
@@ -109,6 +112,10 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
  .stateBar{top:112px}.info{bottom:88px}
 }
 
+.quick-actions{position:absolute;left:4%;bottom:92px;z-index:60;width:min(92%,340px);padding:8px;border:1px solid rgba(255,116,24,.38);border-radius:14px;background:rgba(5,3,2,.98);box-shadow:0 12px 36px rgba(0,0,0,.65)}
+.quick-actions[hidden]{display:none!important}
+.quick-actions button{display:block;width:100%;min-height:44px;padding:10px 12px;border:0;border-radius:9px;background:transparent;color:#f5efe9;text-align:left;font-size:14px;cursor:pointer}
+.quick-actions button:hover,.quick-actions button:focus-visible{background:rgba(255,116,24,.12)}
 .responsePanel{display:none;position:absolute;left:50%;top:175px;transform:translateX(-50%);width:min(88%,620px);z-index:18}
 .responseBubble{border:1px solid rgba(255,116,24,.30);border-radius:14px;padding:16px 17px;background:rgba(7,4,2,.88);color:#eee8e2;font-size:15px;line-height:1.45;box-shadow:0 0 24px rgba(255,116,24,.05);opacity:0;transform:translateY(10px);transition:opacity .35s ease,transform .35s ease}
 #app.responding .status,#app.responding .stateBar,#app.responding .context{display:none}
@@ -325,7 +332,7 @@ body.stacy-no-animations *{animation:none!important;transition:none!important}
   <header class="top">
     <button class="menuBtn" id="menuBtn" aria-label="Abrir menu"><span></span><span></span><span></span></button>
     <div class="brand">STACY</div>
-    <div class="status" id="status">ONLINE</div>
+    <div class="status" id="status" role="status" aria-live="polite" aria-atomic="true">ONLINE</div>
 
   <div class="constellation left" aria-hidden="true" title="LM">
     <svg viewBox="0 0 58 38">
@@ -378,14 +385,14 @@ body.stacy-no-animations *{animation:none!important;transition:none!important}
   </div>
 
   <section class="responsePanel" id="responsePanel" aria-live="polite">
-    <div class="responseBubble" id="responseBubble">Encontrei o que você pediu. Estou organizando os resultados.</div>
+    <div class="responseBubble" id="responseBubble" role="status" aria-live="polite" aria-atomic="true">Pronta para ajudar.</div>
   </section>
 
   <div class="composer">
-    <button class="iconBtn" id="plus" aria-label="Mais">+</button>
-    <input id="message" placeholder="Digite ou fale..." autocomplete="off">
-    <button class="iconBtn" id="mic" aria-label="Microfone">♩</button>
-    <button class="send" id="send" aria-label="Enviar">›</button>
+    <button class="iconBtn" id="plus" type="button" aria-label="Abrir ações rápidas" aria-haspopup="menu" aria-expanded="false" title="Ações rápidas">+</button>
+    <input id="message" type="text" aria-label="Mensagem para a STACY" placeholder="Digite ou fale..." autocomplete="off" enterkeyhint="send">
+    <button class="iconBtn" id="mic" type="button" aria-label="Iniciar entrada por voz" title="Falar com a STACY">♩</button>
+    <button class="send" type="button" id="send" aria-label="Enviar mensagem" title="Enviar">›</button>
   </div>
 
   <div class="quick-actions" id="quickActions" role="menu" aria-label="Ações rápidas da STACY" hidden>
@@ -638,7 +645,6 @@ function setState(name){
  status.textContent=target.label;
  status.classList.toggle("status-online",name==="online");
  status.classList.toggle("status-offline",name==="offline"||name==="erro");
- if(name==='respondendo') document.getElementById('responseBubble').textContent='Encontrei o que você pediu. Estou organizando os resultados.';
  const active=["pesquisando","executando"].includes(name);
  progress.style.display=active?"block":"none";
  if(name==="pesquisando")infoText.textContent="Pesquisa em andamento";
@@ -653,9 +659,22 @@ function setState(name){
 
 /* ===== COMPOSER ===== */
 const message=document.getElementById("message");
-document.getElementById("plus").onclick=()=>{
- message.focus();message.value=message.value?message.value+" ":"";
+const plus=document.getElementById("plus");
+const quickActions=document.getElementById("quickActions");
+function closeQuickActions(){quickActions.hidden=true;plus.setAttribute("aria-expanded","false");}
+plus.onclick=()=>{
+ quickActions.hidden=!quickActions.hidden;
+ plus.setAttribute("aria-expanded",String(!quickActions.hidden));
+ if(!quickActions.hidden){const first=quickActions.querySelector("button");if(first)first.focus();}
 };
+quickActions.addEventListener("keydown",e=>{
+ const items=[...quickActions.querySelectorAll("button")];const i=items.indexOf(document.activeElement);
+ if(e.key==="Escape"){closeQuickActions();plus.focus();}
+ else if(e.key==="ArrowDown"){e.preventDefault();items[(i+1)%items.length]?.focus();}
+ else if(e.key==="ArrowUp"){e.preventDefault();items[(i-1+items.length)%items.length]?.focus();}
+});
+quickActions.addEventListener("click",e=>{if(e.target.closest("button"))closeQuickActions();});
+document.addEventListener("click",e=>{if(!quickActions.contains(e.target)&&e.target!==plus)closeQuickActions();});
 document.getElementById("mic").onclick=()=>{
  if(window.Android && typeof Android.stacyVoice==="function"){
    message.placeholder="Ouvindo...";
@@ -664,17 +683,19 @@ document.getElementById("mic").onclick=()=>{
    window.stacyNativeState && window.stacyNativeState("erro");
  }
 };
-document.getElementById("send").onclick=()=>{
+function sendComposerMessage(){
  const text=message.value.trim();
  if(!text)return;
  if(window.Android && typeof Android.stacySend==="function"){
-   message.value="";
+   message.value="";closeQuickActions();
    window.stacyNativeState && window.stacyNativeState("pensando");
    Android.stacySend(text);
  }else{
    window.stacyNativeResponse && window.stacyNativeResponse("A ponte nativa da STACY não está disponível.","erro");
  }
-};
+}
+document.getElementById("send").onclick=sendComposerMessage;
+message.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendComposerMessage();}});
 
 /* ===== layout ===== */
 function resize(){
@@ -926,6 +947,23 @@ requestAnimationFrame(animate);
       }else if(status){
         status.textContent='Ponte nativa indisponível.';
       }
+      return;
+    }
+    if(key==='configAndroid'){
+      if(window.Android && typeof Android.stacyOpenAndroidSettings==='function')Android.stacyOpenAndroidSettings();
+      else window.stacyNativeResponse('A ponte nativa da STACY não está disponível.','erro');
+      return;
+    }
+    if(key==='calendarioAndroid'){
+      if(window.Android && typeof Android.stacyOpenCalendar==='function')Android.stacyOpenCalendar();
+      else window.stacyNativeResponse('A ponte nativa da STACY não está disponível.','erro');
+      return;
+    }
+    if(key==='compartilhar'){
+      const response=document.getElementById('responseBubble');
+      const text=response?response.textContent.trim():'';
+      if(window.Android && typeof Android.stacyShareText==='function' && text)Android.stacyShareText(text);
+      else window.stacyNativeResponse('Não há resposta disponível para compartilhar.','erro');
       return;
     }
     const commands={
