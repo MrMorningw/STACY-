@@ -170,6 +170,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
 }
 .stacy-drawer{
   position:fixed; z-index:90; left:0; top:0; bottom:0;
+  display:flex; flex-direction:column;
   width:min(82vw,330px);
   padding:calc(env(safe-area-inset-top) + 18px) 18px calc(env(safe-area-inset-bottom) + 18px);
   box-sizing:border-box;
@@ -178,7 +179,10 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
   box-shadow:18px 0 50px rgba(0,0,0,.48), 2px 0 22px rgba(255,91,0,.05);
   transform:translateX(-104%);
   transition:transform .34s cubic-bezier(.2,.8,.2,1);
-  overflow:hidden;
+  overflow-x:hidden; overflow-y:auto;
+  overscroll-behavior:contain;
+  scrollbar-width:thin;
+  scrollbar-color:rgba(255,117,31,.35) transparent;
 }
 .stacy-drawer.open{transform:translateX(0)}
 .stacy-drawer-backdrop.open{opacity:1;pointer-events:auto}
@@ -204,7 +208,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
   height:1px;margin:0 4px 17px;
   background:linear-gradient(90deg,rgba(255,117,31,.42),rgba(255,117,31,.04),transparent);
 }
-.stacy-nav{display:flex;flex-direction:column;gap:6px}
+.stacy-nav{display:flex;flex-direction:column;gap:6px;flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:0 2px 18px;scrollbar-width:thin;scrollbar-color:rgba(255,117,31,.35) transparent}
 .stacy-nav-item{
   appearance:none;width:100%;border:1px solid transparent;
   background:transparent;color:#c8beb7;
@@ -234,8 +238,11 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
   text-transform:uppercase;
 }
 .stacy-drawer-foot{
-  position:absolute;left:18px;right:18px;bottom:calc(env(safe-area-inset-bottom) + 17px);
-  padding-top:14px;border-top:1px solid rgba(255,117,31,.10);
+  position:sticky;bottom:0;flex:0 0 auto;
+  margin-top:auto;margin-left:0;margin-right:0;
+  padding:14px 0 calc(env(safe-area-inset-bottom) + 6px);
+  border-top:1px solid rgba(255,117,31,.10);
+  background:linear-gradient(180deg,rgba(6,6,6,.88),rgba(6,6,6,.99));
 }
 .stacy-system-status{display:flex;align-items:center;gap:8px;color:#716963;font-size:10px;letter-spacing:1px}
 .stacy-system-dot{width:6px;height:6px;border-radius:50%;background:#ff751f;box-shadow:0 0 10px rgba(255,117,31,.8)}
@@ -329,6 +336,20 @@ body.stacy-no-animations *{animation:none!important;transition:none!important}
 .quick-actions .stacy-attach-note{padding:8px 12px 10px;color:#a99a8e;font-size:12px;line-height:1.4}
 .stacy-attachment-chip{display:none;margin:0 0 8px;padding:8px 12px;border:1px solid rgba(255,116,24,.35);border-radius:10px;color:#f5efe9;font-size:12px}
 .stacy-attachment-chip.visible{display:block}
+
+.stacy-chat-log{display:none;position:absolute;left:4%;right:4%;top:calc(env(safe-area-inset-top) + 76px);bottom:calc(env(safe-area-inset-bottom) + 82px);z-index:25;overflow-y:auto;overscroll-behavior:contain;padding:10px 2px 18px;box-sizing:border-box;flex-direction:column;gap:10px;scrollbar-width:thin;scrollbar-color:rgba(255,117,31,.3) transparent}
+#app.chat-active .stacy-chat-log{display:flex}
+#app.chat-active .responsePanel{display:none!important}
+#app.chat-active #scene,#app.chat-active .info{opacity:.14;transition:opacity .25s ease}
+.stacy-chat-row{display:flex;width:100%;animation:stacyMessageIn .24s ease both}
+.stacy-chat-row.user{justify-content:flex-end}
+.stacy-chat-row.assistant{justify-content:flex-start}
+.stacy-chat-bubble{max-width:88%;padding:11px 13px;border-radius:14px;font-size:14px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;box-shadow:0 4px 18px rgba(0,0,0,.22)}
+.stacy-chat-row.user .stacy-chat-bubble{background:rgba(255,116,24,.15);border:1px solid rgba(255,116,24,.35);color:#fff3ea;border-bottom-right-radius:4px}
+.stacy-chat-row.assistant .stacy-chat-bubble{background:rgba(7,4,2,.93);border:1px solid rgba(255,116,24,.24);color:#eee8e2;border-bottom-left-radius:4px}
+.stacy-chat-row.pending .stacy-chat-bubble{color:#ffb27d}
+@keyframes stacyMessageIn{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){.stacy-chat-row{animation:none}}
 </style>
 </head>
 <body>
@@ -388,6 +409,7 @@ body.stacy-no-animations *{animation:none!important;transition:none!important}
     <div class="progress" id="progress"><i></i></div>
   </div>
 
+  <section class="stacy-chat-log" id="stacyChatLog" aria-label="Conversa com a STACY" aria-live="polite"></section>
   <section class="responsePanel" id="responsePanel" aria-live="polite">
     <div class="responseBubble" id="responseBubble" role="status" aria-live="polite" aria-atomic="true">Pronta para ajudar.</div>
   </section>
@@ -722,6 +744,23 @@ document.getElementById("mic").onclick=()=>{
    window.stacyNativeState && window.stacyNativeState("erro");
  }
 };
+function appendStacyChatMessage(text,role,extraClass){
+ const log=document.getElementById("stacyChatLog");
+ if(!log)return null;
+ document.getElementById("app").classList.add("chat-active");
+ const row=document.createElement("div");
+ row.className="stacy-chat-row "+role+(extraClass?" "+extraClass:"");
+ const bubble=document.createElement("div");
+ bubble.className="stacy-chat-bubble";
+ bubble.textContent=String(text||"");
+ row.appendChild(bubble);log.appendChild(row);log.scrollTop=log.scrollHeight;
+ return row;
+}
+window.stacyChatSetPending=function(){
+ const old=document.getElementById("stacyPendingReply");if(old)old.remove();
+ const row=appendStacyChatMessage("Processando sua solicitação…","assistant","pending");
+ if(row)row.id="stacyPendingReply";
+};
 function sendComposerMessage(){
  let text=message.value.trim();
  if(!text && selectedAttachmentNames.length)text="Ajude-me com os anexos selecionados.";
@@ -729,6 +768,8 @@ function sendComposerMessage(){
  if(selectedAttachmentNames.length)text+="\n\n[Anexos selecionados no dispositivo: "+selectedAttachmentNames.join(", ")+". O conteúdo dos arquivos não foi transmitido ao CORE nesta versão.]";
  if(window.Android && typeof Android.stacySend==="function"){
    message.value="";selectedAttachmentNames=[];updateAttachmentChip();closeQuickActions();document.getElementById("app").classList.remove("has-response");
+   appendStacyChatMessage(text,"user");
+   window.stacyChatSetPending();
    window.stacyNativeState && window.stacyNativeState("pensando");
    Android.stacySend(text);
  }else{
@@ -863,6 +904,7 @@ animationFrameId=requestAnimationFrame(animate);
     btn.addEventListener('click',()=>{
       document.querySelectorAll('.stacy-nav-item').forEach(x=>x.classList.remove('active'));
       btn.classList.add('active');
+      btn.scrollIntoView({block:'nearest',behavior:'smooth'});
       setOpen(false);
     });
   });
@@ -942,6 +984,10 @@ animationFrameId=requestAnimationFrame(animate);
   const stateMap={pesquisa:'pesquisando',pesquisando:'pesquisando',research:'pesquisando',execucao:'executando',execução:'executando',executando:'executando',execution:'executando',task:'executando',erro:'erro',error:'erro',ouvindo:'ouvindo',listening:'ouvindo',pensando:'pensando',thinking:'pensando',respondendo:'respondendo',resposta:'respondendo',online:'online',offline:'offline'};
   window.stacyNativeState=function(name){
     const key=String(name||'').toLowerCase();
+    if(['erro','error','offline'].includes(key)){
+      const pending=document.getElementById('stacyPendingReply');
+      if(pending){pending.querySelector('.stacy-chat-bubble').textContent='Não foi possível concluir. Verifique o CORE/Termux ou tente novamente.';pending.classList.remove('pending');pending.id='';}
+    }
     setState(stateMap[key]||key||'online');
     if(['pensando','ouvindo','pesquisando','executando','thinking','listening','researching','executing'].includes(key)){
       document.getElementById('app').classList.remove('has-response');
@@ -956,6 +1002,15 @@ animationFrameId=requestAnimationFrame(animate);
     const bubble=document.getElementById('responseBubble');
     if(bubble)bubble.textContent=text;
     document.getElementById('app').classList.add('has-response');
+    const pending=document.getElementById('stacyPendingReply');
+    if(pending)pending.remove();
+    const log=document.getElementById('stacyChatLog');
+    if(log){
+      document.getElementById('app').classList.add('chat-active');
+      const row=document.createElement('div');row.className='stacy-chat-row assistant';
+      const answer=document.createElement('div');answer.className='stacy-chat-bubble';answer.textContent=text;
+      row.appendChild(answer);log.appendChild(row);log.scrollTop=log.scrollHeight;
+    }
     setState(mapped==='erro'?'erro':'respondendo');
   };
   function nativeSend(text){

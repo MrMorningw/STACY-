@@ -82,3 +82,12 @@ Após atualizar, executar a matriz de testes no aparelho:
 - **Correção:** o callback agora usa `FLAG_MUTABLE` a partir do Android 12 (API 31), mantendo `FLAG_ONE_SHOT` e `FLAG_UPDATE_CURRENT`. Em versões anteriores, usa apenas os flags compatíveis.
 - **Próxima versão:** `0.1.9`, `versionCode 10`.
 - **Validação obrigatória:** compilar, executar os testes e confirmar publicação assinada; depois testar no aparelho o ciclo comando → Termux/Python → broadcast com JSON → resposta na interface. A causa é tecnicamente plausível e a correção foi aplicada, mas o teste físico ainda é necessário para confirmar a causa no dispositivo.
+
+
+## 8. Conversa visível, animação de resposta e menu rolável — 13/10/2026
+
+- A interface mantém um registro visual de mensagens do usuário e respostas da STACY, incluindo estado transitório de processamento substituído pela resposta ou por mensagem de erro.
+- O estado RESPONDENDO é mantido por 1,4 segundo antes de voltar a ONLINE, em vez de desaparecer imediatamente.
+- A barra lateral passou a usar layout flexível com rolagem vertical real, barra de rolagem discreta e rodapé preservado, permitindo alcançar Configurações em telas pequenas.
+- Versão alvo: 0.2.0 / versionCode 11.
+- Validação em CI e teste físico são obrigatórios. A conversa visual depende de o CORE retornar texto válido; a interface não cria respostas fictícias quando o CORE falha.
