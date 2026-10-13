@@ -22,15 +22,34 @@ class StacyCoreBridge(private val context: Context) {
         val flags = PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_UPDATE_CURRENT or
             if (android.os.Build.VERSION.SDK_INT >= 23) PendingIntent.FLAG_IMMUTABLE else 0
         val pendingIntent = PendingIntent.getBroadcast(context, executionId, callback, flags)
+        val command = """
+            ROOT="$HOME/stacy"
+            if [ ! -d "$ROOT" ] || [ ! -f "$ROOT/android/termux_widget/stacy-android.sh" ]; then
+              printf '%s\\n' '{"tipo":"erro","resposta":"O núcleo Python não foi encontrado em ~/stacy. Instale o repositório STACY no Termux e tente novamente."}'
+              exit 0
+            fi
+            if ! command -v python >/dev/null 2>&1; then
+              printf '%s\\n' '{"tipo":"erro","resposta":"O Python não está instalado no Termux. Instale Python e tente novamente."}'
+              exit 0
+            fi
+            if ! python -c 'import requests' >/dev/null 2>&1; then
+              printf '%s\\n' '{"tipo":"erro","resposta":"Falta uma dependência do núcleo. No Termux, execute: python -m pip install -r requirements.txt"}'
+              exit 0
+            fi
+            cd "$ROOT"
+            exec bash "$ROOT/android/termux_widget/stacy-android.sh" "$1"
+        """.trimIndent()
         val intent = Intent().apply {
             setClassName("com.termux", "com.termux.app.RunCommandService")
             action = "com.termux.RUN_COMMAND"
             putExtra("com.termux.RUN_COMMAND_PATH", "/data/data/com.termux/files/usr/bin/bash")
             putExtra("com.termux.RUN_COMMAND_ARGUMENTS", arrayOf(
-                "/data/data/com.termux/files/home/stacy/android/termux_widget/stacy-android.sh",
+                "-lc",
+                command,
+                "stacy-android",
                 normalized,
             ))
-            putExtra("com.termux.RUN_COMMAND_WORKDIR", "/data/data/com.termux/files/home/stacy")
+            putExtra("com.termux.RUN_COMMAND_WORKDIR", "/data/data/com.termux/files/home")
             putExtra("com.termux.RUN_COMMAND_BACKGROUND", true)
             putExtra("com.termux.RUN_COMMAND_SESSION_ACTION", "0")
             putExtra("com.termux.RUN_COMMAND_PENDING_INTENT", pendingIntent)
@@ -41,7 +60,7 @@ class StacyCoreBridge(private val context: Context) {
             onQueued()
         } catch (_: SecurityException) {
             callbacks.remove(executionId)
-            onError("Conceda à STACY a permissão para executar comandos no ambiente Termux.")
+            onError("Permita que aplicativos externos executem comandos no Termux e tente novamente.")
         } catch (erro: Exception) {
             callbacks.remove(executionId)
             onError("Não foi possível acionar o CORE: ${erro.message ?: "erro desconhecido"}.")
