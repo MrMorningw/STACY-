@@ -91,6 +91,22 @@ def avaliar_intencao(intencao: Any) -> dict:
     return {"status": STATUS_AUTORIZADA, "executar": True, "motivo": "acao_deterministica_do_core"}
 
 
+def estado() -> dict:
+    """Retorna estado verificável da camada ANPES, sem alegar integração ausente."""
+    return {
+        "nome": "ANPES",
+        "versao_plano": VERSAO_PLANO,
+        "politica_autonomia": "integrada_ao_core",
+        "validacao_planos": "disponivel",
+        "simulacao_padrao": True,
+        "limite_etapas": MAX_ETAPAS,
+        "execucao_por_ferramentas": "requer_executores_registrados",
+        "auto_modificacao": False,
+        "shell_arbitrario": False,
+        "apk_autossuficiente": False,
+    }
+
+
 def _erro(codigo: str, detalhe: str = "") -> dict:
     resultado = {"status": "invalido", "executar": False, "motivo": codigo}
     if detalhe:
