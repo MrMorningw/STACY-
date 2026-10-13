@@ -119,8 +119,8 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
 .responsePanel{display:none;position:absolute;left:50%;top:175px;transform:translateX(-50%);width:min(88%,620px);z-index:18}
 .responseBubble{border:1px solid rgba(255,116,24,.30);border-radius:14px;padding:16px 17px;background:rgba(7,4,2,.88);color:#eee8e2;font-size:15px;line-height:1.45;box-shadow:0 0 24px rgba(255,116,24,.05);opacity:0;transform:translateY(10px);transition:opacity .35s ease,transform .35s ease}
 #app.responding .status,#app.responding .stateBar,#app.responding .context{display:none}
-#app.responding .responsePanel{display:block}
-#app.responding .responseBubble{opacity:1;transform:translateY(0)}
+#app.responding .responsePanel,#app.has-response .responsePanel{display:block}
+#app.responding .responseBubble,#app.has-response .responseBubble{opacity:1;transform:translateY(0)}
 #app.responding #scene{opacity:.22;transform:scale(.78);transform-origin:50% 42%;transition:opacity .45s ease,transform .45s ease}
 #scene{transition:opacity .45s ease,transform .45s ease}
 
@@ -687,7 +687,7 @@ function sendComposerMessage(){
  const text=message.value.trim();
  if(!text)return;
  if(window.Android && typeof Android.stacySend==="function"){
-   message.value="";closeQuickActions();
+   message.value="";closeQuickActions();document.getElementById("app").classList.remove("has-response");
    window.stacyNativeState && window.stacyNativeState("pensando");
    Android.stacySend(text);
  }else{
@@ -764,7 +764,7 @@ requestAnimationFrame(animate);
 
 <!-- STACY SIDEBAR -->
 <div class="stacy-drawer-backdrop" id="stacyDrawerBackdrop"></div>
-<aside class="stacy-drawer" id="stacyDrawer" aria-hidden="true">
+<aside class="stacy-drawer" id="stacyDrawer" aria-hidden="true" inert>
   <div class="stacy-drawer-head">
     <div class="stacy-brand-block">
       <div class="stacy-drawer-brand">ST<span>A</span>CY</div>
@@ -856,12 +856,14 @@ requestAnimationFrame(animate);
     body.innerHTML=p.html;
     view.classList.add('open');
     view.setAttribute('aria-hidden','false');
+    view.inert=false;
     document.body.classList.add('stacy-section-active');
   }
   window.stacyOpenPage = openPage;
   function closePage(){
     view.classList.remove('open');
     view.setAttribute('aria-hidden','true');
+    view.inert=true;
     document.body.classList.remove('stacy-section-active');
   }
   back.addEventListener('click',()=>{
@@ -897,6 +899,7 @@ requestAnimationFrame(animate);
     const mapped=stateMap[String(tipo||'').toLowerCase()]||'respondendo';
     const bubble=document.getElementById('responseBubble');
     if(bubble)bubble.textContent=text;
+    document.getElementById('app').classList.add('has-response');
     setState(mapped==='erro'?'erro':'respondendo');
   };
   function nativeSend(text){
