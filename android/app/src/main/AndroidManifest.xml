@@ -27,7 +27,8 @@
         android:roundIcon="@drawable/stacy_launcher_icon"
         android:label="STACY"
         android:supportsRtl="true"
-        android:theme="@style/Theme.STACY">
+        android:theme="@style/Theme.STACY"
+        android:networkSecurityConfig="@xml/stacy_network_security">
 
         <provider
             android:name="androidx.core.content.FileProvider"
@@ -48,23 +49,15 @@
             </intent-filter>
         </activity>
 
-        <receiver
-            android:name=".StacyCoreResultReceiver"
-            android:exported="false" />
-
-        <!-- Receives visual-only phase signals from the Termux CORE process. -->
-        <receiver
-            android:name=".StacyCorePhaseReceiver"
-            android:exported="true" />
+        <receiver android:name=".StacyCoreResultReceiver" android:exported="false" />
+        <receiver android:name=".StacyCorePhaseReceiver" android:exported="true" />
 
         <service
             android:name=".StacyVoiceInteractionService"
             android:exported="true"
             android:permission="android.permission.BIND_VOICE_INTERACTION"
             android:process=":interactor">
-            <meta-data
-                android:name="android.voice_interaction"
-                android:resource="@xml/voice_interaction_service" />
+            <meta-data android:name="android.voice_interaction" android:resource="@xml/voice_interaction_service" />
             <intent-filter>
                 <action android:name="android.service.voice.VoiceInteractionService" />
             </intent-filter>
@@ -83,9 +76,7 @@
                 <action android:name="android.speech.RecognitionService" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
-            <meta-data
-                android:name="android.speech"
-                android:resource="@xml/recognition_service" />
+            <meta-data android:name="android.speech" android:resource="@xml/recognition_service" />
         </service>
 
     </application>
