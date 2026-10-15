@@ -26,7 +26,7 @@ trap cleanup EXIT INT TERM
 
 cd "$ROOT" || exit 1
 while true; do
-  if curl -fsS --max-time 1 http://127.0.0.1:8765/health >/dev/null 2>&1; then
+  if "$PYTHON" -c 'import urllib.request; urllib.request.urlopen("http://127.0.0.1:8765/health", timeout=1).read()' >/dev/null 2>&1; then
     sleep 3
     continue
   fi
