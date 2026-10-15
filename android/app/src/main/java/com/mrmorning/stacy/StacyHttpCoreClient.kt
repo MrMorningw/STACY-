@@ -22,7 +22,10 @@ class StacyHttpCoreClient(private val context: Context) {
                 setClassName("com.termux", "com.termux.app.RunCommandService")
                 action = "com.termux.RUN_COMMAND"
                 putExtra("com.termux.RUN_COMMAND_PATH", "/data/data/com.termux/files/usr/bin/bash")
-                putExtra("com.termux.RUN_COMMAND_ARGUMENTS", arrayOf("-lc", "cd \"$HOME/stacy\" && bash android/termux_widget/stacy-core-daemon.sh"))
+                putExtra(
+                    "com.termux.RUN_COMMAND_ARGUMENTS",
+                    arrayOf("-lc", "cd \"${'$'}HOME/stacy\" && bash android/termux_widget/stacy-core-daemon.sh"),
+                )
                 putExtra("com.termux.RUN_COMMAND_WORKDIR", "/data/data/com.termux/files/home")
                 putExtra("com.termux.RUN_COMMAND_BACKGROUND", true)
                 putExtra("com.termux.RUN_COMMAND_SESSION_ACTION", "0")
