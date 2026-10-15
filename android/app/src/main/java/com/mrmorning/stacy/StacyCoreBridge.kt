@@ -23,18 +23,16 @@ class StacyCoreBridge(private val context: Context) {
     private val timeoutHandler = Handler(Looper.getMainLooper())
     private val pendingTimeouts = ConcurrentHashMap<Int, Runnable>()
     private var activeExecutionId: Int? = null
+    private val httpCore = StacyHttpCoreClient(context)
+
+    init {
+        httpCore.startDaemon()
+    }
 
     fun process(message: String, onQueued: () -> Unit = {}, onError: (String) -> Unit = {}) {
         val normalized = message.trim()
         if (normalized.isEmpty()) return
-        if (context.packageManager.getPackageInfoOrNull("com.termux") == null) {
-            onError("O núcleo STACY precisa do Termux instalado para executar o CORE Python.")
-            return
-        }
-
-        synchronized(queue) {
-            queue.addLast(Request(normalized, onQueued, onError))
-        }
+        synchronized(queue) { queue.addLast(Request(normalized, onQueued, onError)) }
         onQueued()
         startNext()
     }
@@ -52,38 +50,43 @@ class StacyCoreBridge(private val context: Context) {
         val request = next.first
         val executionId = next.second
         val timeout = Runnable {
-            fail(
-                executionId,
-                "O CORE não devolveu resposta em 45 segundos. Confira se o Termux está instalado e aberto ao menos uma vez, se a permissão de execução de comandos por aplicativos externos está ativada e se o repositório existe em ~/stacy. Depois, tente novamente.",
-            )
+            fail(executionId, "O CORE não devolveu resposta em 45 segundos. Verifique o Termux, o repositório ~/stacy e tente novamente.")
         }
         pendingTimeouts[executionId] = timeout
         timeoutHandler.postDelayed(timeout, CORE_TIMEOUT_MS)
 
+        // Preferred path: persistent local HTTP CORE. A connection failure alone
+        // triggers the legacy Termux command; CORE application errors do not.
+        httpCore.chat(
+            message = request.message,
+            callback = { result ->
+                if (!isExecutionActive(executionId)) return@chat
+                CoreResultStore.publish(context, result) {
+                    complete(executionId)
+                }
+            },
+            onConnectionError = {
+                if (isExecutionActive(executionId)) startLegacy(request.message, executionId)
+            },
+        )
+    }
+
+    private fun startLegacy(message: String, executionId: Int) {
         try {
             val callback = Intent(context, StacyCoreResultReceiver::class.java).apply {
                 putExtra(StacyCoreResultReceiver.EXTRA_EXECUTION_ID, executionId)
             }
-            // Termux must be able to attach its result bundle to this PendingIntent.
-            // An immutable token can launch the command but prevents delivery of the callback data
-            // on modern Android, leaving the UI stuck in THINKING until timeout.
-            val resultMutability =
-                if (android.os.Build.VERSION.SDK_INT >= 31) PendingIntent.FLAG_MUTABLE else 0
-            val flags = PendingIntent.FLAG_ONE_SHOT or
-                PendingIntent.FLAG_UPDATE_CURRENT or resultMutability
+            val resultMutability = if (android.os.Build.VERSION.SDK_INT >= 31) PendingIntent.FLAG_MUTABLE else 0
+            val flags = PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_UPDATE_CURRENT or resultMutability
             val pendingIntent = PendingIntent.getBroadcast(context, executionId, callback, flags)
             val command = """
                 ROOT="${'$'}HOME/stacy"
                 if [ ! -d "${'$'}ROOT" ] || [ ! -f "${'$'}ROOT/android/termux_widget/stacy-android.sh" ]; then
-                  printf '%s\n' '{"tipo":"erro","resposta":"O núcleo Python não foi encontrado em ~/stacy. Instale o repositório STACY no Termux e tente novamente."}'
+                  printf '%s\n' '{"tipo":"erro","resposta":"O núcleo Python não foi encontrado em ~/stacy."}'
                   exit 0
                 fi
                 if ! command -v python >/dev/null 2>&1; then
-                  printf '%s\n' '{"tipo":"erro","resposta":"O Python não está instalado no Termux. Instale Python e tente novamente."}'
-                  exit 0
-                fi
-                if ! python -c 'import requests' >/dev/null 2>&1; then
-                  printf '%s\n' '{"tipo":"erro","resposta":"Falta uma dependência do núcleo. No Termux, execute: python -m pip install -r requirements.txt"}'
+                  printf '%s\n' '{"tipo":"erro","resposta":"O Python não está instalado no Termux."}'
                   exit 0
                 fi
                 cd "${'$'}ROOT"
@@ -93,10 +96,7 @@ class StacyCoreBridge(private val context: Context) {
                 setClassName("com.termux", "com.termux.app.RunCommandService")
                 action = "com.termux.RUN_COMMAND"
                 putExtra("com.termux.RUN_COMMAND_PATH", "/data/data/com.termux/files/usr/bin/bash")
-                putExtra(
-                    "com.termux.RUN_COMMAND_ARGUMENTS",
-                    arrayOf("-lc", command, "stacy-android", "--execution-id=$executionId", request.message),
-                )
+                putExtra("com.termux.RUN_COMMAND_ARGUMENTS", arrayOf("-lc", command, "stacy-android", "--execution-id=$executionId", message))
                 putExtra("com.termux.RUN_COMMAND_WORKDIR", "/data/data/com.termux/files/home")
                 putExtra("com.termux.RUN_COMMAND_BACKGROUND", true)
                 putExtra("com.termux.RUN_COMMAND_SESSION_ACTION", "0")
@@ -112,11 +112,11 @@ class StacyCoreBridge(private val context: Context) {
 
     private fun finish(executionId: Int) {
         pendingTimeouts.remove(executionId)?.let(timeoutHandler::removeCallbacks)
-        synchronized(queue) {
-            if (activeExecutionId == executionId) activeExecutionId = null
-        }
+        synchronized(queue) { if (activeExecutionId == executionId) activeExecutionId = null }
         startNext()
     }
+
+    fun shutdown() { httpCore.shutdown() }
 
     companion object {
         private const val CORE_TIMEOUT_MS = 45_000L
@@ -130,8 +130,7 @@ class StacyCoreBridge(private val context: Context) {
             bridge?.finish(executionId)
         }
 
-        fun isExecutionActive(executionId: Int): Boolean =
-            activeBridges.containsKey(executionId)
+        fun isExecutionActive(executionId: Int): Boolean = activeBridges.containsKey(executionId)
 
         fun complete(executionId: Int) {
             callbacks.remove(executionId)
@@ -155,11 +154,7 @@ object CoreResultStore {
     fun clear() { listener = null }
     fun publish(context: Context, result: CoreResult, afterPublish: () -> Unit = {}) {
         context.mainExecutor.execute {
-            try {
-                listener?.invoke(result)
-            } finally {
-                afterPublish()
-            }
+            try { listener?.invoke(result) } finally { afterPublish() }
         }
     }
 }
