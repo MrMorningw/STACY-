@@ -87,7 +87,7 @@ class StacyCoreBridge(private val context: Context) {
                   exit 0
                 fi
                 cd "${'$'}ROOT"
-                exec bash "${'$'}ROOT/android/termux_widget/stacy-android.sh" "${'$'}1"
+                exec bash "${'$'}ROOT/android/termux_widget/stacy-android.sh" "${'$'}@"
             """.trimIndent()
             val intent = Intent().apply {
                 setClassName("com.termux", "com.termux.app.RunCommandService")
@@ -95,7 +95,7 @@ class StacyCoreBridge(private val context: Context) {
                 putExtra("com.termux.RUN_COMMAND_PATH", "/data/data/com.termux/files/usr/bin/bash")
                 putExtra(
                     "com.termux.RUN_COMMAND_ARGUMENTS",
-                    arrayOf("-lc", command, "stacy-android", request.message),
+                    arrayOf("-lc", command, "stacy-android", "--execution-id=$executionId", request.message),
                 )
                 putExtra("com.termux.RUN_COMMAND_WORKDIR", "/data/data/com.termux/files/home")
                 putExtra("com.termux.RUN_COMMAND_BACKGROUND", true)
@@ -129,6 +129,9 @@ class StacyCoreBridge(private val context: Context) {
             callbacks.remove(executionId)?.invoke(message)
             bridge?.finish(executionId)
         }
+
+        fun isExecutionActive(executionId: Int): Boolean =
+            activeBridges.containsKey(executionId)
 
         fun complete(executionId: Int) {
             callbacks.remove(executionId)

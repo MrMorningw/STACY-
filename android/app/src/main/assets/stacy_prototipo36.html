@@ -763,17 +763,12 @@ let stacyRequestActive=false;
 function clearStacyPhaseTimers(){
  stacyPhaseTimers.forEach(id=>clearTimeout(id));stacyPhaseTimers=[];
 }
-function startStacyProcessingStages(message){
- clearStacyPhaseTimers();stacyRequestActive=true;
+function startStacyProcessingStages(_message){
+ clearStacyPhaseTimers();
+ stacyRequestActive=true;
+ // Until the CORE emits a real phase event, stay in THINKING.
+ // Never infer RESEARCHING/EXECUTING from the wording of the user's message.
  window.stacyNativeState&&window.stacyNativeState("pensando");
- const text=String(message||"").toLowerCase();
- const likelyQuestion=/[?]|\\b(quem|qual|quais|quando|onde|como|por que|porque|quanto|pesquise|pesquisar|procure|busque|explique|resuma|compare)\\b/.test(text);
- const stages=likelyQuestion?["pesquisando"]:["executando"];
- stages.forEach((stage,index)=>{
-   stacyPhaseTimers.push(setTimeout(()=>{
-     if(stacyRequestActive)window.stacyNativeState&&window.stacyNativeState(stage);
-   },(index+1)*1200));
- });
 }
 window.stacyChatSetPending=function(){
  const old=document.getElementById("stacyPendingReply");if(old)old.remove();
@@ -816,10 +811,9 @@ function animate(now){
  const dt=Math.min(.05,(now-last)/1000);last=now;time+=dt;
  phaseClock+=dt;
  if(state==='pesquisando'||state==='executando'){
+   // Progress belongs to the active phase; reaching 100% must not finish
+   // the request. Only a real CORE result/error can end the phase.
    researchProgress=Math.min(100,(phaseClock/8)*100);
-   if(researchProgress>=100 && state==='pesquisando'){
-     setState('respondendo');
-   }
  }
 
  current.energy=lerp(current.energy,target.energy,.055);
@@ -1024,7 +1018,10 @@ animationFrameId=requestAnimationFrame(animate);
   window.stacyNativeResponse=function(response,tipo){
     const text=String(response||'').trim();
     if(!text)return;
-    const mapped=stateMap[String(tipo||'').toLowerCase()]||'respondendo';
+    const resultType=String(tipo||'').toLowerCase();
+    // A returned payload means processing has finished. Its type describes
+    // the result, not an ongoing phase; only errors stay in ERROR.
+    const mapped=['erro','error'].includes(resultType)?'erro':'respondendo';
     const bubble=document.getElementById('responseBubble');
     if(bubble)bubble.textContent=text;
     document.getElementById('app').classList.add('has-response');

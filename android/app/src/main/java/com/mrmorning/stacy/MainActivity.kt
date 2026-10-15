@@ -93,6 +93,10 @@ class MainActivity : ComponentActivity() {
             )
         }
 
+        CorePhaseStore.subscribe { state ->
+            runOnUiThread { webState(state) }
+        }
+
         CoreResultStore.subscribe { result ->
             runOnUiThread {
                 val action = result.androidAction
@@ -324,6 +328,7 @@ class MainActivity : ComponentActivity() {
         pendingFileChooser?.onReceiveValue(null)
         pendingFileChooser = null
         CoreResultStore.clear()
+        CorePhaseStore.clear()
         if (::voiceInput.isInitialized) voiceInput.destroy()
         if (::textToSpeech.isInitialized) textToSpeech.shutdown()
         if (::webView.isInitialized) {
