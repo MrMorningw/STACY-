@@ -1,17 +1,37 @@
 package com.mrmorning.stacy
 
+import android.content.Context
+import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicInteger
 
-/** Fast local CORE transport. It never owns fallback decisions; callers do. */
-class StacyHttpCoreClient {
+/** Fast local CORE transport. Fallback remains owned by StacyCoreBridge. */
+class StacyHttpCoreClient(private val context: Context) {
     private val executor = Executors.newCachedThreadPool()
     private val main = Handler(Looper.getMainLooper())
     private val baseUrl = "http://localhost:8765"
+
+    fun startDaemon() {
+        try {
+            val intent = Intent().apply {
+                setClassName("com.termux", "com.termux.app.RunCommandService")
+                action = "com.termux.RUN_COMMAND"
+                putExtra("com.termux.RUN_COMMAND_PATH", "/data/data/com.termux/files/usr/bin/bash")
+                putExtra("com.termux.RUN_COMMAND_ARGUMENTS", arrayOf("-lc", "cd \"$HOME/stacy\" && bash android/termux_widget/stacy-core-daemon.sh"))
+                putExtra("com.termux.RUN_COMMAND_WORKDIR", "/data/data/com.termux/files/home")
+                putExtra("com.termux.RUN_COMMAND_BACKGROUND", true)
+                putExtra("com.termux.RUN_COMMAND_SESSION_ACTION", "0")
+            }
+            context.startService(intent)
+        } catch (_: Exception) {
+            // The legacy bridge remains the authoritative fallback.
+        }
+    }
 
     fun isCoreOnline(callback: (Boolean) -> Unit) {
         executor.execute {
@@ -20,7 +40,8 @@ class StacyHttpCoreClient {
         }
     }
 
-    fun chat(message: String, executionId: Int, callback: (CoreResult) -> Unit, onConnectionError: () -> Unit) {
+    fun chat(message: String, callback: (CoreResult) -> Unit, onConnectionError: () -> Unit) {
+        val executionId = NEXT_ID.getAndIncrement()
         executor.execute {
             try {
                 val body = JSONObject().apply {
@@ -36,9 +57,7 @@ class StacyHttpCoreClient {
                 val response = result.optString("resposta", "")
                 val action = result.optJSONObject("acao_android")
                 val sources = result.optJSONArray("fontes")
-                main.post {
-                    callback(CoreResult(type, response, 0, "", action, sources))
-                }
+                main.post { callback(CoreResult(type, response, 0, "", action, sources)) }
             } catch (_: Exception) {
                 main.post(onConnectionError)
             }
@@ -58,9 +77,7 @@ class StacyHttpCoreClient {
             }
         }
         return try {
-            if (body != null) {
-                connection.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
-            }
+            if (body != null) connection.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
             val code = connection.responseCode
             val stream = if (code in 200..299) connection.inputStream else connection.errorStream
             val text = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: return null
@@ -71,7 +88,7 @@ class StacyHttpCoreClient {
         }
     }
 
-    fun shutdown() {
-        executor.shutdownNow()
-    }
+    fun shutdown() { executor.shutdownNow() }
+
+    companion object { private val NEXT_ID = AtomicInteger(10_000) }
 }
