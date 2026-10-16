@@ -33,6 +33,7 @@ class CoreRuntime:
         try:
             import entity_store
             import memory
+            import stacy_ecc
             from orchestrator import StacyOrchestrator
             from android_session import load_api_key, persist_session, restore_session
 
@@ -140,6 +141,24 @@ class CoreRuntime:
 
         if not isinstance(result, dict):
             result = {"tipo": "resposta", "resposta": str(result)}
+
+        # ECC-inspired verification gate: never claim a result is valid merely
+        # because the orchestrator returned. The response shape and source
+        # metadata must pass a deterministic check before reaching Android.
+        try:
+            import stacy_ecc
+            verification = stacy_ecc.verify_result(result)
+        except Exception as exc:
+            verification = None
+            traceback.print_exc(file=sys.stderr)
+
+        if verification is None or not verification.ok:
+            return {
+                "tipo": "erro",
+                "resposta": "A operação foi interrompida porque o resultado não passou pela verificação do CORE.",
+                "verification": verification.to_dict() if verification is not None else {"ok": False, "status": "verification_error"},
+            }
+
         kind = result.get("tipo", "resposta")
         response = result.get("resposta", "")
         if not isinstance(kind, str) or not kind:
@@ -147,7 +166,7 @@ class CoreRuntime:
         if not isinstance(response, str) or not response.strip():
             response = "Não consegui produzir uma resposta válida, senhor."
             kind = "erro"
-        payload = {"tipo": kind, "resposta": response}
+        payload = {"tipo": kind, "resposta": response, "verification": verification.to_dict()}
         if self.warning:
             payload["warning"] = self.warning
         for key in ("acao_android", "fontes", "registry"):
@@ -156,14 +175,21 @@ class CoreRuntime:
         return payload
 
     def health(self) -> dict:
-        return {"ok": self.ready, "service": "stacy-core", "host": HOST, "port": PORT, "error": self.error}
+        return {
+            "ok": self.ready,
+            "service": "stacy-core",
+            "host": HOST,
+            "port": PORT,
+            "error": self.error,
+            "eccAdaptation": "1.0.0",
+        }
 
 
 RUNTIME = CoreRuntime()
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "STACY-Core/0.2.5"
+    server_version = "STACY-Core/0.3.0"
 
     def _json(self, status: int, payload: dict) -> None:
         data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -186,7 +212,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         if self.path != "/chat":
-            self._json(404, {"error": "endpoint_not_found"})
+            self._json(404, {"tipo": "erro", "resposta": "endpoint_not_found"})
             return
         try:
             length = int(self.headers.get("Content-Length", "0"))
