@@ -23,6 +23,7 @@ COMPONENTS = {
     "android_bridge": {"kind": "python", "path": "android_core.py"},
     "android_tools": {"kind": "python", "path": "android_tools.py"},
     "session": {"kind": "python", "path": "android_session.py"},
+    "ecc_adaptation": {"kind": "python", "path": "stacy_ecc.py"},
     "ui": {"kind": "android", "path": "android/app/src/main/assets/stacy_prototipo36.html"},
     "updater": {"kind": "android", "path": "android/app/src/main/java/com/mrmorning/stacy/StacyUpdater.kt"},
 }
@@ -65,12 +66,23 @@ def snapshot() -> dict:
     components["core"]["healthy"] = daemon
     components["core"]["status"] = "online" if daemon else "offline"
 
+    ecc = None
+    if components["ecc_adaptation"]["healthy"]:
+        try:
+            import stacy_ecc
+            ecc = stacy_ecc.diagnostics()
+        except Exception as exc:
+            components["ecc_adaptation"]["healthy"] = False
+            components["ecc_adaptation"]["status"] = "error"
+            components["ecc_adaptation"]["error"] = f"{type(exc).__name__}: {exc}"
+
     return {
-        "registryVersion": "1.1.0",
+        "registryVersion": "1.2.0",
         "generatedAt": time.time(),
         "root": str(ROOT),
         "core": {"host": "127.0.0.1", "port": 8765, "online": daemon},
         "components": components,
+        "eccAdaptation": ecc,
     }
 
 
