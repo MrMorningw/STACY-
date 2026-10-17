@@ -16,7 +16,7 @@ _STATUS_INICIAL = {
 _NOMES = {
     1: "STACY funcional", 2: "inteligência e contexto", 3: "memória avançada",
     4: "ações e ferramentas", 5: "contexto operacional", 6: "voz",
-    7: "interface Android", 8: "automação e Android", 9: "CTAC e MEPO",
+    7: "interface Android", 8: "automação e Android", 9: "trajetória e metas",
     10: "orquestração", 11: "autonomia controlada", 12: "estabilização e finalização",
 }
 
