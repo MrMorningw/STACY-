@@ -23,7 +23,24 @@ class StacyHttpCoreClient(private val context: Context) {
                 putExtra("com.termux.RUN_COMMAND_PATH", "/data/data/com.termux/files/usr/bin/bash")
                 putExtra(
                     "com.termux.RUN_COMMAND_ARGUMENTS",
-                    arrayOf("-lc", "cd \"${'$'}HOME/stacy\" && bash android/termux_widget/stacy-core-daemon.sh"),
+                    arrayOf(
+                        "-lc",
+                        """
+                        set -u
+                        ROOT="${'$'}HOME/stacy"
+                        SCRIPT="${'$'}ROOT/android/termux_widget/stacy-core-daemon.sh"
+                        mkdir -p "${'$'}ROOT/android/termux_widget"
+                        TMP="${'$'}SCRIPT.download"
+                        URL="https://raw.githubusercontent.com/MrMorningw/STACY-/main/android/termux_widget/stacy-core-daemon.sh?ars=${'$'}(date +%s)"
+                        if command -v curl >/dev/null 2>&1 && curl -fsSL --connect-timeout 10 --max-time 60 --retry 3 --retry-delay 1 "${'$'}URL" -o "${'$'}TMP" && test -s "${'$'}TMP"; then
+                            mv "${'$'}TMP" "${'$'}SCRIPT"
+                        else
+                            rm -f "${'$'}TMP"
+                            test -s "${'$'}SCRIPT" || { echo "STACY CORE: não foi possível obter o daemon atualizado." >&2; exit 1; }
+                        fi
+                        exec bash "${'$'}SCRIPT"
+                        """.trimIndent(),
+                    ),
                 )
                 putExtra("com.termux.RUN_COMMAND_WORKDIR", "/data/data/com.termux/files/home")
                 putExtra("com.termux.RUN_COMMAND_BACKGROUND", true)
