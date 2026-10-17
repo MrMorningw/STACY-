@@ -37,6 +37,13 @@ class TestStacyAnimationLifecycle(unittest.TestCase):
         self.assertIn("researchProgress=Math.min(100,(phaseClock/8)*100)", animation_loop)
         self.assertNotIn("setState('respondendo')", animation_loop)
 
+    def test_all_live_orb_states_have_visible_particles(self):
+        self.assertIn(
+            "const desiredParticles={online:0,ouvindo:1,pensando:2,pesquisando:1,executando:1,respondendo:2,offline:0};",
+            self.html,
+        )
+        self.assertIn('respondendo:{label:"RESPONDENDO",energy:1.12,rot:1.02,pulse:.82,glow:1.00', self.html)
+
     def test_final_core_result_transitions_to_response_unless_error(self):
         start = self.html.index("window.stacyNativeResponse=function")
         end = self.html.index("function nativeSend", start)
