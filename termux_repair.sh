@@ -3,27 +3,22 @@ set -euo pipefail
 
 REPO_RAW="https://raw.githubusercontent.com/MrMorningw/STACY-/main"
 ROOT="$HOME/stacy"
-
 mkdir -p "$ROOT"
 cd "$ROOT"
 
-# Stop any stale STACY daemon from this checkout before replacing/checking files.
+# Stop only stale STACY CORE daemons before replacing files.
 pids="$(pgrep -f 'python(3)?[[:space:]]+.*[/]stacy[/]core_server\.py' 2>/dev/null || true)"
 if [ -n "$pids" ]; then
   echo "[STACY ARS] encerrando CORE antigo: $pids"
   echo "$pids" | xargs -r kill 2>/dev/null || true
   sleep 2
   pids2="$(pgrep -f 'python(3)?[[:space:]]+.*[/]stacy[/]core_server\.py' 2>/dev/null || true)"
-  if [ -n "$pids2" ]; then
-    echo "$pids2" | xargs -r kill -9 2>/dev/null || true
-    sleep 1
-  fi
+  [ -z "$pids2" ] || echo "$pids2" | xargs -r kill -9 2>/dev/null || true
 fi
 
-# CTAC is not a STACY code module. Remove any stale local copy from previous ARS runs.
+# CTAC is not a STACY code module. Remove stale copies from previous ARS runs.
 rm -f "$ROOT/ctac.py" "$ROOT/ctac.pyc"
 
-# Synchronize only the actual STACY CORE modules.
 echo "[STACY ARS] sincronizando CORE oficial..."
 PY_FILES=(
   action.py ai.py anpes.py autonomy.py command.py config.py context.py
