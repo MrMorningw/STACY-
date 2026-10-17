@@ -232,7 +232,12 @@ class MainActivity : ComponentActivity() {
     inner class StacyJsBridge {
         @JavascriptInterface
         fun stacySend(message: String) {
-            runOnUiThread { vm.onInputChanged(message); vm.onSend() }
+            runOnUiThread {
+                // Give the UI immediate feedback before the ViewModel starts the request.
+                webState("pensando")
+                vm.onInputChanged(message)
+                vm.onSend()
+            }
         }
 
         @JavascriptInterface
