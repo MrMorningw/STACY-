@@ -7,11 +7,24 @@ ROOT="$HOME/stacy"
 mkdir -p "$ROOT"
 cd "$ROOT"
 
+# Stop a stale STACY daemon BEFORE replacing/checking files.
+pids="$(pgrep -f 'python(3)?[[:space:]]+.*[/]stacy[/]core_server\.py' 2>/dev/null || true)"
+if [ -n "$pids" ]; then
+  echo "[STACY ARS] encerrando CORE antigo: $pids"
+  echo "$pids" | xargs -r kill 2>/dev/null || true
+  sleep 2
+  pids2="$(pgrep -f 'python(3)?[[:space:]]+.*[/]stacy[/]core_server\.py' 2>/dev/null || true)"
+  if [ -n "$pids2" ]; then
+    echo "$pids2" | xargs -r kill -9 2>/dev/null || true
+    sleep 1
+  fi
+fi
+
 echo "[STACY ARS] sincronizando CORE completo..."
 PY_FILES=(
   action.py ai.py anpes.py autonomy.py command.py config.py context.py
-  conversation.py cortex.py ctac.py entity_resolver.py entity_store.py
-  intent.py knowledge.py memory.py mepo.py orchestration.py orchestrator.py
+  conversation.py cortex.py entity_resolver.py entity_store.py intent.py
+  knowledge.py memory.py mepo.py orchestration.py orchestrator.py
   stacy_ecc.py tasks.py android_session.py core_server.py
 )
 
@@ -35,15 +48,6 @@ if "phase_callback" not in params:
 print("[STACY ARS] grafo do CORE carregado: OK")
 print("[STACY ARS] phase_callback: OK")
 PY
-
-# Stop only STACY daemon processes from this checkout.
-pids="$(pgrep -f 'python(3)?[[:space:]]+.*[/]stacy[/]core_server\.py' 2>/dev/null || true)"
-if [ -n "$pids" ]; then
-  echo "[STACY ARS] encerrando CORE antigo: $pids"
-  echo "$pids" | xargs -r kill 2>/dev/null || true
-  sleep 2
-  echo "$pids" | xargs -r kill -9 2>/dev/null || true
-fi
 
 termux-wake-lock
 echo "[STACY ARS] iniciando CORE..."
