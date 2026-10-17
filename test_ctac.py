@@ -1,8 +1,24 @@
+import inspect
 import unittest
-import ctac
-class CtacTest(unittest.TestCase):
-    def test_trajetoria_completa(self):
-        estado=ctac.estado(); self.assertIsNone(estado["mepo_atual"]); self.assertEqual(estado["status_mepo_atual"],None); self.assertEqual(estado["mepos_fechados"],12); self.assertTrue(ctac.validar_coerencia()["coerente"])
-    def test_formatacao(self):
-        self.assertIn("CTAC",ctac.formatar_estado()); self.assertIn("MP-12",ctac.formatar_mepos())
-if __name__=="__main__": unittest.main()
+
+import orchestrator
+
+
+class LegacyCtacDependencyTest(unittest.TestCase):
+    def test_orchestrator_does_not_import_ctac(self):
+        source = inspect.getsource(orchestrator)
+        self.assertNotIn("import ctac", source.lower())
+        self.assertNotIn("from ctac", source.lower())
+
+    def test_orchestrator_retains_full_core_contract(self):
+        required = {
+            "processar",
+            "_processar_interno",
+            "_registrar_resultado_conversa",
+            "_usar_ai",
+        }
+        self.assertTrue(required.issubset(set(dir(orchestrator.StacyOrchestrator))))
+
+
+if __name__ == "__main__":
+    unittest.main()
