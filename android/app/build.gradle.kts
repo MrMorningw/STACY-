@@ -11,8 +11,8 @@ android {
         applicationId = "com.mrmorning.stacy"
         minSdk = 26
         targetSdk = 36
-        versionCode = 18
-        versionName = "0.2.7"
+        versionCode = 19
+        versionName = "0.2.8"
     }
 
     signingConfigs {
