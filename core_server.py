@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import contextlib
+import importlib.util
 import json
 import os
 import sys
@@ -13,6 +14,20 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 HOST = "127.0.0.1"
 PORT = 8765
+
+
+def _load_local_orchestrator():
+    """Load the orchestrator shipped beside this daemon, never a shadow module."""
+    module_path = ROOT / "orchestrator.py"
+    if not module_path.is_file():
+        raise FileNotFoundError(f"orchestrator.py ausente em {module_path}")
+    spec = importlib.util.spec_from_file_location("stacy_local_orchestrator", module_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"não foi possível carregar {module_path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module.StacyOrchestrator
 
 
 class CoreRuntime:
@@ -29,7 +44,7 @@ class CoreRuntime:
             import entity_store
             import memory
             import stacy_ecc
-            from orchestrator import StacyOrchestrator
+            StacyOrchestrator = _load_local_orchestrator()
             from android_session import load_api_key, persist_session, restore_session
             self._persist_session = persist_session
             with contextlib.redirect_stdout(sys.stderr):
@@ -69,7 +84,6 @@ class CoreRuntime:
         if not self.ready:
             return {"tipo": "erro", "resposta": "O CORE não está saudável: " + (self.error or "falha de inicialização")}
 
-        # Phase must be emitted as soon as a valid request enters the daemon.
         self.execution_id = execution_id
         self._phase("pensando")
 
@@ -77,20 +91,11 @@ class CoreRuntime:
             try:
                 import android_tools
                 import stacy_ecc
-
-                # Security: user text is untrusted data, never a system instruction.
                 sec = stacy_ecc.inspect_untrusted_text(normalized)
                 if not sec.allowed:
-                    return {
-                        "tipo": "erro",
-                        "resposta": "Detectei conteúdo suspeito e interrompi por segurança, senhor.",
-                        "security": {"allowed": False, "reason": sec.reason, "risk": sec.risk},
-                    }
-
-                # Internal agent selection is diagnostic and does not alter the UI.
+                    return {"tipo": "erro", "resposta": "Detectei conteúdo suspeito e interrompi por segurança, senhor.", "security": {"allowed": False, "reason": sec.reason, "risk": sec.risk}}
                 agent = stacy_ecc.select_agent("ia_local")
                 print(f"[stacy-ecc] agent={agent.name}", file=sys.stderr)
-
                 self.orchestrator.acao_pendente = getattr(self.orchestrator, "acao_pendente", None)
                 android_action = None
                 if self.orchestrator.acao_pendente is None and self.orchestrator.conversa.intencao_pendente is None:
@@ -124,7 +129,6 @@ class CoreRuntime:
         if not isinstance(result, dict):
             result = {"tipo": "resposta", "resposta": str(result)}
 
-        # ECC verification is diagnostic for valid responses; it must not swallow them.
         try:
             verification = stacy_ecc.verify_result(result)
         except Exception:
@@ -141,27 +145,15 @@ class CoreRuntime:
         payload = {"tipo": kind, "resposta": response}
         if verification is not None:
             payload["verification"] = verification.to_dict()
-            # Only force an error when the response itself is actually empty/invalid.
-            if not verification.ok and kind != "erro" and not response.strip():
-                payload["tipo"] = "erro"
-                payload["resposta"] = "Não consegui produzir uma resposta válida, senhor."
-
         if self.warning:
             payload["warning"] = self.warning
         for key in ("acao_android", "fontes", "registry", "security"):
             if isinstance(result.get(key), (dict, list)):
                 payload[key] = result[key]
 
-        # Learning store (ECC) — record successful interactions without affecting the response.
         try:
             if payload.get("tipo") not in {"erro", "error"}:
-                stacy_ecc.LearningStore().record(
-                    trigger=normalized[:200],
-                    behavior=str(payload.get("resposta", ""))[:300],
-                    scope="conversation",
-                    evidence="core_response",
-                    success=True,
-                )
+                stacy_ecc.LearningStore().record(trigger=normalized[:200], behavior=str(payload.get("resposta", ""))[:300], scope="conversation", evidence="core_response", success=True)
         except Exception:
             pass
 
