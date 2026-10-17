@@ -8,7 +8,6 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.Executors
-import java.util.concurrent.atomic.AtomicInteger
 
 /** Fast local CORE transport. Fallback remains owned by StacyCoreBridge. */
 class StacyHttpCoreClient(private val context: Context) {
@@ -43,8 +42,7 @@ class StacyHttpCoreClient(private val context: Context) {
         }
     }
 
-    fun chat(message: String, callback: (CoreResult) -> Unit, onConnectionError: () -> Unit) {
-        val executionId = NEXT_ID.getAndIncrement()
+    fun chat(message: String, executionId: Int, callback: (CoreResult) -> Unit, onConnectionError: () -> Unit) {
         executor.execute {
             try {
                 val body = JSONObject().apply {
@@ -60,7 +58,7 @@ class StacyHttpCoreClient(private val context: Context) {
                 val response = result.optString("resposta", "")
                 val action = result.optJSONObject("acao_android")
                 val sources = result.optJSONArray("fontes")
-                main.post { callback(CoreResult(type, response, 0, "", action, sources)) }
+                main.post { callback(CoreResult(type, response, 0, "", action, sources, executionId)) }
             } catch (_: Exception) {
                 main.post(onConnectionError)
             }
@@ -84,8 +82,6 @@ class StacyHttpCoreClient(private val context: Context) {
             val code = connection.responseCode
             val stream = if (code in 200..299) connection.inputStream else connection.errorStream
             val text = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: return null
-            // HTTP status alone does not determine transport health. Preserve a
-            // structured STACY application response even for 4xx/5xx.
             try {
                 val json = JSONObject(text)
                 if (json.has("tipo") || json.has("resposta")) json else null
@@ -98,6 +94,4 @@ class StacyHttpCoreClient(private val context: Context) {
     }
 
     fun shutdown() { executor.shutdownNow() }
-
-    companion object { private val NEXT_ID = AtomicInteger(10_000) }
 }
