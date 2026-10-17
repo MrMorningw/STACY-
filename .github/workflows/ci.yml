@@ -25,5 +25,8 @@ jobs:
       - name: Compile
         run: python -m py_compile *.py
 
+      - name: Validate Termux bootstrap syntax
+        run: bash -n termux_repair.sh android/termux_widget/stacy-core-daemon.sh
+
       - name: Core regression tests
         run: python -m unittest discover -v
