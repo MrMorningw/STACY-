@@ -84,8 +84,14 @@ class StacyHttpCoreClient(private val context: Context) {
             val code = connection.responseCode
             val stream = if (code in 200..299) connection.inputStream else connection.errorStream
             val text = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: return null
-            if (code !in 200..299) return null
-            JSONObject(text)
+            // HTTP status alone does not determine transport health. Preserve a
+            // structured STACY application response even for 4xx/5xx.
+            try {
+                val json = JSONObject(text)
+                if (json.has("tipo") || json.has("resposta")) json else null
+            } catch (_: Exception) {
+                null
+            }
         } finally {
             connection.disconnect()
         }
