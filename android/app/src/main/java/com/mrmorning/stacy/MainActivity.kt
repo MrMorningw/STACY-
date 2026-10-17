@@ -95,13 +95,15 @@ class MainActivity : ComponentActivity() {
                     webState("respondendo")
                     handleAndroidAction(action)
                 } else if (result.response.isNotBlank()) {
+                    val isError = result.tipo.equals("erro", ignoreCase = true) ||
+                        result.tipo.equals("error", ignoreCase = true)
+                    // A real result wins over phase telemetry: update the state first,
+                    // then deliver text/TTS, and return to ONLINE after the response settles.
+                    webState(if (isError) "erro" else "respondendo")
                     vm.onCoreResponse(result)
                     webResponse(formatResponseWithSources(result), result.tipo)
                     if (voiceEnabled) textToSpeech.speak(result.response)
-                    if (result.tipo == "erro") {
-                        webState("erro")
-                    } else {
-                        webState("respondendo")
+                    if (!isError) {
                         responseHandler.postDelayed({ webState("online") }, 1200L)
                     }
                 } else {
@@ -202,6 +204,7 @@ class MainActivity : ComponentActivity() {
         @JavascriptInterface
         fun stacySend(message: String) {
             runOnUiThread {
+                responseHandler.removeCallbacksAndMessages(null)
                 webState("pensando")
                 vm.onInputChanged(message)
                 vm.onSend()
