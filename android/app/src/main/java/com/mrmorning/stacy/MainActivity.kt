@@ -19,12 +19,13 @@ class MainActivity : ComponentActivity() {
     private lateinit var voiceInput: AndroidVoiceInput
     private lateinit var coreBridge: StacyCoreBridge
     private lateinit var textToSpeech: AndroidTextToSpeech
-    private lateinit var androidAutomation: StacyAndroidAutomation
+    private lateinit var androidAutomation: AndroidAutomation
     private lateinit var webView: WebView
     private lateinit var vm: StacyViewModel
     private var voiceEnabled = true
     private lateinit var updater: StacyUpdater
     private var pendingFileChooser: ValueCallback<Array<Uri>>? = null
+    private val responseHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private val fileChooserResult = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val callback = pendingFileChooser ?: return@registerForActivityResult
         pendingFileChooser = null
@@ -54,29 +55,19 @@ class MainActivity : ComponentActivity() {
         coreBridge = StacyCoreBridge(this)
         androidAutomation = AndroidAutomation(this)
         textToSpeech = AndroidTextToSpeech(this)
-        updater = StacyUpdater(this) { status ->
-            runOnUiThread { webUpdateStatus(status) }
-        }
+        updater = StacyUpdater(this) { status -> runOnUiThread { webUpdateStatus(status) } }
 
         voiceInput = AndroidVoiceInput(
             context = this,
             onResult = { result ->
                 runOnUiThread {
                     when (result) {
-                        is VoiceResult.Success -> {
-                            webState("pensando")
-                            vm.onVoiceResult(result)
-                        }
-                        is VoiceResult.Failure -> {
-                            webState("offline")
-                            vm.onVoiceResult(result)
-                        }
+                        is VoiceResult.Success -> { webState("pensando"); vm.onVoiceResult(result) }
+                        is VoiceResult.Failure -> { webState("offline"); vm.onVoiceResult(result) }
                     }
                 }
             },
-            onStateChanged = { listening ->
-                runOnUiThread { webState(if (listening) "ouvindo" else "online") }
-            },
+            onStateChanged = { listening -> runOnUiThread { webState(if (listening) "ouvindo" else "online") } },
         )
 
         vm.bindCore { message ->
@@ -93,31 +84,31 @@ class MainActivity : ComponentActivity() {
             )
         }
 
-        CorePhaseStore.subscribe { state ->
-            runOnUiThread { webState(state) }
-        }
+        CorePhaseStore.subscribe { state -> runOnUiThread { webState(state) } }
 
         CoreResultStore.subscribe { result ->
             runOnUiThread {
+                // A result from the CORE is authoritative for completion. Even if
+                // its phase events were lost, the response itself must drive the UI.
                 val action = result.androidAction
                 if (action != null) {
-                    webState("executando")
+                    webState("respondendo")
                     handleAndroidAction(action)
                 } else if (result.response.isNotBlank()) {
                     vm.onCoreResponse(result)
-                    if (voiceEnabled) textToSpeech.speak(result.response)
                     webResponse(formatResponseWithSources(result), result.tipo)
+                    if (voiceEnabled) textToSpeech.speak(result.response)
                     if (result.tipo == "erro") {
                         webState("erro")
                     } else {
                         webState("respondendo")
-                        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                            webState("online")
-                        }, 1400L)
+                        responseHandler.postDelayed({ webState("online") }, 1200L)
                     }
-                } else if (result.exitCode != 0) {
-                    val error = result.stderr.ifBlank {
-                        "O CORE encerrou a execução com erro."
+                } else {
+                    val error = if (result.exitCode != 0) {
+                        result.stderr.ifBlank { "O CORE encerrou a execução com erro." }
+                    } else {
+                        "O CORE não retornou uma resposta válida, senhor."
                     }
                     vm.onCoreError(error)
                     webResponse(error, "erro")
@@ -134,11 +125,7 @@ class MainActivity : ComponentActivity() {
             settings.allowContentAccess = true
             webViewClient = WebViewClient()
             webChromeClient = object : WebChromeClient() {
-                override fun onShowFileChooser(
-                    webView: WebView?,
-                    filePathCallback: ValueCallback<Array<Uri>>?,
-                    fileChooserParams: FileChooserParams?,
-                ): Boolean {
+                override fun onShowFileChooser(webView: WebView?, filePathCallback: ValueCallback<Array<Uri>>?, fileChooserParams: FileChooserParams?): Boolean {
                     pendingFileChooser?.onReceiveValue(null)
                     pendingFileChooser = filePathCallback ?: return false
                     return try {
@@ -167,8 +154,7 @@ class MainActivity : ComponentActivity() {
             val url = source.optString("url")
             if (!url.startsWith("https://")) null else "${title}\n$url"
         }
-        return if (lines.isEmpty()) result.response
-        else result.response + "\n\nFontes consultadas:\n" + lines.joinToString("\n\n")
+        return if (lines.isEmpty()) result.response else result.response + "\n\nFontes consultadas:\n" + lines.joinToString("\n\n")
     }
 
     private fun handleAndroidAction(action: JSONObject) {
@@ -178,31 +164,13 @@ class MainActivity : ComponentActivity() {
             "abrir_calendario" -> androidAutomation.openCalendar()
             "abrir_aplicativo" -> {
                 val packageName = action.optString("pacote")
-                if (packageName !in setOf(
-                        "com.whatsapp",
-                        "com.google.android.youtube",
-                        "com.android.chrome",
-                        "com.google.android.gm",
-                        "com.spotify.music",
-                        "com.google.android.apps.maps",
-                    )
-                ) {
-                    AutomationResult.Failure(
-                        "APP_NOT_ALLOWED",
-                        "Esse aplicativo não está na lista de ações autorizadas da STACY.",
-                    )
-                } else {
-                    androidAutomation.openApplication(packageName)
-                }
+                if (packageName !in setOf("com.whatsapp", "com.google.android.youtube", "com.android.chrome", "com.google.android.gm", "com.spotify.music", "com.google.android.apps.maps")) {
+                    AutomationResult.Failure("APP_NOT_ALLOWED", "Esse aplicativo não está na lista de ações autorizadas da STACY.")
+                } else androidAutomation.openApplication(packageName)
             }
-            "selecionar_arquivo" ->
-                androidAutomation.pickFile(action.optString("mime_type", "*/*"))
-            "compartilhar_texto" ->
-                androidAutomation.shareText(action.optString("texto"), "Compartilhar pela STACY")
-            else -> AutomationResult.Failure(
-                "UNKNOWN_ANDROID_ACTION",
-                "A STACY recusou uma ação Android desconhecida.",
-            )
+            "selecionar_arquivo" -> androidAutomation.pickFile(action.optString("mime_type", "*/*"))
+            "compartilhar_texto" -> androidAutomation.shareText(action.optString("texto"), "Compartilhar pela STACY")
+            else -> AutomationResult.Failure("UNKNOWN_ANDROID_ACTION", "A STACY recusou uma ação Android desconhecida.")
         }
 
         when (outcome) {
@@ -218,7 +186,8 @@ class MainActivity : ComponentActivity() {
                 vm.addAssistantMessage(message)
                 if (voiceEnabled) textToSpeech.speak(message)
                 webResponse(message, "resposta")
-                webState("online")
+                webState("respondendo")
+                responseHandler.postDelayed({ webState("online") }, 1200L)
             }
             is AutomationResult.Failure -> {
                 vm.onCoreError(outcome.message)
@@ -233,7 +202,6 @@ class MainActivity : ComponentActivity() {
         @JavascriptInterface
         fun stacySend(message: String) {
             runOnUiThread {
-                // Give the UI immediate feedback before the ViewModel starts the request.
                 webState("pensando")
                 vm.onInputChanged(message)
                 vm.onSend()
@@ -243,53 +211,21 @@ class MainActivity : ComponentActivity() {
         @JavascriptInterface
         fun stacyVoice() {
             runOnUiThread {
-                if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) ==
-                    android.content.pm.PackageManager.PERMISSION_GRANTED
-                ) {
+                if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
                     webState("ouvindo")
                     voiceInput.startListening()
-                } else {
-                    requestMicrophone.launch(Manifest.permission.RECORD_AUDIO)
-                }
+                } else requestMicrophone.launch(Manifest.permission.RECORD_AUDIO)
             }
         }
 
-        @JavascriptInterface
-        fun stacySetVoiceEnabled(enabled: Boolean) {
-            voiceEnabled = enabled
+        @JavascriptInterface fun stacySetVoiceEnabled(enabled: Boolean) { voiceEnabled = enabled }
+        @JavascriptInterface fun stacyCheckUpdate() { updater.checkAndUpdate() }
+        @JavascriptInterface fun stacyOpenAppSettings() {
+            runOnUiThread { startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))) }
         }
-
-        @JavascriptInterface
-        fun stacyCheckUpdate() {
-            updater.checkAndUpdate()
-        }
-
-        @JavascriptInterface
-        fun stacyOpenAppSettings() {
-            runOnUiThread {
-                startActivity(
-                    Intent(
-                        android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                        Uri.parse("package:$packageName"),
-                    ),
-                )
-            }
-        }
-
-        @JavascriptInterface
-        fun stacyOpenAndroidSettings() {
-            runOnUiThread { reportAutomationOutcome(androidAutomation.openSettings(), "Configurações do Android abertas.") }
-        }
-
-        @JavascriptInterface
-        fun stacyOpenCalendar() {
-            runOnUiThread { reportAutomationOutcome(androidAutomation.openCalendar(), "Calendário do Android aberto.") }
-        }
-
-        @JavascriptInterface
-        fun stacyShareText(text: String) {
-            runOnUiThread { reportAutomationOutcome(androidAutomation.shareText(text, "Compartilhar pela STACY"), "Menu de compartilhamento aberto.") }
-        }
+        @JavascriptInterface fun stacyOpenAndroidSettings() { runOnUiThread { reportAutomationOutcome(androidAutomation.openSettings(), "Configurações do Android abertas.") } }
+        @JavascriptInterface fun stacyOpenCalendar() { runOnUiThread { reportAutomationOutcome(androidAutomation.openCalendar(), "Calendário do Android aberto.") } }
+        @JavascriptInterface fun stacyShareText(text: String) { runOnUiThread { reportAutomationOutcome(androidAutomation.shareText(text, "Compartilhar pela STACY"), "Menu de compartilhamento aberto.") } }
     }
 
     private fun reportAutomationOutcome(outcome: AutomationResult, successMessage: String) {
@@ -300,46 +236,36 @@ class MainActivity : ComponentActivity() {
         if (outcome is AutomationResult.Success) vm.addAssistantMessage(message) else vm.onCoreError(message)
         if (voiceEnabled) textToSpeech.speak(message)
         webResponse(message, if (outcome is AutomationResult.Success) "resposta" else "erro")
-        webState(if (outcome is AutomationResult.Success) "online" else "erro")
+        if (outcome is AutomationResult.Success) {
+            webState("respondendo")
+            responseHandler.postDelayed({ webState("online") }, 1200L)
+        } else webState("erro")
     }
 
     private fun webState(state: String) {
         if (!::webView.isInitialized) return
-        webView.evaluateJavascript(
-            "window.stacyNativeState && window.stacyNativeState(" + JSONObject.quote(state) + ")",
-            null,
-        )
+        webView.evaluateJavascript("window.stacyNativeState && window.stacyNativeState(" + JSONObject.quote(state) + ")", null)
     }
 
     private fun webUpdateStatus(status: String) {
         if (!::webView.isInitialized) return
-        webView.evaluateJavascript(
-            "window.stacyNativeUpdateStatus && window.stacyNativeUpdateStatus(" +
-                JSONObject.quote(status) + ")",
-            null,
-        )
+        webView.evaluateJavascript("window.stacyNativeUpdateStatus && window.stacyNativeUpdateStatus(" + JSONObject.quote(status) + ")", null)
     }
 
     private fun webResponse(response: String, tipo: String) {
         if (!::webView.isInitialized) return
-        webView.evaluateJavascript(
-            "window.stacyNativeResponse && window.stacyNativeResponse(" +
-                JSONObject.quote(response) + "," + JSONObject.quote(tipo) + ")",
-            null,
-        )
+        webView.evaluateJavascript("window.stacyNativeResponse && window.stacyNativeResponse(" + JSONObject.quote(response) + "," + JSONObject.quote(tipo) + ")", null)
     }
 
     override fun onDestroy() {
         pendingFileChooser?.onReceiveValue(null)
         pendingFileChooser = null
+        responseHandler.removeCallbacksAndMessages(null)
         CoreResultStore.clear()
         CorePhaseStore.clear()
         if (::voiceInput.isInitialized) voiceInput.destroy()
         if (::textToSpeech.isInitialized) textToSpeech.shutdown()
-        if (::webView.isInitialized) {
-            webView.removeJavascriptInterface("Android")
-            webView.destroy()
-        }
+        if (::webView.isInitialized) { webView.removeJavascriptInterface("Android"); webView.destroy() }
         super.onDestroy()
     }
 }
