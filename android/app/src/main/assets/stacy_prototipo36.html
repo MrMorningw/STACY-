@@ -607,7 +607,7 @@ function makeOrbiter(){
  return s;
 }
 for(let i=0;i<6;i++) makeOrbiter();
-const desiredParticles={online:0,ouvindo:1,pensando:2,pesquisando:1,executando:1,respondendo:2,offline:0};
+const desiredParticles={online:0,ouvindo:1,pensando:2,pesquisando:0,executando:0,respondendo:0,offline:0};
 let researchProgress=0;
 let phaseClock=0;
 const progressSteps=[10,20,40,60,80,100];
@@ -657,7 +657,7 @@ const states={
  pensando:{label:"PENSANDO",energy:1.20,rot:1.12,pulse:.62,glow:.90,title:"Analisando sua solicitação.",sub:"Em breve, uma resposta."},
  pesquisando:{label:"PESQUISANDO",energy:1.14,rot:1.00,pulse:.50,glow:.84,title:"Pesquisando informações.",sub:"Buscando dados relevantes."},
  executando:{label:"EXECUTANDO",energy:1.30,rot:1.32,pulse:.72,glow:.98,title:"Executando sua solicitação.",sub:"Processando a tarefa."},
- respondendo:{label:"RESPONDENDO",energy:1.08,rot:.88,pulse:.64,glow:.86,title:"Aqui está sua resposta.",sub:"Preparando a resposta."},
+ respondendo:{label:"RESPONDENDO",energy:1.12,rot:1.02,pulse:.82,glow:1.00,title:"Aqui está sua resposta.",sub:"Preparando a resposta."},
  erro:{label:"ERRO",energy:.25,rot:.08,pulse:.08,glow:.12,title:"Não consegui concluir.",sub:"Verifique a conexão com o núcleo."},
  offline:{label:"OFFLINE",energy:.12,rot:.04,pulse:0,glow:0,title:"STACY está offline.",sub:"Tentando reconectar..."}
 };
