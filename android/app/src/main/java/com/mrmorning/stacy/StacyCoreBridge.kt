@@ -25,9 +25,7 @@ class StacyCoreBridge(private val context: Context) {
     private var activeExecutionId: Int? = null
     private val httpCore = StacyHttpCoreClient(context)
 
-    init {
-        httpCore.startDaemon()
-    }
+    init { httpCore.startDaemon() }
 
     fun process(message: String, onQueued: () -> Unit = {}, onError: (String) -> Unit = {}) {
         val normalized = message.trim()
@@ -55,15 +53,12 @@ class StacyCoreBridge(private val context: Context) {
         pendingTimeouts[executionId] = timeout
         timeoutHandler.postDelayed(timeout, CORE_TIMEOUT_MS)
 
-        // Preferred path: persistent local HTTP CORE. A connection failure alone
-        // triggers the legacy Termux command; CORE application errors do not.
         httpCore.chat(
             message = request.message,
+            executionId = executionId,
             callback = { result ->
                 if (!isExecutionActive(executionId)) return@chat
-                CoreResultStore.publish(context, result) {
-                    complete(executionId)
-                }
+                CoreResultStore.publish(context, result) { complete(executionId) }
             },
             onConnectionError = {
                 if (isExecutionActive(executionId)) startLegacy(request.message, executionId)
@@ -146,6 +141,7 @@ data class CoreResult(
     val stderr: String,
     val androidAction: JSONObject? = null,
     val fontes: JSONArray? = null,
+    val executionId: Int = -1,
 )
 
 object CoreResultStore {
