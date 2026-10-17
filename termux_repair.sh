@@ -7,7 +7,7 @@ ROOT="$HOME/stacy"
 mkdir -p "$ROOT"
 cd "$ROOT"
 
-# Stop a stale STACY daemon BEFORE replacing/checking files.
+# Stop any stale STACY daemon from this checkout before replacing/checking files.
 pids="$(pgrep -f 'python(3)?[[:space:]]+.*[/]stacy[/]core_server\.py' 2>/dev/null || true)"
 if [ -n "$pids" ]; then
   echo "[STACY ARS] encerrando CORE antigo: $pids"
@@ -20,7 +20,11 @@ if [ -n "$pids" ]; then
   fi
 fi
 
-echo "[STACY ARS] sincronizando CORE completo..."
+# CTAC is not a STACY code module. Remove any stale local copy from previous ARS runs.
+rm -f "$ROOT/ctac.py" "$ROOT/ctac.pyc"
+
+# Synchronize only the actual STACY CORE modules.
+echo "[STACY ARS] sincronizando CORE oficial..."
 PY_FILES=(
   action.py ai.py anpes.py autonomy.py command.py config.py context.py
   conversation.py cortex.py entity_resolver.py entity_store.py intent.py
