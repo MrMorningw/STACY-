@@ -7,18 +7,26 @@ ROOT="$HOME/stacy"
 mkdir -p "$ROOT"
 cd "$ROOT"
 
-# Pull the authoritative CORE daemon directly from main so a stale/local
-# feature branch cannot leave the phone without core_server.py.
-curl -fsSL "$REPO_RAW/core_server.py" -o core_server.py
-
-# Refuse to start if the daemon or its Python dependencies are absent.
-python -m py_compile core_server.py
-
-for f in orchestrator.py ai.py config.py memory.py entity_store.py stacy_ecc.py android_session.py; do
-  if [ ! -f "$f" ]; then
-    curl -fsSL "$REPO_RAW/$f" -o "$f"
-  fi
+# Always synchronize the authoritative CORE runtime files from main.
+# This is intentional: a stale local Python module can be incompatible with
+# the current core_server.py even when git reports "Already up to date".
+for f in core_server.py orchestrator.py android_session.py stacy_ecc.py entity_store.py memory.py ai.py config.py; do
+  echo "[STACY ARS] sincronizando $f"
+  curl -fsSL "$REPO_RAW/$f" -o "$f"
 done
+
+# Verify the runtime before starting it.
+python -m py_compile core_server.py orchestrator.py android_session.py stacy_ecc.py entity_store.py memory.py ai.py config.py
+
+# Verify the current orchestrator exposes the callback expected by core_server.
+python - <<'PY'
+import inspect
+from orchestrator import StacyOrchestrator
+params = inspect.signature(StacyOrchestrator.__init__).parameters
+if "phase_callback" not in params:
+    raise SystemExit("[STACY ARS] ERRO: orchestrator.py incompatível: phase_callback ausente")
+print("[STACY ARS] orchestrator.py compatível: phase_callback OK")
+PY
 
 termux-wake-lock
 exec python core_server.py
