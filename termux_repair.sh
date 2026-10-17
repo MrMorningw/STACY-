@@ -1,7 +1,7 @@
 #!/data/data/com.termux/files/usr/bin/bash
 set -euo pipefail
 
-REPO_RAW="https://raw.githubusercontent.com/MrMorningw/STACY-/main"
+REPO_RAW="https://raw.githubusercontent.com/MrMorningw/STACY-/1ba1c65eb7528b3c0dc8900046407f8ce75bfb25"
 ROOT="$HOME/stacy"
 
 mkdir -p "$ROOT"
@@ -15,30 +15,24 @@ for f in core_server.py orchestrator.py android_session.py stacy_ecc.py entity_s
   mv "$f.tmp" "$f"
 done
 
-# Always load sibling modules from ~/stacy first.
 export PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}"
 
-# Validate syntax and the authoritative orchestrator before touching the daemon.
 python -m py_compile core_server.py orchestrator.py android_session.py stacy_ecc.py entity_store.py memory.py ai.py config.py
 python - <<'PY'
 import inspect
 import orchestrator
 params = inspect.signature(orchestrator.StacyOrchestrator.__init__).parameters
 if "phase_callback" not in params:
-    raise SystemExit("[STACY ARS] ERRO: orchestrator.py sem phase_callback")
+    raise SystemExit("[STACY ARS] ERRO: orchestrator.py incompatível")
 print("[STACY ARS] orchestrator.py compatível: phase_callback OK")
 PY
 
-# Stop stale STACY CORE instances. The previous repair only matched an
-# absolute path; Termux often launches it as `python core_server.py`.
-pkill -f 'core_server\.py' 2>/dev/null || true
-sleep 2
-
-# If anything still owns the port, report it instead of hiding the failure.
-if command -v lsof >/dev/null 2>&1 && lsof -iTCP:8765 -sTCP:LISTEN >/dev/null 2>&1; then
-  echo "[STACY ARS] ERRO: porta 8765 ainda está ocupada."
-  lsof -iTCP:8765 -sTCP:LISTEN || true
-  exit 1
+# Kill only the STACY daemon; do not match this repair shell itself.
+pids="$(pgrep -f '/home/.*/stacy/core_server\.py' 2>/dev/null || true)"
+if [ -n "$pids" ]; then
+  echo "$pids" | xargs -r kill 2>/dev/null || true
+  sleep 2
+  echo "$pids" | xargs -r kill -9 2>/dev/null || true
 fi
 
 termux-wake-lock
