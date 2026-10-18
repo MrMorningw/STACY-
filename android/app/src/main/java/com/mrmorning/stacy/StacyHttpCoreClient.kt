@@ -213,5 +213,6 @@ class StacyHttpCoreClient(private val context: Context) {
         private const val HEALTH_RETRY_DELAY_MS = 350L
         private const val MAX_CONNECT_TIMEOUT_MS = 2000
         private const val MIN_CONNECT_TIMEOUT_MS = 500
+        private const val MAX_HEALTH_ERROR_CHARS = 700
     }
 }
