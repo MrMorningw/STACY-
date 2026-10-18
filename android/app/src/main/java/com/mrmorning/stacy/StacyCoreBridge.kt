@@ -24,12 +24,25 @@ class StacyCoreBridge(private val context: Context) {
     private val pendingTimeouts = ConcurrentHashMap<Int, Runnable>()
     private var activeExecutionId: Int? = null
     private val httpCore = StacyHttpCoreClient(context)
+    private val nativeCore = StacyNativeCore()
 
-    init { httpCore.startDaemon() }
+    // The built-in fast path runs before any Termux/Python activity. Unknown
+    // requests still use the existing Python CORE until native migration is complete.
+
 
     fun process(message: String, onQueued: () -> Unit = {}, onError: (String) -> Unit = {}) {
         val normalized = message.trim()
         if (normalized.isEmpty()) return
+
+        // Fast path: simple conversation and diagnostics return from Kotlin
+        // without starting Termux, opening localhost, or creating a queue timeout.
+        val nativeResult = nativeCore.process(normalized)
+        if (nativeResult != null) {
+            onQueued()
+            CoreResultStore.publish(context, nativeResult)
+            return
+        }
+
         synchronized(queue) { queue.addLast(Request(normalized, onQueued, onError)) }
         onQueued()
         startNext()
@@ -53,6 +66,9 @@ class StacyCoreBridge(private val context: Context) {
         pendingTimeouts[executionId] = timeout
         timeoutHandler.postDelayed(timeout, CORE_TIMEOUT_MS)
 
+        // Start the external runtime only for requests the native core cannot
+        // answer. The daemon performs its own health/reuse check.
+        httpCore.startDaemon()
         httpCore.chat(
             message = request.message,
             executionId = executionId,
