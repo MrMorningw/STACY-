@@ -39,6 +39,12 @@ class StacyHttpCoreClient(private val context: Context) {
                         set -u
                         ROOT="${'$'}HOME/stacy"
                         SCRIPT="${'$'}ROOT/android/termux_widget/stacy-core-daemon.sh"
+                        APP_VERSION_CODE=$appVersionCode
+                        CURRENT_APP_VERSION="${'$'}(cat "${'$'}ROOT/.stacy-core-app-version" 2>/dev/null || true)"
+                        # Fast no-op when the same app version already has a healthy CORE.
+                        if [ "${'$'}CURRENT_APP_VERSION" = "${'$'}APP_VERSION_CODE" ] && command -v python >/dev/null 2>&1 && python -c 'import json,urllib.request; d=json.load(urllib.request.urlopen("http://127.0.0.1:8765/health", timeout=1)); raise SystemExit(0 if d.get("ok") is True and d.get("service") == "stacy-core" else 1)' >/dev/null 2>&1; then
+                            exit 0
+                        fi
                         mkdir -p "${'$'}ROOT/android/termux_widget"
                         TMP="${'$'}SCRIPT.download"
                         URL="https://raw.githubusercontent.com/MrMorningw/STACY-/main/android/termux_widget/stacy-core-daemon.sh?ars=${'$'}(date +%s)"
