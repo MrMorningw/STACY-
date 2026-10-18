@@ -268,6 +268,7 @@ class MainActivity : ComponentActivity() {
         CorePhaseStore.clear()
         if (::voiceInput.isInitialized) voiceInput.destroy()
         if (::textToSpeech.isInitialized) textToSpeech.shutdown()
+        if (::coreBridge.isInitialized) coreBridge.shutdown()
         if (::webView.isInitialized) { webView.removeJavascriptInterface("Android"); webView.destroy() }
         super.onDestroy()
     }
