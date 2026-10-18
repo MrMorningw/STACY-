@@ -30,14 +30,21 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
         self.assertIn('request("GET", "/health"', self.http)
         self.assertIn('health.optString("service") == "stacy-core"', self.http)
         self.assertIn('JSONObject(text)', self.http)
+        self.assertIn('val startupError = readiness.error', self.http)
+        self.assertIn('health.optString("error", "").trim()', self.http)
+        self.assertIn('O CORE da STACY iniciou, mas não ficou saudável:', self.http)
 
     def test_daemon_does_not_restart_a_healthy_core_for_the_same_app_version(self):
         self.assertIn('--app-version-code=', self.daemon)
         self.assertIn('.stacy-core-app-version', self.daemon)
         self.assertIn('HEALTH" = "ok"', self.daemon)
-        self.assertIn('another CORE startup is already running', self.daemon)
-        self.assertIn('[ "$OLD_PID" != "$" ]', self.daemon)
-        self.assertIn('for ((attempt=0; attempt<40; attempt++))', self.daemon)
+        self.assertIn('CORE já está saudável para o aplicativo código', self.daemon)
+        self.assertIn('LOCK_VERSION="$(cat "$START_LOCK/version"', self.daemon)
+        self.assertIn('core_health_error()', self.daemon)
+        self.assertIn('READY=0', self.daemon)
+        self.assertIn('if [ "$READY" != "1" ]', self.daemon)
+        self.assertIn('rm -f "$VERSION_MARKER"', self.daemon)
+        self.assertIn('for ((attempt=0; attempt<80; attempt++))', self.daemon)
         self.assertLess(self.daemon.index('if [ "$HEALTH" = "ok"'), self.daemon.index("pkill -f"))
         self.assertGreater(self.daemon.index('rm -rf "$START_LOCK"', self.daemon.index("core_server.py iniciado")), self.daemon.index("core_server.py iniciado"))
 
@@ -52,8 +59,8 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
             self.assertIn(path, self.daemon)
 
     def test_released_build_advances_version_so_installed_app_can_update(self):
-        self.assertIn("versionCode = 20", self.gradle)
-        self.assertIn('versionName = "0.2.9"', self.gradle)
+        self.assertIn("versionCode = 21", self.gradle)
+        self.assertIn('versionName = "0.3.0"', self.gradle)
 
 
 if __name__ == "__main__":
