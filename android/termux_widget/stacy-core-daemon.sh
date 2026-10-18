@@ -9,7 +9,7 @@ VERSION_MARKER="${ROOT}/.stacy-core-app-version"
 START_LOCK="${ROOT}/.stacy-core-start.lock"
 PYTHON="$(command -v python || true)"
 CURL="$(command -v curl || true)"
-STAGE="${ROOT}/.stacy-core-sync.$"
+STAGE="${ROOT}/.stacy-core-sync.$$"
 APP_VERSION_CODE=""
 
 for arg in "$@"; do
@@ -57,7 +57,7 @@ if ! mkdir "$START_LOCK" 2>/dev/null; then
     exit 0
   fi
 fi
-echo "$" > "$START_LOCK/pid"
+echo "$$" > "$START_LOCK/pid"
 trap 'rm -rf "$START_LOCK"' EXIT INT TERM
 
 # Only a release-version change or a dead supervisor may replace the runtime.
