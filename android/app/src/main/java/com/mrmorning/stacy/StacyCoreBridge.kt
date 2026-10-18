@@ -48,7 +48,7 @@ class StacyCoreBridge(private val context: Context) {
         val request = next.first
         val executionId = next.second
         val timeout = Runnable {
-            fail(executionId, "O CORE não devolveu resposta em 45 segundos. Verifique o Termux, o repositório ~/stacy e tente novamente.")
+            fail(executionId, "O CORE não devolveu resposta em 90 segundos. Verifique o Termux, o repositório ~/stacy e tente novamente.")
         }
         pendingTimeouts[executionId] = timeout
         timeoutHandler.postDelayed(timeout, CORE_TIMEOUT_MS)
@@ -114,7 +114,7 @@ class StacyCoreBridge(private val context: Context) {
     fun shutdown() { httpCore.shutdown() }
 
     companion object {
-        private const val CORE_TIMEOUT_MS = 45_000L
+        private const val CORE_TIMEOUT_MS = 90_000L
         private val NEXT_ID = AtomicInteger(1000)
         private val callbacks = ConcurrentHashMap<Int, (String) -> Unit>()
         private val activeBridges = ConcurrentHashMap<Int, StacyCoreBridge>()
