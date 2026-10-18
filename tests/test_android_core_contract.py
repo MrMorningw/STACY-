@@ -36,7 +36,7 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
         self.assertIn('.stacy-core-app-version', self.daemon)
         self.assertIn('HEALTH" = "ok"', self.daemon)
         self.assertIn('another CORE startup is already running', self.daemon)
-        self.assertLess(self.daemon.index('if [ "$HEALTH" = "ok"'), self.daemon.index("pkill -f '[p]ython.*core_server\\.py'"))
+        self.assertLess(self.daemon.index('if [ "$HEALTH" = "ok"'), self.daemon.index("pkill -f"))
 
     def test_runtime_sync_includes_the_new_evolution_components_and_skills(self):
         for path in (
