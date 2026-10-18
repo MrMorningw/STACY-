@@ -147,6 +147,7 @@ done
 if [[ "$APP_VERSION_CODE" =~ ^[0-9]+$ ]]; then
   printf '%s\n' "$APP_VERSION_CODE" > "$VERSION_MARKER.tmp"
   mv "$VERSION_MARKER.tmp" "$VERSION_MARKER"
+rm -rf "$START_LOCK" # lock protects sync only; supervisor owns PIDFILE
 fi
 rm -rf "$STAGE" "$ROOT/__pycache__"
 find "$ROOT" -type d -name __pycache__ -prune -exec rm -rf {} + 2>/dev/null || true
