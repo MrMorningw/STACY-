@@ -147,7 +147,6 @@ done
 if [[ "$APP_VERSION_CODE" =~ ^[0-9]+$ ]]; then
   printf '%s\n' "$APP_VERSION_CODE" > "$VERSION_MARKER.tmp"
   mv "$VERSION_MARKER.tmp" "$VERSION_MARKER"
-rm -rf "$START_LOCK" # lock protects sync only; supervisor owns PIDFILE
 fi
 rm -rf "$STAGE" "$ROOT/__pycache__"
 find "$ROOT" -type d -name __pycache__ -prune -exec rm -rf {} + 2>/dev/null || true
@@ -156,19 +155,32 @@ export PYTHONPATH="$ROOT"
 
 termux-wake-lock
 echo "$$" > "$PIDFILE"
-cleanup() { rm -f "$PIDFILE"; }
-trap 'cleanup; rm -rf "$START_LOCK"' EXIT INT TERM
+cleanup() { rm -f "$PIDFILE"; rm -rf "$START_LOCK"; }
+trap cleanup EXIT INT TERM
 log "CORE sincronizado e validado; iniciando servidor HTTP"
 
 while true; do
-  HEALTH="$("$PYTHON" -c 'import json,urllib.request; d=json.load(urllib.request.urlopen("http://127.0.0.1:8765/health", timeout=1)); print("ok" if d.get("ok") is True and d.get("service") == "stacy-core" else "bad")' 2>/dev/null || true)"
+  HEALTH="$(core_health)"
   if [ "$HEALTH" = "ok" ]; then
+    rm -rf "$START_LOCK"
     sleep 3
     continue
   fi
   "$PYTHON" "$ROOT/core_server.py" >> "$LOG" 2>&1 &
   CORE_PID=$!
   log "core_server.py iniciado (pid=$CORE_PID)"
+  # Keep the startup lock until the HTTP health endpoint confirms readiness.
+  for ((attempt=0; attempt<40; attempt++)); do
+    HEALTH="$(core_health)"
+    if [ "$HEALTH" = "ok" ]; then
+      rm -rf "$START_LOCK"
+      break
+    fi
+    if ! kill -0 "$CORE_PID" 2>/dev/null; then
+      break
+    fi
+    sleep 0.25
+  done
   wait "$CORE_PID"
   STATUS=$?
   log "core_server.py terminou ($STATUS); verificando/reiniciando"
