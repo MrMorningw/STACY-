@@ -62,7 +62,7 @@ trap 'rm -rf "$START_LOCK"' EXIT INT TERM
 
 # Only a release-version change or a dead supervisor may replace the runtime.
 OLD_PID="$(cat "$PIDFILE" 2>/dev/null || true)"
-if [[ "$OLD_PID" =~ ^[0-9]+$ ]] && kill -0 "$OLD_PID" 2>/dev/null && [ "$OLD_PID" != "$" ]; then
+if [[ "$OLD_PID" =~ ^[0-9]+$ ]] && kill -0 "$OLD_PID" 2>/dev/null && [ "$OLD_PID" != "$$" ]; then
   log "updating CORE for app code $APP_VERSION_CODE; stopping previous supervisor ($OLD_PID)"
   kill "$OLD_PID" 2>/dev/null || true
   sleep 2
