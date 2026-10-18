@@ -50,11 +50,15 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
         self.assertGreater(self.daemon.index('rm -rf "$START_LOCK"', self.daemon.index("core_server.py iniciado")), self.daemon.index("core_server.py iniciado"))
 
     def test_native_core_fast_path_does_not_require_termux(self):
+        self.assertNotIn("init { httpCore.startDaemon() }", self.bridge)
         self.assertIn("private val nativeCore = StacyNativeCore()", self.bridge)
         self.assertIn("val nativeResult = nativeCore.process(normalized)", self.bridge)
+        self.assertIn("CURRENT_APP_VERSION", self.http)
+        self.assertIn("current app version already has a healthy persistent CORE", self.http)
         self.assertLess(self.bridge.index("val nativeResult = nativeCore.process(normalized)"), self.bridge.index("startNext()"))
         self.assertIn("Termux para este teste: não utilizado", self.native)
         self.assertIn("IA generativa / Orchestrator Python: não testados", self.native)
+        self.assertIn("if (normalized in GREETINGS)", self.native)
 
     def test_runtime_sync_includes_the_new_evolution_components_and_skills(self):
         for path in (
