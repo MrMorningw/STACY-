@@ -29,7 +29,6 @@ class StacyCoreBridge(private val context: Context) {
     // The built-in fast path runs before any Termux/Python activity. Unknown
     // requests still use the existing Python CORE until native migration is complete.
 
-
     fun process(message: String, onQueued: () -> Unit = {}, onError: (String) -> Unit = {}) {
         val normalized = message.trim()
         if (normalized.isEmpty()) return
