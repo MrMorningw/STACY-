@@ -30,6 +30,55 @@ core_health() {
   "$PYTHON" -c 'import json,urllib.request; d=json.load(urllib.request.urlopen("http://127.0.0.1:8765/health", timeout=1)); print("ok" if d.get("ok") is True and d.get("service") == "stacy-core" else "bad")' 2>/dev/null || true
 }
 
+core_health() {
+  "$PYTHON" - <<'PY' 2>/dev/null || true
+import json
+import urllib.error
+import urllib.request
+try:
+    try:
+        response = urllib.request.urlopen("http://127.0.0.1:8765/health", timeout=1)
+        payload = response.read()
+    except urllib.error.HTTPError as error:
+        payload = error.read()
+    data = json.loads(payload.decode("utf-8"))
+except Exception:
+    print("offline")
+    raise SystemExit(0)
+if data.get("service") != "stacy-core":
+    print("bad")
+elif data.get("ok") is True:
+    print("ok")
+else:
+    print("unhealthy")
+PY
+}
+
+core_health_error() {
+  "$PYTHON" - <<'PY' 2>/dev/null || true
+import json
+import urllib.error
+import urllib.request
+try:
+    try:
+        response = urllib.request.urlopen("http://127.0.0.1:8765/health", timeout=1)
+        payload = response.read()
+    except urllib.error.HTTPError as error:
+        payload = error.read()
+    data = json.loads(payload.decode("utf-8"))
+except Exception as error:
+    print(type(error).__name__ + ": " + str(error))
+    raise SystemExit(0)
+detail = data.get("error")
+if isinstance(detail, str) and detail.strip():
+    print(" ".join(detail.split())[:800])
+elif data.get("ok") is True:
+    print("OK")
+else:
+    print("O CORE respondeu com ok=false sem detalhar a falha.")
+PY
+}
+
 HEALTH="$(core_health)"
 CURRENT_APP_VERSION="$(cat "$VERSION_MARKER" 2>/dev/null || true)"
 if [ "$HEALTH" = "ok" ] && [ -n "$APP_VERSION_CODE" ] && [ "$CURRENT_APP_VERSION" = "$APP_VERSION_CODE" ]; then
@@ -37,33 +86,31 @@ if [ "$HEALTH" = "ok" ] && [ -n "$APP_VERSION_CODE" ] && [ "$CURRENT_APP_VERSION
   exit 0
 fi
 
-# If the same release is already starting, don't kill it or launch a competing sync.
-OLD_PID="$(cat "$PIDFILE" 2>/dev/null || true)"
-if [[ "$OLD_PID" =~ ^[0-9]+$ ]] && kill -0 "$OLD_PID" 2>/dev/null && [ "$CURRENT_APP_VERSION" = "$APP_VERSION_CODE" ]; then
-  log "another CORE startup is already running; preserving the active supervisor."
-  exit 0
-fi
-
-# Atomic startup lock: two Activity launches must never synchronize over each other.
-if ! mkdir "$START_LOCK" 2>/dev/null; then
+# Remove locks left by older daemons. New daemons stamp the lock with a version,
+# so a same-version live startup can finish its own work without a second sync.
+if [ -d "$START_LOCK" ]; then
   LOCK_PID="$(cat "$START_LOCK/pid" 2>/dev/null || true)"
-  if [[ "$LOCK_PID" =~ ^[0-9]+$ ]] && kill -0 "$LOCK_PID" 2>/dev/null; then
-    log "another CORE startup is already running; this launch will reuse it."
+  LOCK_VERSION="$(cat "$START_LOCK/version" 2>/dev/null || true)"
+  if [[ "$LOCK_PID" =~ ^[0-9]+$ ]] && kill -0 "$LOCK_PID" 2>/dev/null && [ "$LOCK_VERSION" = "$APP_VERSION_CODE" ]; then
+    log "A inicialização do CORE para o código $APP_VERSION_CODE já está em andamento."
     exit 0
+  fi
+  if [[ "$LOCK_PID" =~ ^[0-9]+$ ]] && kill -0 "$LOCK_PID" 2>/dev/null; then
+    log "Recuperando inicialização antiga do CORE (versão da trava: $LOCK_VERSION)."
+    kill "$LOCK_PID" 2>/dev/null || true
+    sleep 2
+    if kill -0 "$LOCK_PID" 2>/dev/null; then kill -9 "$LOCK_PID" 2>/dev/null || true; fi
+    pkill -f '[p]ython.*core_server\.py' 2>/dev/null || true
+    pkill -9 -f '[p]ython.*core_server\.py' 2>/dev/null || true
   fi
   rm -rf "$START_LOCK"
-  if ! mkdir "$START_LOCK" 2>/dev/null; then
-    log "CORE startup lock is busy; refusing a parallel synchronization."
-    exit 0
-  fi
 fi
-echo "$$" > "$START_LOCK/pid"
-trap 'rm -rf "$START_LOCK"' EXIT INT TERM
 
-# Only a release-version change or a dead supervisor may replace the runtime.
+# Never preserve a live supervisor when health is failing. Stop it before the
+# new lock is acquired so its shutdown trap cannot remove the new lock.
 OLD_PID="$(cat "$PIDFILE" 2>/dev/null || true)"
 if [[ "$OLD_PID" =~ ^[0-9]+$ ]] && kill -0 "$OLD_PID" 2>/dev/null && [ "$OLD_PID" != "$$" ]; then
-  log "updating CORE for app code $APP_VERSION_CODE; stopping previous supervisor ($OLD_PID)"
+  log "Encerrando supervisor anterior do CORE (pid=$OLD_PID; saúde=$HEALTH; código anterior=$CURRENT_APP_VERSION)."
   kill "$OLD_PID" 2>/dev/null || true
   sleep 2
   if kill -0 "$OLD_PID" 2>/dev/null; then kill -9 "$OLD_PID" 2>/dev/null || true; fi
@@ -72,6 +119,30 @@ pkill -f '[p]ython.*core_server\.py' 2>/dev/null || true
 sleep 1
 pkill -9 -f '[p]ython.*core_server\.py' 2>/dev/null || true
 rm -f "$PIDFILE"
+
+# Serialize the download/startup phase and record who owns this lock.
+if ! mkdir "$START_LOCK" 2>/dev/null; then
+  LOCK_PID="$(cat "$START_LOCK/pid" 2>/dev/null || true)"
+  LOCK_VERSION="$(cat "$START_LOCK/version" 2>/dev/null || true)"
+  if [[ "$LOCK_PID" =~ ^[0-9]+$ ]] && kill -0 "$LOCK_PID" 2>/dev/null && [ "$LOCK_VERSION" = "$APP_VERSION_CODE" ]; then
+    log "Outra inicialização do CORE assumiu a trava; esta execução será encerrada."
+    exit 0
+  fi
+  rm -rf "$START_LOCK"
+  if ! mkdir "$START_LOCK" 2>/dev/null; then
+    log "ERRO: não foi possível adquirir a trava de inicialização do CORE."
+    exit 1
+  fi
+fi
+echo "$$" > "$START_LOCK/pid"
+printf '%s\n' "$APP_VERSION_CODE" > "$START_LOCK/version"
+cleanup() {
+  LOCK_OWNER="$(cat "$START_LOCK/pid" 2>/dev/null || true)"
+  [ "$LOCK_OWNER" = "$$" ] && rm -rf "$START_LOCK"
+  PID_OWNER="$(cat "$PIDFILE" 2>/dev/null || true)"
+  [ "$PID_OWNER" = "$$" ] && rm -f "$PIDFILE"
+}
+trap cleanup EXIT INT TERM
 
 # Download the full runtime graph to a staging directory. No partial graph is run.
 CORE_FILES=(
@@ -154,26 +225,29 @@ find "$ROOT" -name '*.pyc' -delete 2>/dev/null || true
 export PYTHONPATH="$ROOT"
 
 termux-wake-lock
-echo "$$" > "$PIDFILE"
-cleanup() { rm -f "$PIDFILE"; rm -rf "$START_LOCK"; }
-trap cleanup EXIT INT TERM
+echo "$" > "$PIDFILE"
 log "CORE sincronizado e validado; iniciando servidor HTTP"
 
 while true; do
   HEALTH="$(core_health)"
   if [ "$HEALTH" = "ok" ]; then
-    rm -rf "$START_LOCK"
     sleep 3
     continue
   fi
   "$PYTHON" "$ROOT/core_server.py" >> "$LOG" 2>&1 &
   CORE_PID=$!
   log "core_server.py iniciado (pid=$CORE_PID)"
-  # Keep the startup lock until the HTTP health endpoint confirms readiness.
-  for ((attempt=0; attempt<40; attempt++)); do
+  READY=0
+  for ((attempt=0; attempt<80; attempt++)); do
     HEALTH="$(core_health)"
     if [ "$HEALTH" = "ok" ]; then
+      READY=1
       rm -rf "$START_LOCK"
+      break
+    fi
+    if [ "$HEALTH" = "unhealthy" ]; then
+      DETAIL="$(core_health_error)"
+      log "ERRO: o servidor abriu, mas o runtime do CORE está inválido: $DETAIL"
       break
     fi
     if ! kill -0 "$CORE_PID" 2>/dev/null; then
@@ -181,6 +255,18 @@ while true; do
     fi
     sleep 0.25
   done
+  if [ "$READY" != "1" ]; then
+    if [ "$HEALTH" != "unhealthy" ]; then
+      DETAIL="$(core_health_error)"
+      log "ERRO: CORE não ficou saudável após a inicialização. Diagnóstico: $DETAIL"
+    fi
+    kill "$CORE_PID" 2>/dev/null || true
+    sleep 1
+    if kill -0 "$CORE_PID" 2>/dev/null; then kill -9 "$CORE_PID" 2>/dev/null || true; fi
+    wait "$CORE_PID" 2>/dev/null || true
+    rm -f "$VERSION_MARKER"
+    exit 1
+  fi
   wait "$CORE_PID"
   STATUS=$?
   log "core_server.py terminou ($STATUS); verificando/reiniciando"
