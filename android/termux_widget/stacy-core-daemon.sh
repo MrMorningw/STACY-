@@ -27,10 +27,6 @@ if [ -z "$PYTHON" ] || [ -z "$CURL" ]; then
 fi
 
 core_health() {
-  "$PYTHON" -c 'import json,urllib.request; d=json.load(urllib.request.urlopen("http://127.0.0.1:8765/health", timeout=1)); print("ok" if d.get("ok") is True and d.get("service") == "stacy-core" else "bad")' 2>/dev/null || true
-}
-
-core_health() {
   "$PYTHON" - <<'PY' 2>/dev/null || true
 import json
 import urllib.error
@@ -248,6 +244,8 @@ while true; do
     if [ "$HEALTH" = "unhealthy" ]; then
       DETAIL="$(core_health_error)"
       log "ERRO: o servidor abriu, mas o runtime do CORE está inválido: $DETAIL"
+      # Give Android a short window to read the diagnostic JSON from /health.
+      sleep 3
       break
     fi
     if ! kill -0 "$CORE_PID" 2>/dev/null; then
