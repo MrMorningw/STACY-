@@ -84,10 +84,8 @@ class StacyHttpCoreClient(private val context: Context) {
     ) {
         executor.execute {
             try {
-                if (!daemonLaunchAccepted) {
-                    main.post(onConnectionError)
-                    return@execute
-                }
+                // Health is authoritative: even if Android did not report that the
+                // Termux service launch was accepted, reuse an already-running healthy CORE.
                 val readiness = awaitCoreReady(CORE_READY_TIMEOUT_MS)
                 if (!readiness.ready) {
                     val startupError = readiness.error
