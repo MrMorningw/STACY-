@@ -11,6 +11,8 @@ import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+from core_phase_context import CorePhaseContext
+
 ROOT = Path(__file__).resolve().parent
 HOST = "127.0.0.1"
 PORT = 8765
@@ -37,6 +39,7 @@ class CoreRuntime:
         self.error = None
         self.orchestrator = None
         self.warning = None
+        self._phase_context = CorePhaseContext()
         self._load()
 
     def _load(self) -> None:
@@ -64,7 +67,7 @@ class CoreRuntime:
             return
         try:
             import subprocess
-            execution_id = getattr(self, "execution_id", None)
+            execution_id = self._phase_context.current_execution_id()
             if execution_id is None:
                 return
             subprocess.run(
@@ -84,11 +87,14 @@ class CoreRuntime:
         if not self.ready:
             return {"tipo": "erro", "resposta": "O CORE não está saudável: " + (self.error or "falha de inicialização")}
 
-        self.execution_id = execution_id
-        self._phase("pensando")
+        # HTTP requests run on separate threads. Keep phase events correlated to
+        # this request rather than storing its ID on the shared runtime object.
+        self._phase_context.set_current_execution_id(execution_id)
 
         with self.lock:
             try:
+                # Emit THINKING only when this request owns the serialized CORE.
+                self._phase("pensando")
                 import android_tools
                 import stacy_ecc
                 sec = stacy_ecc.inspect_untrusted_text(normalized)
@@ -124,7 +130,7 @@ class CoreRuntime:
                     pass
                 return {"tipo": "erro", "resposta": "Não consegui concluir o processamento, senhor. A operação foi interrompida com segurança."}
             finally:
-                self.execution_id = None
+                self._phase_context.clear_current_execution_id()
 
         if not isinstance(result, dict):
             result = {"tipo": "resposta", "resposta": str(result)}
@@ -167,7 +173,7 @@ RUNTIME = CoreRuntime()
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "STACY-Core/0.3.1"
+    server_version = "STACY-Core/0.3.2"
 
     def _json(self, status: int, payload: dict) -> None:
         data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
