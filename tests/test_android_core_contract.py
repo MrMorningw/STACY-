@@ -1,0 +1,57 @@
+from pathlib import Path
+import unittest
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+class TestAndroidCoreResponseContract(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.html = (ROOT / "android/app/src/main/assets/stacy_prototipo36.html").read_text(encoding="utf-8")
+        cls.activity = (ROOT / "android/app/src/main/java/com/mrmorning/stacy/MainActivity.kt").read_text(encoding="utf-8")
+        cls.bridge = (ROOT / "android/app/src/main/java/com/mrmorning/stacy/StacyCoreBridge.kt").read_text(encoding="utf-8")
+        cls.http = (ROOT / "android/app/src/main/java/com/mrmorning/stacy/StacyHttpCoreClient.kt").read_text(encoding="utf-8")
+        cls.daemon = (ROOT / "android/termux_widget/stacy-core-daemon.sh").read_text(encoding="utf-8")
+        cls.gradle = (ROOT / "android/app/build.gradle.kts").read_text(encoding="utf-8")
+
+    def test_message_has_a_complete_ui_to_core_and_back_path(self):
+        self.assertIn('Android.stacySend(text)', self.html)
+        self.assertIn('fun stacySend(message: String)', self.activity)
+        self.assertIn('coreBridge.process(', self.activity)
+        self.assertIn('httpCore.chat(', self.bridge)
+        self.assertIn('CoreResultStore.publish(context, result)', self.bridge)
+        self.assertIn('webResponse(formatResponseWithSources(result), result.tipo)', self.activity)
+        self.assertIn('window.stacyNativeResponse=function(response,tipo)', self.html)
+
+    def test_http_transport_waits_for_a_healthy_core_before_chat(self):
+        self.assertIn('http://127.0.0.1:8765', self.http)
+        self.assertIn('awaitCoreReady(CORE_READY_TIMEOUT_MS)', self.http)
+        self.assertIn('request("GET", "/health"', self.http)
+        self.assertIn('health.optString("service") == "stacy-core"', self.http)
+        self.assertIn('JSONObject(text)', self.http)
+
+    def test_daemon_does_not_restart_a_healthy_core_for_the_same_app_version(self):
+        self.assertIn('--app-version-code=', self.daemon)
+        self.assertIn('.stacy-core-app-version', self.daemon)
+        self.assertIn('HEALTH" = "ok"', self.daemon)
+        self.assertIn('another CORE startup is already running', self.daemon)
+        self.assertLess(self.daemon.index('if [ "$HEALTH" = "ok"'), self.daemon.index("pkill -f '[p]ython.*core_server\\.py'"))
+
+    def test_runtime_sync_includes_the_new_evolution_components_and_skills(self):
+        for path in (
+            "agent_modes.py", "skills_registry.py", "verification_gate.py",
+            "skills/README.md", "skills/research/SKILL.md",
+            "skills/verification/SKILL.md", "skills/memory/SKILL.md",
+            "skills/android/SKILL.md", "skills/automation/SKILL.md",
+            "skills/engineering/SKILL.md",
+        ):
+            self.assertIn(path, self.daemon)
+
+    def test_released_build_advances_version_so_installed_app_can_update(self):
+        self.assertIn("versionCode = 20", self.gradle)
+        self.assertIn('versionName = "0.2.9"', self.gradle)
+
+
+if __name__ == "__main__":
+    unittest.main()
