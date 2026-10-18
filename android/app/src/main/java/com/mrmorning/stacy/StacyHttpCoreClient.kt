@@ -84,8 +84,22 @@ class StacyHttpCoreClient(private val context: Context) {
     ) {
         executor.execute {
             try {
-                if (!daemonLaunchAccepted || !awaitCoreReady(CORE_READY_TIMEOUT_MS)) {
+                if (!daemonLaunchAccepted) {
                     main.post(onConnectionError)
+                    return@execute
+                }
+                val readiness = awaitCoreReady(CORE_READY_TIMEOUT_MS)
+                if (!readiness.ready) {
+                    val startupError = readiness.error
+                    if (!startupError.isNullOrBlank()) {
+                        val detail = startupError.replace('\n', ' ').take(MAX_HEALTH_ERROR_CHARS)
+                        val message = "O CORE da STACY iniciou, mas não ficou saudável: $detail"
+                        main.post {
+                            callback(CoreResult("erro", message, 1, detail, null, null, executionId))
+                        }
+                    } else {
+                        main.post(onConnectionError)
+                    }
                     return@execute
                 }
 
@@ -115,7 +129,12 @@ class StacyHttpCoreClient(private val context: Context) {
         }
     }
 
-    private fun awaitCoreReady(timeoutMs: Long): Boolean {
+    private data class CoreReadiness(
+        val ready: Boolean,
+        val error: String? = null,
+    )
+
+    private fun awaitCoreReady(timeoutMs: Long): CoreReadiness {
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
             val health = try {
@@ -127,17 +146,26 @@ class StacyHttpCoreClient(private val context: Context) {
                 health.optString("service") == "stacy-core" &&
                 health.optInt("port", 8765) == 8765
             ) {
-                return true
+                return CoreReadiness(ready = true)
+            }
+
+            // core_server.py exposes initialization exceptions through /health.
+            // Return them immediately instead of waiting and masking them as network failure.
+            if (health != null && health.optString("service") == "stacy-core") {
+                val detail = health.optString("error", "").trim()
+                if (!health.optBoolean("ok", false) && detail.isNotBlank() && detail != "null") {
+                    return CoreReadiness(ready = false, error = detail)
+                }
             }
 
             try {
                 Thread.sleep(HEALTH_RETRY_DELAY_MS)
             } catch (_: InterruptedException) {
                 Thread.currentThread().interrupt()
-                return false
+                return CoreReadiness(ready = false)
             }
         }
-        return false
+        return CoreReadiness(ready = false)
     }
 
     private fun request(
