@@ -14,6 +14,7 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
         cls.native = (ROOT / "android/app/src/main/java/com/mrmorning/stacy/StacyNativeCore.kt").read_text(encoding="utf-8")
         cls.http = (ROOT / "android/app/src/main/java/com/mrmorning/stacy/StacyHttpCoreClient.kt").read_text(encoding="utf-8")
         cls.daemon = (ROOT / "android/termux_widget/stacy-core-daemon.sh").read_text(encoding="utf-8")
+        cls.server = (ROOT / "core_server.py").read_text(encoding="utf-8")
         cls.gradle = (ROOT / "android/app/build.gradle.kts").read_text(encoding="utf-8")
 
     def test_message_has_a_complete_ui_to_core_and_back_path(self):
@@ -62,7 +63,7 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
 
     def test_runtime_sync_includes_the_new_evolution_components_and_skills(self):
         for path in (
-            "agent_modes.py", "skills_registry.py", "verification_gate.py",
+            "agent_modes.py", "skills_registry.py", "verification_gate.py", "core_phase_context.py",
             "skills/README.md", "skills/research/SKILL.md",
             "skills/verification/SKILL.md", "skills/memory/SKILL.md",
             "skills/android/SKILL.md", "skills/automation/SKILL.md",
@@ -70,9 +71,17 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
         ):
             self.assertIn(path, self.daemon)
 
+    def test_phase_events_are_correlated_to_the_request_thread(self):
+        self.assertIn("CorePhaseContext", self.server)
+        self.assertIn("current_execution_id()", self.server)
+        self.assertIn("set_current_execution_id(execution_id)", self.server)
+        self.assertIn("clear_current_execution_id()", self.server)
+        self.assertNotIn('getattr(self, "execution_id", None)', self.server)
+        self.assertIn("CorePhaseContext", (ROOT / "core_phase_context.py").read_text(encoding="utf-8"))
+
     def test_released_build_advances_version_so_installed_app_can_update(self):
-        self.assertIn("versionCode = 22", self.gradle)
-        self.assertIn('versionName = "0.3.1"', self.gradle)
+        self.assertIn("versionCode = 23", self.gradle)
+        self.assertIn('versionName = "0.3.2"', self.gradle)
 
 
 if __name__ == "__main__":
