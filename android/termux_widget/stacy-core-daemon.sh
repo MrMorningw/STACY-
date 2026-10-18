@@ -221,7 +221,7 @@ find "$ROOT" -name '*.pyc' -delete 2>/dev/null || true
 export PYTHONPATH="$ROOT"
 
 termux-wake-lock
-echo "$" > "$PIDFILE"
+printf '%s\n' "$BASHPID" > "$PIDFILE"
 log "CORE sincronizado e validado; iniciando servidor HTTP"
 
 while true; do
