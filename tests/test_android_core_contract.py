@@ -38,7 +38,7 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
         self.assertIn('--app-version-code=', self.daemon)
         self.assertIn('.stacy-core-app-version', self.daemon)
         self.assertIn('HEALTH" = "ok"', self.daemon)
-        self.assertIn('another CORE startup is already running', self.daemon)
+        self.assertIn('CORE já está saudável para o aplicativo código', self.daemon)
         self.assertIn('LOCK_VERSION="$(cat "$START_LOCK/version"', self.daemon)
         self.assertIn('core_health_error()', self.daemon)
         self.assertIn('READY=0', self.daemon)
