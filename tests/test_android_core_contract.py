@@ -11,6 +11,7 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
         cls.html = (ROOT / "android/app/src/main/assets/stacy_prototipo36.html").read_text(encoding="utf-8")
         cls.activity = (ROOT / "android/app/src/main/java/com/mrmorning/stacy/MainActivity.kt").read_text(encoding="utf-8")
         cls.bridge = (ROOT / "android/app/src/main/java/com/mrmorning/stacy/StacyCoreBridge.kt").read_text(encoding="utf-8")
+        cls.native = (ROOT / "android/app/src/main/java/com/mrmorning/stacy/StacyNativeCore.kt").read_text(encoding="utf-8")
         cls.http = (ROOT / "android/app/src/main/java/com/mrmorning/stacy/StacyHttpCoreClient.kt").read_text(encoding="utf-8")
         cls.daemon = (ROOT / "android/termux_widget/stacy-core-daemon.sh").read_text(encoding="utf-8")
         cls.gradle = (ROOT / "android/app/build.gradle.kts").read_text(encoding="utf-8")
@@ -48,6 +49,17 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
         self.assertLess(self.daemon.index('if [ "$HEALTH" = "ok"'), self.daemon.index("pkill -f"))
         self.assertGreater(self.daemon.index('rm -rf "$START_LOCK"', self.daemon.index("core_server.py iniciado")), self.daemon.index("core_server.py iniciado"))
 
+    def test_native_core_fast_path_does_not_require_termux(self):
+        self.assertNotIn("init { httpCore.startDaemon() }", self.bridge)
+        self.assertIn("private val nativeCore = StacyNativeCore()", self.bridge)
+        self.assertIn("val nativeResult = nativeCore.process(normalized)", self.bridge)
+        self.assertIn("CURRENT_APP_VERSION", self.http)
+        self.assertIn("Fast no-op when the same app version already has a healthy CORE", self.http)
+        self.assertLess(self.bridge.index("val nativeResult = nativeCore.process(normalized)"), self.bridge.index("startNext()"))
+        self.assertIn("Termux para este teste: não utilizado", self.native)
+        self.assertIn("IA generativa / Orchestrator Python: não testados", self.native)
+        self.assertIn("if (normalized in GREETINGS)", self.native)
+
     def test_runtime_sync_includes_the_new_evolution_components_and_skills(self):
         for path in (
             "agent_modes.py", "skills_registry.py", "verification_gate.py",
@@ -59,8 +71,8 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
             self.assertIn(path, self.daemon)
 
     def test_released_build_advances_version_so_installed_app_can_update(self):
-        self.assertIn("versionCode = 21", self.gradle)
-        self.assertIn('versionName = "0.3.0"', self.gradle)
+        self.assertIn("versionCode = 22", self.gradle)
+        self.assertIn('versionName = "0.3.1"', self.gradle)
 
 
 if __name__ == "__main__":
