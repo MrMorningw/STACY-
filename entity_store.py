@@ -187,6 +187,8 @@ def definir_contexto_persistente(dados, identificador):
 
 
 def obter_contexto_persistente(dados):
+    if not isinstance(dados, dict):
+        return None
     return dados.get("contexto")
 
 
