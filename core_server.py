@@ -90,10 +90,11 @@ class CoreRuntime:
         # HTTP requests run on separate threads. Keep phase events correlated to
         # this request rather than storing its ID on the shared runtime object.
         self._phase_context.set_current_execution_id(execution_id)
-        self._phase("pensando")
 
         with self.lock:
             try:
+                # Emit THINKING only when this request owns the serialized CORE.
+                self._phase("pensando")
                 import android_tools
                 import stacy_ecc
                 sec = stacy_ecc.inspect_untrusted_text(normalized)
