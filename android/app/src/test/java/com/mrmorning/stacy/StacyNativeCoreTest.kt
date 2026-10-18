@@ -11,7 +11,7 @@ class StacyNativeCoreTest {
 
     @Test
     fun diagnosticProbeIsAnsweredLocallyWithoutTermux() {
-        val result = core.process("Teste de comunicação sem Termux") 
+        val result = core.process("Teste de comunicação sem Termux")
         assertNotNull(result)
         assertTrue(result!!.response.contains("CORE NATIVO: ONLINE"))
         assertTrue(result.response.contains("Termux para este teste: não utilizado"))
