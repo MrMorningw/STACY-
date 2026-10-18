@@ -8,7 +8,6 @@ file exists.
 from __future__ import annotations
 
 import importlib.util
-import os
 import socket
 import time
 from pathlib import Path
@@ -24,6 +23,9 @@ COMPONENTS = {
     "android_tools": {"kind": "python", "path": "android_tools.py"},
     "session": {"kind": "python", "path": "android_session.py"},
     "ecc_adaptation": {"kind": "python", "path": "stacy_ecc.py"},
+    "skills_registry": {"kind": "python", "path": "skills_registry.py"},
+    "verification_gate": {"kind": "python", "path": "verification_gate.py"},
+    "agent_modes": {"kind": "python", "path": "agent_modes.py"},
     "ui": {"kind": "android", "path": "android/app/src/main/assets/stacy_prototipo36.html"},
     "updater": {"kind": "android", "path": "android/app/src/main/java/com/mrmorning/stacy/StacyUpdater.kt"},
 }
@@ -76,13 +78,35 @@ def snapshot() -> dict:
             components["ecc_adaptation"]["status"] = "error"
             components["ecc_adaptation"]["error"] = f"{type(exc).__name__}: {exc}"
 
+    skills = None
+    if components["skills_registry"]["healthy"]:
+        try:
+            import skills_registry
+            skills = skills_registry.diagnostics()
+        except Exception as exc:
+            components["skills_registry"]["healthy"] = False
+            components["skills_registry"]["status"] = "error"
+            components["skills_registry"]["error"] = f"{type(exc).__name__}: {exc}"
+
+    agent_modes = None
+    if components["agent_modes"]["healthy"]:
+        try:
+            import agent_modes
+            agent_modes = agent_modes.diagnostics()
+        except Exception as exc:
+            components["agent_modes"]["healthy"] = False
+            components["agent_modes"]["status"] = "error"
+            components["agent_modes"]["error"] = f"{type(exc).__name__}: {exc}"
+
     return {
-        "registryVersion": "1.2.0",
+        "registryVersion": "1.3.0",
         "generatedAt": time.time(),
         "root": str(ROOT),
         "core": {"host": "127.0.0.1", "port": 8765, "online": daemon},
         "components": components,
         "eccAdaptation": ecc,
+        "skills": skills,
+        "agentModes": agent_modes,
     }
 
 
@@ -91,6 +115,10 @@ def render_status() -> str:
     online = sum(1 for c in data["components"].values() if c["healthy"])
     total = len(data["components"])
     lines = [f"STACY CORE — {online}/{total} componentes saudáveis."]
+    if data.get("skills"):
+        lines.append(f"• skills: {data['skills']['count']} descobertas")
+    if data.get("agentModes"):
+        lines.append(f"• modos de agente: {len(data['agentModes']['modes'])}")
     for name, component in data["components"].items():
         lines.append(f"• {name}: {component['status']} — {component['path']}")
     return "\n".join(lines)
