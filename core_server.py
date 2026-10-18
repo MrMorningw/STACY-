@@ -173,7 +173,7 @@ RUNTIME = CoreRuntime()
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "STACY-Core/0.3.1"
+    server_version = "STACY-Core/0.3.2"
 
     def _json(self, status: int, payload: dict) -> None:
         data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
