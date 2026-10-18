@@ -147,7 +147,7 @@ CORE_FILES=(
   conversation.py cortex.py entity.py entity_resolver.py entity_store.py
   intent.py interface.py knowledge.py memory.py mepo.py orchestration.py
   orchestrator.py response_guard.py stacy.py stacy_ecc.py tasks.py voice.py
-  agent_modes.py skills_registry.py verification_gate.py core_server.py
+  agent_modes.py skills_registry.py verification_gate.py core_phase_context.py core_server.py
   skills/README.md
   skills/android/SKILL.md skills/automation/SKILL.md
   skills/engineering/SKILL.md skills/memory/SKILL.md
