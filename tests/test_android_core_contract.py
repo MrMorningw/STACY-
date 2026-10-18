@@ -54,7 +54,7 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
         self.assertIn("private val nativeCore = StacyNativeCore()", self.bridge)
         self.assertIn("val nativeResult = nativeCore.process(normalized)", self.bridge)
         self.assertIn("CURRENT_APP_VERSION", self.http)
-        self.assertIn("current app version already has a healthy persistent CORE", self.http)
+        self.assertIn("Fast no-op when the same app version already has a healthy CORE", self.http)
         self.assertLess(self.bridge.index("val nativeResult = nativeCore.process(normalized)"), self.bridge.index("startNext()"))
         self.assertIn("Termux para este teste: não utilizado", self.native)
         self.assertIn("IA generativa / Orchestrator Python: não testados", self.native)
