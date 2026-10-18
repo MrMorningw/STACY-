@@ -18,6 +18,15 @@ class CorePhaseContext:
     def current_execution_id(self):
         return getattr(self._state, "execution_id", None)
 
+    def set_current_execution_id(self, execution_id) -> None:
+        self._state.execution_id = execution_id
+
+    def clear_current_execution_id(self) -> None:
+        try:
+            del self._state.execution_id
+        except AttributeError:
+            pass
+
     @contextmanager
     def bind(self, execution_id) -> Iterator[None]:
         previous = getattr(self._state, "execution_id", _MISSING)
