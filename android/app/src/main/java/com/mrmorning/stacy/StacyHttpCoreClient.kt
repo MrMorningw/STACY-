@@ -2,6 +2,7 @@ package com.mrmorning.stacy
 
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import org.json.JSONObject
@@ -9,14 +10,23 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.Executors
 
-/** Fast local CORE transport. Fallback remains owned by StacyCoreBridge. */
+/** Local CORE transport with readiness checks; fallback remains owned by StacyCoreBridge. */
 class StacyHttpCoreClient(private val context: Context) {
     private val executor = Executors.newCachedThreadPool()
     private val main = Handler(Looper.getMainLooper())
-    private val baseUrl = "http://localhost:8765"
+    private val baseUrl = "http://127.0.0.1:8765"
+
+    @Volatile private var daemonLaunchAccepted = false
 
     fun startDaemon() {
         try {
+            @Suppress("DEPRECATION")
+            val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+            val appVersionCode = if (Build.VERSION.SDK_INT >= 28) {
+                packageInfo.longVersionCode
+            } else {
+                packageInfo.versionCode.toLong()
+            }
             val intent = Intent().apply {
                 setClassName("com.termux", "com.termux.app.RunCommandService")
                 action = "com.termux.RUN_COMMAND"
@@ -38,7 +48,7 @@ class StacyHttpCoreClient(private val context: Context) {
                             rm -f "${'$'}TMP"
                             test -s "${'$'}SCRIPT" || { echo "STACY CORE: não foi possível obter o daemon atualizado." >&2; exit 1; }
                         fi
-                        exec bash "${'$'}SCRIPT"
+                        exec bash "${'$'}SCRIPT" --app-version-code=$appVersionCode
                         """.trimIndent(),
                     ),
                 )
@@ -46,31 +56,54 @@ class StacyHttpCoreClient(private val context: Context) {
                 putExtra("com.termux.RUN_COMMAND_BACKGROUND", true)
                 putExtra("com.termux.RUN_COMMAND_SESSION_ACTION", "0")
             }
-            context.startService(intent)
+            daemonLaunchAccepted = context.startService(intent) != null
         } catch (_: Exception) {
-            // The legacy bridge remains the authoritative fallback.
+            // The UI will receive an explicit failure through the legacy bridge.
+            daemonLaunchAccepted = false
         }
     }
 
     fun isCoreOnline(callback: (Boolean) -> Unit) {
         executor.execute {
-            val online = request("GET", "/health", null, 1200)?.optBoolean("ok", false) == true
+            val online = try {
+                val health = request("GET", "/health", null, 1200)
+                health?.optBoolean("ok", false) == true &&
+                    health.optString("service") == "stacy-core"
+            } catch (_: Exception) {
+                false
+            }
             main.post { callback(online) }
         }
     }
 
-    fun chat(message: String, executionId: Int, callback: (CoreResult) -> Unit, onConnectionError: () -> Unit) {
+    fun chat(
+        message: String,
+        executionId: Int,
+        callback: (CoreResult) -> Unit,
+        onConnectionError: () -> Unit,
+    ) {
         executor.execute {
             try {
-                val body = JSONObject().apply {
-                    put("message", message)
-                    put("executionId", executionId)
-                }
-                val result = request("POST", "/chat", body, 45_000)
-                if (result == null) {
+                if (!daemonLaunchAccepted || !awaitCoreReady(CORE_READY_TIMEOUT_MS)) {
                     main.post(onConnectionError)
                     return@execute
                 }
+
+                val result = request(
+                    "POST",
+                    "/chat",
+                    JSONObject().apply {
+                        put("message", message)
+                        put("executionId", executionId)
+                    },
+                    CORE_CHAT_TIMEOUT_MS,
+                )
+
+                if (result == null || (!result.has("tipo") && !result.has("resposta"))) {
+                    main.post(onConnectionError)
+                    return@execute
+                }
+
                 val type = result.optString("tipo", "resposta")
                 val response = result.optString("resposta", "")
                 val action = result.optJSONObject("acao_android")
@@ -82,10 +115,40 @@ class StacyHttpCoreClient(private val context: Context) {
         }
     }
 
-    private fun request(method: String, path: String, body: JSONObject?, timeoutMs: Int): JSONObject? {
+    private fun awaitCoreReady(timeoutMs: Long): Boolean {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline) {
+            val health = try {
+                request("GET", "/health", null, HEALTH_CHECK_TIMEOUT_MS)
+            } catch (_: Exception) {
+                null
+            }
+            if (health?.optBoolean("ok", false) == true &&
+                health.optString("service") == "stacy-core" &&
+                health.optInt("port", 8765) == 8765
+            ) {
+                return true
+            }
+
+            try {
+                Thread.sleep(HEALTH_RETRY_DELAY_MS)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+                return false
+            }
+        }
+        return false
+    }
+
+    private fun request(
+        method: String,
+        path: String,
+        body: JSONObject?,
+        timeoutMs: Int,
+    ): JSONObject? {
         val connection = (URL(baseUrl + path).openConnection() as HttpURLConnection).apply {
             requestMethod = method
-            connectTimeout = 1200
+            connectTimeout = timeoutMs.coerceAtMost(MAX_CONNECT_TIMEOUT_MS).coerceAtLeast(MIN_CONNECT_TIMEOUT_MS)
             readTimeout = timeoutMs
             useCaches = false
             setRequestProperty("Accept", "application/json")
@@ -95,13 +158,14 @@ class StacyHttpCoreClient(private val context: Context) {
             }
         }
         return try {
-            if (body != null) connection.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
+            if (body != null) {
+                connection.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
+            }
             val code = connection.responseCode
             val stream = if (code in 200..299) connection.inputStream else connection.errorStream
             val text = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: return null
             try {
-                val json = JSONObject(text)
-                if (json.has("tipo") || json.has("resposta")) json else null
+                JSONObject(text)
             } catch (_: Exception) {
                 null
             }
@@ -110,5 +174,16 @@ class StacyHttpCoreClient(private val context: Context) {
         }
     }
 
-    fun shutdown() { executor.shutdownNow() }
+    fun shutdown() {
+        executor.shutdownNow()
+    }
+
+    companion object {
+        private const val CORE_READY_TIMEOUT_MS = 25_000L
+        private const val CORE_CHAT_TIMEOUT_MS = 45_000
+        private const val HEALTH_CHECK_TIMEOUT_MS = 1000
+        private const val HEALTH_RETRY_DELAY_MS = 350L
+        private const val MAX_CONNECT_TIMEOUT_MS = 2000
+        private const val MIN_CONNECT_TIMEOUT_MS = 500
+    }
 }
