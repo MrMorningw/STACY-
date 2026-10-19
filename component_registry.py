@@ -11,6 +11,7 @@ import importlib.util
 import socket
 import time
 from pathlib import Path
+from urllib.parse import urlparse
 
 ROOT = Path(__file__).resolve().parent
 
@@ -44,6 +45,40 @@ def _tcp_listening(host: str, port: int, timeout: float = 0.15) -> bool:
             return True
     except OSError:
         return False
+
+
+def _ai_provider_snapshot() -> dict:
+    """Report provider readiness without exposing credentials or making API calls."""
+    local_ai_online = False
+    try:
+        import config
+        parsed = urlparse(config.LOCAL_AI_URL)
+        if parsed.hostname and parsed.port:
+            local_ai_online = _tcp_listening(parsed.hostname, parsed.port)
+    except Exception:
+        local_ai_online = False
+
+    gemini_key_configured = False
+    try:
+        from android_session import load_api_key
+        gemini_key_configured = bool(load_api_key())
+    except Exception:
+        gemini_key_configured = False
+
+    if local_ai_online:
+        selected_provider = "local"
+    elif gemini_key_configured:
+        selected_provider = "gemini"
+    else:
+        selected_provider = "unavailable"
+
+    return {
+        "selected_provider": selected_provider,
+        "generation_configured": selected_provider != "unavailable",
+        "local_model_server": "online" if local_ai_online else "offline",
+        "gemini_key_configured": gemini_key_configured,
+        "provider_validation": "not_tested",
+    }
 
 
 def snapshot() -> dict:
@@ -107,6 +142,7 @@ def snapshot() -> dict:
         "eccAdaptation": ecc,
         "skills": skills,
         "agentModes": agent_modes,
+        "aiProviders": _ai_provider_snapshot(),
     }
 
 
@@ -119,6 +155,16 @@ def render_status() -> str:
         lines.append(f"• skills: {data['skills']['count']} descobertas")
     if data.get("agentModes"):
         lines.append(f"• modos de agente: {len(data['agentModes']['modes'])}")
+    providers = data.get("aiProviders", {})
+    if providers.get("selected_provider") == "local":
+        lines.append("• IA generativa: servidor local acessível; validação de resposta não testada")
+    elif providers.get("selected_provider") == "gemini":
+        lines.append("• IA generativa: chave Gemini configurada; validade, rede e cota não testadas")
+    else:
+        lines.append(
+            "• IA generativa: INDISPONÍVEL — servidor local 127.0.0.1:8080 offline "
+            "e chave Gemini ausente. Configure ~/.stacy/secrets.json no Termux."
+        )
     for name, component in data["components"].items():
         lines.append(f"• {name}: {component['status']} — {component['path']}")
     return "\n".join(lines)
