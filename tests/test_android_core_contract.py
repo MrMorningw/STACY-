@@ -35,6 +35,9 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
         self.assertIn('val startupError = readiness.error', self.http)
         self.assertIn('health.optString("error", "").trim()', self.http)
         self.assertIn('O CORE da STACY iniciou, mas não ficou saudável:', self.http)
+        self.assertIn('O CORE da STACY não ficou pronto em até 90 segundos.', self.http)
+        self.assertIn('CORE_READY_TIMEOUT_MS = 90_000L', self.http)
+        self.assertIn('CORE_TIMEOUT_MS = 150_000L', self.bridge)
 
     def test_daemon_does_not_restart_a_healthy_core_for_the_same_app_version(self):
         self.assertIn('--app-version-code=', self.daemon)
