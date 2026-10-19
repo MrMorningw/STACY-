@@ -79,7 +79,10 @@ def gerar_resposta(
     contexto_conversa=None
 ):
     if not api_key:
-        raise RuntimeError("Chave da Gemini não configurada.")
+        raise RuntimeError(
+            "Chave da Gemini não configurada. No Termux, configure "
+            "~/.stacy/secrets.json com GEMINI_API_KEY; não envie a chave no chat."
+        )
 
     url = (
         "https://generativelanguage.googleapis.com/v1beta/"
@@ -160,7 +163,10 @@ def gerar_resposta_pesquisa(
 ):
     """Pesquisa fatos externos com Gemini + Google Search, sem memória persistente."""
     if not api_key:
-        raise RuntimeError("Chave da Gemini não configurada.")
+        raise RuntimeError(
+            "Chave da Gemini não configurada. No Termux, configure "
+            "~/.stacy/secrets.json com GEMINI_API_KEY; não envie a chave no chat."
+        )
 
     url = (
         "https://generativelanguage.googleapis.com/v1beta/"
@@ -541,7 +547,11 @@ def gerar_resposta_hibrida(
 
     except Exception as erro_gemini:
         erros.append(f"Gemini: {erro_gemini}")
+        # Expose concise, actionable diagnostics without ever echoing the key.
+        diagnostico = " | ".join(" ".join(item.split()) for item in erros if item)
+        if api_key:
+            diagnostico = diagnostico.replace(api_key, "[chave ocultada]")
+        diagnostico = diagnostico[:600] or "Nenhum provedor retornou uma resposta."
         raise RuntimeError(
-            "Não consegui obter uma resposta da IA agora, senhor. "
-            "A IA local e o Gemini não responderam corretamente."
+            "Falha nos provedores de IA. Diagnóstico: " + diagnostico
         ) from erro_gemini
