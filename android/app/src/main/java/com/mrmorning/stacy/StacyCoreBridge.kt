@@ -129,7 +129,7 @@ class StacyCoreBridge(private val context: Context) {
     fun shutdown() { httpCore.shutdown() }
 
     companion object {
-        private const val CORE_TIMEOUT_MS = 90_000L
+        private const val CORE_TIMEOUT_MS = 150_000L
         private val NEXT_ID = AtomicInteger(1000)
         private val callbacks = ConcurrentHashMap<Int, (String) -> Unit>()
         private val activeBridges = ConcurrentHashMap<Int, StacyCoreBridge>()
