@@ -104,7 +104,14 @@ class StacyHttpCoreClient(private val context: Context) {
                             callback(CoreResult("erro", message, 1, detail, null, null, executionId))
                         }
                     } else {
-                        main.post(onConnectionError)
+                        val detail = (
+                            "O CORE da STACY não ficou pronto em até 90 segundos. " +
+                                "Confira se o Termux está instalado, se a permissão de comandos externos " +
+                                "está habilitada e consulte ~/stacy/stacy-core-daemon.log. Depois, tente novamente."
+                            )
+                        main.post {
+                            callback(CoreResult("erro", detail, 1, detail, null, null, executionId))
+                        }
                     }
                     return@execute
                 }
@@ -213,7 +220,7 @@ class StacyHttpCoreClient(private val context: Context) {
     }
 
     companion object {
-        private const val CORE_READY_TIMEOUT_MS = 25_000L
+        private const val CORE_READY_TIMEOUT_MS = 90_000L
         private const val CORE_CHAT_TIMEOUT_MS = 45_000
         private const val HEALTH_CHECK_TIMEOUT_MS = 1000
         private const val HEALTH_RETRY_DELAY_MS = 350L
