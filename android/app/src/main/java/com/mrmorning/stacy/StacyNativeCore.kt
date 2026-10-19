@@ -61,10 +61,6 @@ internal class StacyNativeCore {
             "diagnostico nativo",
             "diagnostico do core",
             "status do core nativo",
-            "status operacional do nucleo stacy",
-            "verifique o status operacional do nucleo stacy",
-            "status dos componentes",
-            "saude da stacy",
         )
         return probes.any(text::contains)
     }
