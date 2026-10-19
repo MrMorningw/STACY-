@@ -148,6 +148,7 @@ CORE_FILES=(
   intent.py interface.py knowledge.py memory.py mepo.py orchestration.py
   orchestrator.py response_guard.py stacy.py stacy_ecc.py tasks.py voice.py
   agent_modes.py skills_registry.py verification_gate.py core_phase_context.py core_server.py
+  requirements.txt
   skills/README.md
   skills/android/SKILL.md skills/automation/SKILL.md
   skills/engineering/SKILL.md skills/memory/SKILL.md
@@ -170,6 +171,26 @@ for f in "${CORE_FILES[@]}"; do
     exit 1
   fi
 done
+
+# The Android app relies on Termux for Python. Ensure the CORE's declared
+# dependency is present instead of silently failing during the first launch.
+if ! "$PYTHON" -c 'import requests' >/dev/null 2>&1; then
+  log "A dependência Python requests está ausente; tentando instalar automaticamente."
+  if command -v pkg >/dev/null 2>&1; then
+    pkg install -y python-requests >> "$LOG" 2>&1 || true
+  fi
+  if ! "$PYTHON" -c 'import requests' >/dev/null 2>&1; then
+    if [ -s "$STAGE/requirements.txt" ]; then
+      "$PYTHON" -m pip install --disable-pip-version-check --no-input -r "$STAGE/requirements.txt" >> "$LOG" 2>&1 || true
+    fi
+  fi
+  if ! "$PYTHON" -c 'import requests' >/dev/null 2>&1; then
+    log "ERRO: não foi possível instalar requests. Abra o Termux e execute: pkg install python-requests"
+    rm -rf "$STAGE"
+    exit 1
+  fi
+  log "Dependência requests pronta."
+fi
 
 if ! "$PYTHON" -m py_compile "$STAGE"/*.py; then
   log "ERRO: py_compile falhou; CORE não iniciado."
