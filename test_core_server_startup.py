@@ -59,5 +59,21 @@ class CoreServerStartupSmokeTests(unittest.TestCase):
         self.assertTrue(payload["resposta"].strip())
 
 
+    def test_registry_reports_real_provider_configuration_without_secrets(self):
+        from component_registry import snapshot, render_status
+
+        data = snapshot()
+        providers = data.get("aiProviders")
+        self.assertIsInstance(providers, dict)
+        self.assertIn(providers.get("selected_provider"), {"local", "gemini", "unavailable"})
+        self.assertIsInstance(providers.get("generation_configured"), bool)
+        self.assertIsInstance(providers.get("local_model_server"), str)
+        self.assertIsInstance(providers.get("gemini_key_configured"), bool)
+        self.assertEqual(providers.get("provider_validation"), "not_tested")
+        self.assertIn("IA generativa:", render_status())
+        self.assertNotIn("AIza", render_status())
+
+
+
 if __name__ == "__main__":
     unittest.main()
