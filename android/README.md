@@ -16,7 +16,13 @@ A interface Android conversa com o STACY CORE Python por meio do serviço de com
    ```
 
 4. Disponibilize o repositório privado da STACY no caminho `$HOME/stacy` usando seu método autenticado de acesso ao GitHub. Não coloque token ou senha diretamente no código nem em comandos que fiquem salvos no histórico.
-5. Entre na pasta e instale as dependências:
+5. Nas versões recentes da STACY, o inicializador do CORE baixa os arquivos de runtime e tenta instalar automaticamente a dependência `requests` (primeiro pelo pacote do Termux e, se necessário, por `pip`). Se a instalação automática falhar, o log fica em `~/stacy/stacy-core-daemon.log`; tente no Termux:
+
+   ```bash
+   pkg install python-requests
+   ```
+
+   Para uma instalação manual do runtime, use:
 
    ```bash
    cd ~/stacy
