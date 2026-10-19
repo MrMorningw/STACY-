@@ -120,7 +120,7 @@ class CoreRuntime:
                     else:
                         result = self.orchestrator.processar(normalized)
                 self._persist_session(self.orchestrator)
-            except Exception:
+            except Exception as exc:
                 traceback.print_exc(file=sys.stderr)
                 try:
                     self.orchestrator.acao_pendente = None
@@ -128,7 +128,19 @@ class CoreRuntime:
                     self.orchestrator.conversa.registrar_erro("falha no processamento")
                 except Exception:
                     pass
-                return {"tipo": "erro", "resposta": "Não consegui concluir o processamento, senhor. A operação foi interrompida com segurança."}
+                # Give Android a useful diagnosis, but never return a stored API key.
+                diagnostic = " ".join(str(exc).split())
+                api_key = getattr(self.orchestrator, "api_key", None)
+                if isinstance(api_key, str) and api_key:
+                    diagnostic = diagnostic.replace(api_key, "[chave ocultada]")
+                diagnostic = diagnostic[:600] or type(exc).__name__
+                return {
+                    "tipo": "erro",
+                    "resposta": (
+                        "Não consegui concluir o processamento, senhor. "
+                        "Diagnóstico: " + diagnostic
+                    ),
+                }
             finally:
                 self._phase_context.clear_current_execution_id()
 
