@@ -114,7 +114,12 @@ class CoreRuntime:
                         self.orchestrator.conversa.registrar_mensagem(normalized)
                         result = self.orchestrator._registrar_resultado_conversa({"tipo": "acao_android", "resposta": "Solicitação de ação Android recebida.", "acao": {"tipo": "android", **android_action}, "rota": "interno"})
                         result["acao_android"] = android_action
-                    elif normalized.casefold() in {"status dos componentes", "status da stacy", "saúde da stacy", "saude da stacy"}:
+                    elif " ".join(normalized.casefold().strip(" .!?;:").split()) in {
+                        "status dos componentes", "status da stacy", "saúde da stacy", "saude da stacy",
+                        "status operacional do núcleo stacy", "status operacional do nucleo stacy",
+                        "verifique o status operacional do núcleo stacy", "verifique o status operacional do nucleo stacy",
+                        "verifique os componentes da stacy", "diagnóstico da stacy", "diagnostico da stacy",
+                    }:
                         from component_registry import snapshot, render_status
                         result = {"tipo": "resposta", "resposta": render_status(), "registry": snapshot(), "rota": "interno"}
                     else:
@@ -185,7 +190,7 @@ RUNTIME = CoreRuntime()
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "STACY-Core/0.3.2"
+    server_version = "STACY-Core/0.3.3"
 
     def _json(self, status: int, payload: dict) -> None:
         data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
