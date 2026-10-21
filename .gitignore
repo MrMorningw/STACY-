@@ -3,3 +3,12 @@ __pycache__/
 *.pyc
 *.pyo
 *.log
+# Local credentials, runtime state, and signing material must never enter the public repo.
+.stacy/
+secrets.json
+.env
+.env.*
+*.jks
+*.keystore
+*.p12
+local.properties
