@@ -35,6 +35,9 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
         self.assertIn('val startupError = readiness.error', self.http)
         self.assertIn('health.optString("error", "").trim()', self.http)
         self.assertIn('O CORE da STACY iniciou, mas não ficou saudável:', self.http)
+        self.assertIn('O CORE da STACY não ficou pronto em até 90 segundos.', self.http)
+        self.assertIn('CORE_READY_TIMEOUT_MS = 90_000L', self.http)
+        self.assertIn('CORE_TIMEOUT_MS = 150_000L', self.bridge)
 
     def test_daemon_does_not_restart_a_healthy_core_for_the_same_app_version(self):
         self.assertIn('--app-version-code=', self.daemon)
@@ -63,13 +66,16 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
 
     def test_runtime_sync_includes_the_new_evolution_components_and_skills(self):
         for path in (
-            "agent_modes.py", "skills_registry.py", "verification_gate.py", "core_phase_context.py",
+            "agent_modes.py", "skills_registry.py", "verification_gate.py", "core_phase_context.py", "requirements.txt",
             "skills/README.md", "skills/research/SKILL.md",
             "skills/verification/SKILL.md", "skills/memory/SKILL.md",
             "skills/android/SKILL.md", "skills/automation/SKILL.md",
             "skills/engineering/SKILL.md",
         ):
             self.assertIn(path, self.daemon)
+        self.assertIn("import requests", self.daemon)
+        self.assertIn("pkg install -y python-requests", self.daemon)
+        self.assertIn("requirements.txt", self.daemon)
 
     def test_phase_events_are_correlated_to_the_request_thread(self):
         self.assertIn("CorePhaseContext", self.server)
@@ -80,8 +86,8 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
         self.assertIn("CorePhaseContext", (ROOT / "core_phase_context.py").read_text(encoding="utf-8"))
 
     def test_released_build_advances_version_so_installed_app_can_update(self):
-        self.assertIn("versionCode = 23", self.gradle)
-        self.assertIn('versionName = "0.3.2"', self.gradle)
+        self.assertIn("versionCode = 24", self.gradle)
+        self.assertIn('versionName = "0.3.3"', self.gradle)
 
 
 if __name__ == "__main__":

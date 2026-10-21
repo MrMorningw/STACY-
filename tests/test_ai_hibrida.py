@@ -61,7 +61,28 @@ class TestIAHibrida(unittest.TestCase):
                 "{}"
             )
 
-        self.assertIn("não responderam corretamente", str(contexto.exception))
+        self.assertIn("Falha nos provedores de IA", str(contexto.exception))
+        self.assertIn("servidor local não está acessível", str(contexto.exception))
+        self.assertIn("Gemini indisponível", str(contexto.exception))
+
+
+    @patch("ai.gerar_resposta")
+    @patch("ai.gerar_resposta_local")
+    @patch("ai.verificar_ia_local")
+    def test_explains_missing_gemini_key_without_revealing_secrets(self, verificar, local, gemini):
+        verificar.return_value = False
+        gemini.side_effect = RuntimeError(
+            "Chave da Gemini não configurada. No Termux, configure "
+            "~/.stacy/secrets.json com GEMINI_API_KEY; não envie a chave no chat."
+        )
+
+        with self.assertRaises(RuntimeError) as contexto:
+            ai.gerar_resposta_hibrida(None, self.historico, "{}")
+
+        message = str(contexto.exception)
+        self.assertIn("GEMINI_API_KEY", message)
+        self.assertIn("servidor local não está acessível", message)
+        self.assertNotIn("AIza", message)
 
 
 if __name__ == "__main__":

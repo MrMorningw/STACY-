@@ -8,15 +8,21 @@ A interface Android conversa com o STACY CORE Python por meio do serviço de com
 
 1. Instale o Termux de uma fonte compatível e abra-o ao menos uma vez.
 2. No Termux, habilite a opção que permite comandos de aplicativos externos. A STACY usa a permissão `com.termux.permission.RUN_COMMAND`.
-3. Instale os requisitos básicos:
+3. Instale os requisitos de inicialização:
 
    ```bash
    pkg update
-   pkg install python git
+   pkg install python curl
    ```
 
-4. Disponibilize o repositório privado da STACY no caminho `$HOME/stacy` usando seu método autenticado de acesso ao GitHub. Não coloque token ou senha diretamente no código nem em comandos que fiquem salvos no histórico.
-5. Entre na pasta e instale as dependências:
+4. Na versão 0.3.3, não é necessário clonar manualmente o repositório: no primeiro envio de mensagem, o APK baixa o inicializador oficial e sincroniza o CORE para `$HOME/stacy`. Mantenha a internet disponível durante essa primeira inicialização. Para desenvolvimento manual, use o repositório oficial em https://github.com/MrMorningw/STACY-. Nunca coloque tokens ou senhas no código nem em comandos que fiquem salvos no histórico.
+5. Nas versões recentes da STACY, o inicializador do CORE baixa os arquivos de runtime e tenta instalar automaticamente a dependência `requests` (primeiro pelo pacote do Termux e, se necessário, por `pip`). Se a instalação automática falhar, o log fica em `~/stacy/stacy-core-daemon.log`; tente no Termux:
+
+   ```bash
+   pkg install python-requests
+   ```
+
+   Para uma instalação manual do runtime, use:
 
    ```bash
    cd ~/stacy

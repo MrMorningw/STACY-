@@ -114,13 +114,18 @@ class CoreRuntime:
                         self.orchestrator.conversa.registrar_mensagem(normalized)
                         result = self.orchestrator._registrar_resultado_conversa({"tipo": "acao_android", "resposta": "Solicitação de ação Android recebida.", "acao": {"tipo": "android", **android_action}, "rota": "interno"})
                         result["acao_android"] = android_action
-                    elif normalized.casefold() in {"status dos componentes", "status da stacy", "saúde da stacy", "saude da stacy"}:
+                    elif " ".join(normalized.casefold().strip(" .!?;:").split()) in {
+                        "status dos componentes", "status da stacy", "saúde da stacy", "saude da stacy",
+                        "status operacional do núcleo stacy", "status operacional do nucleo stacy",
+                        "verifique o status operacional do núcleo stacy", "verifique o status operacional do nucleo stacy",
+                        "verifique os componentes da stacy", "diagnóstico da stacy", "diagnostico da stacy",
+                    }:
                         from component_registry import snapshot, render_status
                         result = {"tipo": "resposta", "resposta": render_status(), "registry": snapshot(), "rota": "interno"}
                     else:
                         result = self.orchestrator.processar(normalized)
                 self._persist_session(self.orchestrator)
-            except Exception:
+            except Exception as exc:
                 traceback.print_exc(file=sys.stderr)
                 try:
                     self.orchestrator.acao_pendente = None
@@ -128,7 +133,19 @@ class CoreRuntime:
                     self.orchestrator.conversa.registrar_erro("falha no processamento")
                 except Exception:
                     pass
-                return {"tipo": "erro", "resposta": "Não consegui concluir o processamento, senhor. A operação foi interrompida com segurança."}
+                # Give Android a useful diagnosis, but never return a stored API key.
+                diagnostic = " ".join(str(exc).split())
+                api_key = getattr(self.orchestrator, "api_key", None)
+                if isinstance(api_key, str) and api_key:
+                    diagnostic = diagnostic.replace(api_key, "[chave ocultada]")
+                diagnostic = diagnostic[:600] or type(exc).__name__
+                return {
+                    "tipo": "erro",
+                    "resposta": (
+                        "Não consegui concluir o processamento, senhor. "
+                        "Diagnóstico: " + diagnostic
+                    ),
+                }
             finally:
                 self._phase_context.clear_current_execution_id()
 
@@ -173,7 +190,7 @@ RUNTIME = CoreRuntime()
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "STACY-Core/0.3.2"
+    server_version = "STACY-Core/0.3.3"
 
     def _json(self, status: int, payload: dict) -> None:
         data = json.dumps(payload, ensure_ascii=False).encode("utf-8")

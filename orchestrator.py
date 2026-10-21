@@ -2299,9 +2299,10 @@ class StacyOrchestrator:
                 )
 
         except Exception as erro_hibrido:
+            diagnostico = " ".join(str(erro_hibrido).split())[:700]
             raise RuntimeError(
                 "Não consegui obter uma resposta da IA agora, senhor. "
-                "A IA local e o Gemini não responderam corretamente."
+                "Diagnóstico: " + (diagnostico or type(erro_hibrido).__name__)
             ) from erro_hibrido
 
         self.historico.append({

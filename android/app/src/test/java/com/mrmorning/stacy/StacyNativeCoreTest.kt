@@ -29,6 +29,14 @@ class StacyNativeCoreTest {
         assertTrue(result.response.contains("CORE nativo"))
     }
 
+
+    @Test
+    fun fullComponentStatusFallsThroughToPythonCore() {
+        assertNull(core.process("status dos componentes"))
+        assertNull(core.process("saúde da STACY"))
+        assertNull(core.process("status operacional do núcleo STACY"))
+    }
+
     @Test
     fun unrelatedRequestsFallThroughToExistingPythonCore() {
         assertNull(core.process("Pesquise a previsão do tempo para amanhã."))
