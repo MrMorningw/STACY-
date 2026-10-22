@@ -65,6 +65,8 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
         self.assertNotIn(r"\${index + 1}", self.native)
         self.assertIn("store.addTask", self.native)
         self.assertIn("store.saveMemory", self.native)
+        self.assertIn("conclu[ií]da", self.native)
+        self.assertIn("mem[oó]ria", self.native)
         self.assertIn("abrir_aplicativo", self.native)
         local_store = (ROOT / "android/app/src/main/java/com/mrmorning/stacy/StacyLocalStore.kt").read_text(encoding="utf-8")
         self.assertIn("CREATE TABLE tasks", local_store)

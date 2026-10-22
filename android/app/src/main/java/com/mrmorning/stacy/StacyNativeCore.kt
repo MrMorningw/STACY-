@@ -267,11 +267,11 @@ internal class StacyNativeCore(private val localStore: StacyLocalStore? = null) 
             RegexOption.IGNORE_CASE,
         )
         val COMPLETE_TASK_PATTERN = Regex(
-            "^(?:conclua|concluir|finalize|finalizar|marque como concluida|marcar como concluida)\\s+(?:a\\s+)?tarefa\\s+(.+)$",
+            "^(?:conclua|concluir|finalize|finalizar|marque como conclu[ií]da|marcar como conclu[ií]da)\\s+(?:a\\s+)?tarefa\\s+(.+)$",
             RegexOption.IGNORE_CASE,
         )
         val REMEMBER_PATTERN = Regex(
-            "^(?:lembre(?:-se)? que|guarde na memoria(?: que)?|memorize(?: que)?|anote(?: que)?)\\s+(.+)$",
+            "^(?:lembre(?:-se)? que|guarde na mem[oó]ria(?: que)?|memorize(?: que)?|anote(?: que)?)\\s+(.+)$",
             RegexOption.IGNORE_CASE,
         )
         val DUE_AT_START_PATTERN = Regex(
