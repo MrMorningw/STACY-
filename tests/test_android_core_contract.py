@@ -40,6 +40,9 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
         self.assertIn("GCMParameterSpec", self.secrets)
         self.assertIn('setRequestProperty("x-goog-api-key", apiKey)', self.ai)
         self.assertIn("https://generativelanguage.googleapis.com/", self.ai)
+        self.assertIn('"google_search"', self.ai)
+        self.assertNotIn('"temperature"', self.ai)
+        self.assertIn("groundingChunks", self.ai)
         self.assertNotIn("?key=", self.ai)
         self.assertIn("stacyConfigureAi", self.activity)
 

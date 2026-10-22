@@ -70,8 +70,10 @@ internal class StacyAiClient(context: Context) {
                 .put("contents", contents)
                 .put(
                     "generationConfig",
-                    JSONObject().put("temperature", 0.65).put("maxOutputTokens", 2048),
+                    JSONObject().put("maxOutputTokens", 2048),
                 )
+                // Gemini 3.8 Flash can ground answers in Google Search when useful.
+                .put("tools", JSONArray().put(JSONObject().put("google_search", JSONObject())))
 
             connection = (URL(ENDPOINT).openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"
@@ -135,7 +137,27 @@ internal class StacyAiClient(context: Context) {
                     .put("parts", JSONArray().put(JSONObject().put("text", answer))),
             )
             while (history.size > MAX_HISTORY_MESSAGES) history.removeAt(0)
-            return CoreResult(tipo = "resposta", response = answer, exitCode = 0, stderr = "")
+
+            val sources = JSONArray()
+            val chunks = responseJson.optJSONArray("candidates")
+                ?.optJSONObject(0)
+                ?.optJSONObject("groundingMetadata")
+                ?.optJSONArray("groundingChunks")
+            if (chunks != null) {
+                for (index in 0 until chunks.length()) {
+                    val web = chunks.optJSONObject(index)?.optJSONObject("web") ?: continue
+                    val uri = web.optString("uri").takeIf { it.startsWith("https://") } ?: continue
+                    val title = web.optString("title").ifBlank { "Fonte consultada" }.take(180)
+                    sources.put(JSONObject().put("titulo", title).put("url", uri))
+                }
+            }
+            return CoreResult(
+                tipo = "resposta",
+                response = answer,
+                exitCode = 0,
+                stderr = "",
+                fontes = sources.takeIf { it.length() > 0 },
+            )
         } catch (_: UnknownHostException) {
             return errorResult("Sem conexão com a internet. Os comandos locais continuam disponíveis.")
         } catch (_: SocketTimeoutException) {

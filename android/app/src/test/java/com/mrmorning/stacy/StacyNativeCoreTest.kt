@@ -27,4 +27,25 @@ class StacyNativeCoreTest {
     fun unknownQuestionIsNotFalselyReportedAsHandledLocally() {
         assertNull(StacyNativeCore().process("Explique a teoria geral dos contratos"))
     }
+
+    @Test
+    fun whatsappCommandIsRoutedToAllowListedAndroidAction() {
+        val result = StacyNativeCore().process("Abra o WhatsApp")
+        assertNotNull(result)
+        assertEquals("abrir_aplicativo", result?.androidAction?.optString("acao"))
+        assertEquals("com.whatsapp", result?.androidAction?.optString("pacote"))
+    }
+
+    @Test
+    fun unknownAppsAreNotExecutedLocally() {
+        assertNull(StacyNativeCore().process("Abra um aplicativo desconhecido"))
+    }
+
+    @Test
+    fun shareActionPreservesUserTextAndRequiresAndroidChooser() {
+        val result = StacyNativeCore().process("Compartilhe: Olá, equipe!")
+        assertNotNull(result)
+        assertEquals("compartilhar_texto", result?.androidAction?.optString("acao"))
+        assertEquals("Olá, equipe!", result?.androidAction?.optString("texto"))
+    }
 }
