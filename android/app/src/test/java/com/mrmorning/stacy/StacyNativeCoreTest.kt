@@ -32,8 +32,8 @@ class StacyNativeCoreTest {
     fun whatsappCommandIsRoutedToAllowListedAndroidAction() {
         val result = StacyNativeCore().process("Abra o WhatsApp")
         assertNotNull(result)
-        assertEquals("abrir_aplicativo", result?.androidAction?.optString("acao"))
-        assertEquals("com.whatsapp", result?.androidAction?.optString("pacote"))
+        assertEquals("abrir_aplicativo", result?.androidAction?.get("acao"))
+        assertEquals("com.whatsapp", result?.androidAction?.get("pacote"))
     }
 
     @Test
@@ -45,7 +45,7 @@ class StacyNativeCoreTest {
     fun shareActionPreservesUserTextAndRequiresAndroidChooser() {
         val result = StacyNativeCore().process("Compartilhe: Olá, equipe!")
         assertNotNull(result)
-        assertEquals("compartilhar_texto", result?.androidAction?.optString("acao"))
-        assertEquals("Olá, equipe!", result?.androidAction?.optString("texto"))
+        assertEquals("compartilhar_texto", result?.androidAction?.get("acao"))
+        assertEquals("Olá, equipe!", result?.androidAction?.get("texto"))
     }
 }
