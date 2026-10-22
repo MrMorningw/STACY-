@@ -5,6 +5,8 @@ import android.os.Handler
 import android.os.Looper
 import org.json.JSONArray
 import org.json.JSONObject
+import java.text.Normalizer
+import java.util.Locale
 
 /**
  * Android-native request router.
@@ -27,9 +29,29 @@ class StacyCoreBridge(private val context: Context) {
             return
         }
 
-        aiClient.chat(normalized) { result ->
+        val useWebSearch = shouldUseWebSearch(normalized)
+        CorePhaseStore.publish(context, if (useWebSearch) "pesquisando" else "pensando")
+        aiClient.chat(normalized, useWebSearch) { result ->
+            CorePhaseStore.publish(
+                context,
+                if (result.tipo.equals("erro", ignoreCase = true) || result.tipo.equals("error", ignoreCase = true)) "erro" else "respondendo",
+            )
             CoreResultStore.publish(context, result)
         }
+    }
+
+    private fun shouldUseWebSearch(message: String): Boolean {
+        val normalized = Normalizer.normalize(message, Normalizer.Form.NFD)
+            .replace(Regex("\\p{Mn}+"), "")
+            .lowercase(Locale.ROOT)
+        val webIntents = listOf(
+            "pesquise", "pesquisar", "pesquisa na web", "pesquisa na internet",
+            "busque na web", "procure na internet", "na internet", "na web",
+            "noticias", "hoje", "atualmente", "agora", "mais recente", "ultimas",
+            "ultimo", "ultima", "preco", "cotacao", "onde assistir", "fontes",
+            "referencias", "situacao atual", "quem e o atual", "pesquise sobre",
+        )
+        return webIntents.any(normalized::contains)
     }
 
     fun testConnection(callback: (CoreResult) -> Unit) {
