@@ -179,11 +179,11 @@ internal class StacyNativeCore {
         )
 
         val OPEN_APP_PATTERN = Regex(
-            "^(?:abra|abrir|abre|inicie|iniciar|execute|executar)\\\\s+(?:(?:o|a|os|as)\\\\s+)?(.+)$",
+            "^(?:abra|abrir|abre|inicie|iniciar|execute|executar)\\s+(?:(?:o|a|os|as)\\s+)?(.+)$",
         )
 
         val SHARE_PATTERN = Regex(
-            "^(?:compartilhar|compartilhe|compartilha)\\\\s*(?::|-)?\\\\s*(.+)$",
+            "^(?:compartilhar|compartilhe|compartilha)\\s*(?::|-)?\\s*(.+)$",
             RegexOption.IGNORE_CASE,
         )
 
