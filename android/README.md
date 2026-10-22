@@ -1,86 +1,40 @@
-# Interface Android da STACY
+# STACY para Android
 
-## Arquitetura atual do núcleo
+## Núcleo nativo Kotlin
 
-A interface Android conversa com o STACY CORE Python por meio do serviço de comandos do Termux. **Nesta versão, o APK ainda não contém um runtime Python independente**: o Termux e o repositório do núcleo precisam estar instalados no aparelho.
+A rota de mensagens do APK funciona sem Termux, daemon Python ou servidor em localhost. O Kotlin faz o roteamento, responde a saudações e diagnósticos localmente, executa uma lista controlada de ações Android e salva tarefas e anotações explícitas em SQLite no próprio aparelho.
 
-## Preparação do CORE no Termux
+Conversas generativas e pesquisa na web usam a API Gemini Interactions diretamente por HTTPS.
 
-1. Instale o Termux de uma fonte compatível e abra-o ao menos uma vez.
-2. No Termux, habilite a opção que permite comandos de aplicativos externos. A STACY usa a permissão `com.termux.permission.RUN_COMMAND`.
-3. Instale os requisitos de inicialização:
+### Primeira configuração da IA
 
-   ```bash
-   pkg update
-   pkg install python curl
-   ```
+1. Abra o menu lateral → **Configurações**.
+2. Em **IA generativa**, selecione **Conectar**.
+3. Crie uma chave em https://aistudio.google.com/apikey, cole-a e selecione **Salvar e testar**.
+4. A STACY testa a API no chat. A chave é criptografada com AES-GCM usando uma chave gerenciada pelo Android Keystore; não é guardada no código, URL, logs ou repositório.
 
-4. Na versão 0.3.3, não é necessário clonar manualmente o repositório: no primeiro envio de mensagem, o APK baixa o inicializador oficial e sincroniza o CORE para `$HOME/stacy`. Mantenha a internet disponível durante essa primeira inicialização. Para desenvolvimento manual, use o repositório oficial em https://github.com/MrMorningw/STACY-. Nunca coloque tokens ou senhas no código nem em comandos que fiquem salvos no histórico.
-5. Nas versões recentes da STACY, o inicializador do CORE baixa os arquivos de runtime e tenta instalar automaticamente a dependência `requests` (primeiro pelo pacote do Termux e, se necessário, por `pip`). Se a instalação automática falhar, o log fica em `~/stacy/stacy-core-daemon.log`; tente no Termux:
+As mensagens enviadas à IA são processadas pelo Google. A STACY usa \`previous_interaction_id\` para manter o contexto, o que significa que o serviço guarda as interações de acordo com sua política de retenção e a modalidade da conta (a documentação atual descreve retenção padrão de 55 dias no nível pago e 1 dia no nível sem custo). Não envie senhas ou conteúdo que não queira processar em serviço externo. A API exige internet, chave válida e está sujeita à quota/condições da conta.
 
-   ```bash
-   pkg install python-requests
-   ```
+Sem chave ou internet, as funções locais continuam disponíveis e retornam diagnóstico explícito. O núcleo não fica esperando o Termux.
 
-   Para uma instalação manual do runtime, use:
+## Funções locais
 
-   ```bash
-   cd ~/stacy
-   python -m pip install -r requirements.txt
-   ```
+- Saudações e verificação básica do CORE.
+- Criar, listar e concluir tarefas no banco SQLite privado da STACY.
+- Guardar e consultar anotações que o usuário pedir explicitamente para memorizar.
+- Abrir aplicativos de uma lista permitida, abrir configurações/calendário, selecionar arquivos pelo seletor do Android e abrir o menu de compartilhamento.
+- As ações permitidas são verificadas no lado Android. Uma resposta textual da IA não é considerada execução de ação.
 
-6. Para habilitar os recursos que usam Gemini, crie `~/.stacy/secrets.json` no Termux com o conteúdo abaixo, substituindo o valor pela sua chave privada:
+## Build e validação
 
-   ```json
-   {"GEMINI_API_KEY":"SUA_CHAVE_PRIVADA"}
-   ```
+Na pasta \`android\`:
 
-   Restrinja as permissões do arquivo e da pasta:
+\`\`\`bash
+gradle assembleDebug testDebugUnitTest
+\`\`\`
 
-   ```bash
-   chmod 700 ~/.stacy
-   chmod 600 ~/.stacy/secrets.json
-   ```
+O CI valida a rota nativa, compila o APK e executa testes unitários e de regressão. A validação em CI não substitui teste físico do APK com uma chave Gemini válida; esse teste de ponta a ponta precisa ser concluído no Android antes de declarar liberação final.
 
-   A STACY também aceita a variável de ambiente `GEMINI_API_KEY`, que tem precedência sobre o arquivo. Nunca coloque a chave no repositório, no APK, em capturas de tela ou em mensagens.
+## Componentes legados
 
-7. Abra a STACY e envie uma mensagem simples. Se o núcleo ou uma dependência estiver ausente, a ponte Android deve devolver uma mensagem de diagnóstico.
-
-A chave `GEMINI_API_KEY` é opcional para os fluxos locais; funcionalidades que dependem da API de IA precisam da chave configurada no ambiente do Termux. Nunca a publique no repositório.
-
-## Voz e recursos opcionais
-
-A interface usa comandos do Termux:API quando disponíveis:
-
-- `termux-speech-to-text` para entrada de voz.
-- `termux-tts-speak` para saída de voz.
-- `termux-notification` para notificações.
-
-A instalação do Termux:API e do plugin Termux:Widget é externa ao repositório. A ausência desses complementos não deve impedir o uso textual do CORE.
-
-## Atalho Termux:Widget
-
-O arquivo `stacy-voz.sh` pode ser colocado no diretório de scripts do Termux:Widget e tornado executável:
-
-```bash
-chmod +x stacy-voz.sh
-```
-
-O atalho chama `python stacy.py --voz` e continua usando o mesmo CORE.
-
-
-## Ações nativas disponíveis nesta fase
-
-O roteador Android aceita apenas comandos explícitos e uma lista permitida de ações. Exemplos de teste:
-
-- `Abra as configurações do Android`
-- `Abra o calendário`
-- `Abra o WhatsApp`, `Abra o YouTube`, `Abra o Chrome`, `Abra o Gmail`, `Abra o Spotify` ou `Abra o Google Maps`
-- `Selecione um arquivo`
-- `Compartilhe: texto que você deseja compartilhar`
-
-O compartilhamento apenas abre o seletor do Android; o usuário escolhe o aplicativo e confirma o envio. Aplicativos não instalados, ações desconhecidas e pacotes fora da lista são recusados. Nesta etapa, criar eventos de calendário, agendar notificações e executar comandos arbitrários não está conectado ao roteador conversacional.
-
-## Validação obrigatória
-
-O CI valida compilação e testes automatizados, mas não comprova a instalação do Termux, as permissões de execução externa, a presença de cada aplicativo ou a experiência de voz no aparelho. Esses itens devem ser registrados no RBI de validação física antes do fechamento do núcleo.
+Scripts do CORE Python e arquivos Termux permanecem no repositório para referência e desenvolvimento. Eles não são invocados pela rota principal de mensagens do APK, e a permissão de execução do Termux foi removida do manifesto Android.
