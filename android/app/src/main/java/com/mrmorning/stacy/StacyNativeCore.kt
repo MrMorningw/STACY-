@@ -67,7 +67,7 @@ internal class StacyNativeCore(private val localStore: StacyLocalStore? = null) 
             return if (tasks.isEmpty()) localResponse("Não há tarefas pendentes salvas neste aparelho.")
             else localResponse("Tarefas pendentes salvas neste aparelho:\n" + tasks.joinToString("\n") { task ->
                 val due = task.dueHint?.let { " — prazo: $it" }.orEmpty()
-                "• [" + task.id + "] " + task.title + due"
+                "• [" + task.id + "] " + task.title + due
             })
         }
 
