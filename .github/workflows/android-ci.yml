@@ -39,9 +39,11 @@ jobs:
         working-directory: .
         run: python scripts/fix_stacy_web_animation.py
 
-      - name: Validate STACY web animation states
+      - name: Validate STACY web console
         working-directory: .
-        run: grep -F 'online:0,ouvindo:1,pensando:2,pesquisando:1,executando:1,respondendo:2' android/app/src/main/assets/stacy_prototipo36.html
+        run: |
+          grep -F 'stacy-core-v1' android/app/src/main/assets/stacy_prototipo36.html
+          grep -F 'window.stacyNativeResponse' android/app/src/main/assets/stacy_prototipo36.html
 
       - name: Build and unit tests
         run: gradle assembleDebug testDebugUnitTest
