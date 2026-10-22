@@ -769,8 +769,8 @@ function startStacyProcessingStages(message){
  // Animate immediately, then use the search state only when the same routing
  // heuristic as the native CORE has identified a web-research request.
  window.stacyNativeState&&window.stacyNativeState("pensando");
- const normalized=String(message||"").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase();
- const wantsSearch=/\\b(pesquise|pesquisar|pesquisa na web|pesquisa na internet|busque na web|procure na internet|na internet|na web|noticias|hoje|atualmente|agora|mais recente|ultimas|ultimo|ultima|preco|cotacao|onde assistir|fontes|referencias|situacao atual|quem e o atual|pesquise sobre)\\b/.test(normalized);
+ const normalized=String(message||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+ const wantsSearch=/\b(pesquise|pesquisar|pesquisa na web|pesquisa na internet|busque na web|procure na internet|na internet|na web|noticias|hoje|atualmente|agora|mais recente|ultimas|ultimo|ultima|preco|cotacao|onde assistir|fontes|referencias|situacao atual|quem e o atual|pesquise sobre)\b/.test(normalized);
  if(wantsSearch)window.stacyNativeState&&window.stacyNativeState("pesquisando");
  const watchdogMs=wantsSearch?42000:32000;
  stacyPhaseTimers.push(setTimeout(function(){
