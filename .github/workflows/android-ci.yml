@@ -42,6 +42,20 @@ jobs:
       - name: Validate STACY web animation states
         working-directory: .
         run: grep -F 'online:0,ouvindo:1,pensando:2,pesquisando:1,executando:1,respondendo:2' android/app/src/main/assets/stacy_prototipo36.html
+      - name: Validate native CORE contract
+        working-directory: .
+        run: |
+          grep -F 'data-stacy-action="configurarIA"' android/app/src/main/assets/stacy_prototipo36.html
+          grep -F 'StacyAiClient' android/app/src/main/java/com/mrmorning/stacy/StacyCoreBridge.kt
+          grep -F 'CREATE TABLE tasks' android/app/src/main/java/com/mrmorning/stacy/StacyLocalStore.kt
+          grep -F 'v1beta/interactions' android/app/src/main/java/com/mrmorning/stacy/StacyAiClient.kt
+          grep -F 'previous_interaction_id' android/app/src/main/java/com/mrmorning/stacy/StacyAiClient.kt
+          grep -F '"type", "google_search"' android/app/src/main/java/com/mrmorning/stacy/StacyAiClient.kt
+          if grep -F '"temperature"' android/app/src/main/java/com/mrmorning/stacy/StacyAiClient.kt; then exit 1; fi
+          if grep -F 'RUN_COMMAND' android/app/src/main/java/com/mrmorning/stacy/StacyCoreBridge.kt; then exit 1; fi
+          if grep -F 'com.termux' android/app/src/main/AndroidManifest.xml; then exit 1; fi
+          python -c "from pathlib import Path; p=Path('android/app/src/main/assets/stacy_prototipo36.html'); assert len(p.read_text(encoding='utf-8')) > 170000"
+
 
       - name: Build and unit tests
         run: gradle assembleDebug testDebugUnitTest
