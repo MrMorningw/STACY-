@@ -96,9 +96,12 @@ class MainActivity : ComponentActivity() {
                         result.tipo.equals("error", ignoreCase = true)
                     // A real result wins over phase telemetry: update the state first,
                     // then deliver text/TTS, and return to ONLINE after the response settles.
-                    webState(if (isError) "erro" else "respondendo")
+                    // Deliver the actual payload before state telemetry. ERROR state
+                    // can replace the pending UI bubble; ordering this way avoids hiding
+                    // the returned diagnostic behind a generic placeholder.
                     vm.onCoreResponse(result)
                     webResponse(formatResponseWithSources(result), result.tipo)
+                    webState(if (isError) "erro" else "respondendo")
                     if (voiceEnabled) textToSpeech.speak(result.response)
                     if (!isError) {
                         responseHandler.postDelayed({ webState("online") }, 1200L)
