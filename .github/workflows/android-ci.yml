@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - feat/stacy-local-nucleus-android
       - mp08-automacao-android-20260922
       - stacy-final-android-20260924
       - mp-ef10-android-assistant-ready
