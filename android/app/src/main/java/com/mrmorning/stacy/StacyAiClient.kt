@@ -22,16 +22,20 @@ internal class StacyAiClient(context: Context) {
     private val executor = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
 
-    fun chat(message: String, callback: (CoreResult) -> Unit) {
+    fun chat(message: String, useWebSearch: Boolean = false, callback: (CoreResult) -> Unit) {
         executor.execute {
-            val key = secrets.getGeminiApiKey()
-            val result = if (key.isNullOrBlank()) {
-                errorResult(
-                    "Os comandos locais estão ativos, senhor, mas a IA generativa ainda não foi conectada. " +
-                        "Abra Menu → Ajustes e configure uma chave Gemini API. O Termux não é necessário.",
-                )
-            } else {
-                requestGemini(key, message)
+            val result = try {
+                val key = secrets.getGeminiApiKey()
+                if (key.isNullOrBlank()) {
+                    errorResult(
+                        "Os comandos locais estão ativos, senhor, mas a IA generativa ainda não foi conectada. " +
+                            "Abra Menu → Ajustes → Conectar IA e salve uma chave Gemini API válida. O Termux não é necessário.",
+                    )
+                } else {
+                    requestGemini(key, message, useWebSearch)
+                }
+            } catch (error: Exception) {
+                errorResult("Falha ao preparar a solicitação da IA: " + (error.message ?: "erro inesperado"))
             }
             mainHandler.post { callback(result) }
         }
@@ -41,7 +45,7 @@ internal class StacyAiClient(context: Context) {
         executor.shutdownNow()
     }
 
-    private fun requestGemini(apiKey: String, message: String): CoreResult {
+    private fun requestGemini(apiKey: String, message: String, useWebSearch: Boolean): CoreResult {
         var connection: HttpURLConnection? = null
         try {
             val payload = JSONObject()
@@ -52,19 +56,14 @@ internal class StacyAiClient(context: Context) {
                     "generation_config",
                     JSONObject()
                         .put("thinking_level", "low")
-                        .put("max_output_tokens", 2048),
+                        .put("max_output_tokens", 1024),
                 )
-                .put(
-                    "tools",
-                    JSONArray().put(
-                        JSONObject()
-                            .put("type", "google_search")
-                            .put("search_types", JSONArray().put("web_search")),
-                    ),
-                )
-                // Retaining the interaction allows the next request to continue context.
+                // Keep normal chat light; attach Google Search only when explicitly needed.
                 .put("store", true)
 
+            if (useWebSearch) {
+                payload.put("tools", JSONArray().put(JSONObject().put("type", "google_search")))
+            }
             secrets.getPreviousInteractionId()?.let { previousId ->
                 payload.put("previous_interaction_id", previousId)
             }
@@ -72,7 +71,7 @@ internal class StacyAiClient(context: Context) {
             connection = (URL(ENDPOINT).openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"
                 connectTimeout = CONNECT_TIMEOUT_MS
-                readTimeout = READ_TIMEOUT_MS
+                readTimeout = if (useWebSearch) SEARCH_READ_TIMEOUT_MS else READ_TIMEOUT_MS
                 doOutput = true
                 setRequestProperty("Content-Type", "application/json; charset=UTF-8")
                 setRequestProperty("Accept", "application/json")
@@ -148,16 +147,36 @@ internal class StacyAiClient(context: Context) {
     }
 
     private fun extractText(response: JSONObject): String {
-        val steps = response.optJSONArray("steps") ?: return ""
+        // Prefer the convenience field when supplied; standard REST responses expose steps.
+        val direct = response.opt("output_text")
+        if (direct is String && direct.isNotBlank()) return direct.trim()
+
+        val steps = response.optJSONArray("steps")
+            ?: response.optJSONArray("output")
+            ?: response.optJSONArray("outputs")
+            ?: return ""
         val output = ArrayList<String>()
         for (i in 0 until steps.length()) {
             val step = steps.optJSONObject(i) ?: continue
-            if (step.optString("type") != "model_output") continue
-            val content = step.optJSONArray("content") ?: continue
-            for (j in 0 until content.length()) {
-                val part = content.optJSONObject(j) ?: continue
-                if (part.optString("type") != "text") continue
-                part.optString("text").takeIf { it.isNotBlank() }?.let(output::add)
+            val type = step.optString("type")
+            if (type.isNotBlank() && type !in setOf("model_output", "text", "output_text")) continue
+
+            val directText = step.opt("text")
+            if (directText is String && directText.isNotBlank()) {
+                output.add(directText)
+                continue
+            }
+
+            val content = step.optJSONArray("content")
+            if (content != null) {
+                for (j in 0 until content.length()) {
+                    val part = content.optJSONObject(j) ?: continue
+                    val partType = part.optString("type")
+                    if (partType.isNotBlank() && partType != "text") continue
+                    part.optString("text").takeIf { it.isNotBlank() }?.let(output::add)
+                }
+            } else {
+                step.optString("output_text").takeIf { it.isNotBlank() }?.let(output::add)
             }
         }
         return output.joinToString("\n").trim()
@@ -193,8 +212,9 @@ internal class StacyAiClient(context: Context) {
     private companion object {
         const val ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/interactions"
         const val MODEL = "gemini-3.8-flash"
-        const val CONNECT_TIMEOUT_MS = 15_000
-        const val READ_TIMEOUT_MS = 90_000
+        const val CONNECT_TIMEOUT_MS = 10_000
+        const val READ_TIMEOUT_MS = 25_000
+        const val SEARCH_READ_TIMEOUT_MS = 35_000
         const val MAX_ERROR_DETAIL = 320
         const val SYSTEM_INSTRUCTION =
             "Você é STACY, uma assistente pessoal em português brasileiro. " +
