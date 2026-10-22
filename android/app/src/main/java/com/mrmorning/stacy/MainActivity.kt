@@ -1,6 +1,10 @@
 package com.mrmorning.stacy
 
 import android.Manifest
+import android.app.AlertDialog
+import android.text.InputType
+import android.view.WindowManager
+import android.widget.EditText
 import android.annotation.SuppressLint
 import android.os.Bundle
 import android.content.Intent
@@ -74,13 +78,6 @@ class MainActivity : ComponentActivity() {
             coreBridge.process(
                 message = message,
                 onQueued = { runOnUiThread { webState("pensando") } },
-                onError = { error ->
-                    runOnUiThread {
-                        vm.onCoreError(error)
-                        webResponse(error, "erro")
-                        webState("erro")
-                    }
-                },
             )
         }
 
@@ -200,6 +197,55 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun configureAiProvider() {
+        val store = StacySecretStore(this)
+        val hasSavedKey = store.hasGeminiApiKey()
+        val entry = EditText(this).apply {
+            hint = "Chave da Gemini API"
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            maxLines = 1
+        }
+        val message = if (hasSavedKey) {
+            "Uma chave já está salva com criptografia do Android. Informe outra para substituí-la ou deixe vazio para testar a chave atual."
+        } else {
+            "Configure uma chave Gemini API para ativar a conversa generativa. Crie uma chave em https://aistudio.google.com/apikey. A chave é cifrada no aparelho e não é enviada ao repositório."
+        }
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Conectar IA da STACY")
+            .setMessage(message)
+            .setView(entry)
+            .setPositiveButton("Salvar e testar") { _, _ ->
+                val key = entry.text?.toString()?.trim().orEmpty()
+                if (key.isNotBlank()) {
+                    try {
+                        store.saveGeminiApiKey(key)
+                    } catch (error: Exception) {
+                        webResponse("Não foi possível salvar a chave: " + (error.message ?: "erro desconhecido"), "erro")
+                        webState("erro")
+                        return@setPositiveButton
+                    }
+                } else if (!store.hasGeminiApiKey()) {
+                    webResponse("Cole uma chave Gemini API antes de testar a conexão.", "erro")
+                    webState("erro")
+                    return@setPositiveButton
+                }
+                webState("pensando")
+                webResponse("Chave configurada. Verificando a conexão segura com a IA...", "resposta")
+                coreBridge.testConnection { result ->
+                    CoreResultStore.publish(this@MainActivity, result)
+                }
+            }
+            .setNeutralButton("Apagar chave") { _, _ ->
+                store.clearGeminiApiKey()
+                webResponse("A chave da IA foi removida. Os comandos locais continuam disponíveis.", "resposta")
+                webState("online")
+            }
+            .setNegativeButton("Cancelar", null)
+            .create()
+        dialog.show()
+        dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
+    }
+
     inner class StacyJsBridge {
         @JavascriptInterface
         fun stacySend(message: String) {
@@ -222,6 +268,9 @@ class MainActivity : ComponentActivity() {
         }
 
         @JavascriptInterface fun stacySetVoiceEnabled(enabled: Boolean) { voiceEnabled = enabled }
+        @JavascriptInterface fun stacyConfigureAi() {
+            runOnUiThread { configureAiProvider() }
+        }
         @JavascriptInterface fun stacyCheckUpdate() { updater.checkAndUpdate() }
         @JavascriptInterface fun stacyOpenAppSettings() {
             runOnUiThread { startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))) }
