@@ -9,7 +9,7 @@ import org.json.JSONObject
 /**
  * Android-native request router.
  * Deterministic commands are answered locally. General conversation uses HTTPS
- * directly from this app; this request path starts no Python daemon or localhost server.
+ * directly from this app; this request path starts no Python daemon or secondary server.
  */
 class StacyCoreBridge(private val context: Context) {
     private val nativeCore = StacyNativeCore()
