@@ -48,4 +48,10 @@ class StacyNativeCoreTest {
         assertEquals("compartilhar_texto", result?.androidAction?.get("acao"))
         assertEquals("Olá, equipe!", result?.androidAction?.get("texto"))
     }
+
+    @Test
+    fun calendarAndSettingsAreLocalAndroidActions() {
+        assertEquals("abrir_calendario", StacyNativeCore().process("abrir calendário")?.androidAction?.get("acao"))
+        assertEquals("abrir_configuracoes", StacyNativeCore().process("abrir configurações")?.androidAction?.get("acao"))
+    }
 }
