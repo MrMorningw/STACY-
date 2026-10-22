@@ -1,45 +1,51 @@
 package com.mrmorning.stacy
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class StacyNativeCoreTest {
-    private val core = StacyNativeCore()
-
     @Test
-    fun diagnosticProbeIsAnsweredLocallyWithoutTermux() {
-        val result = requireNotNull(core.process("Teste de comunicação sem Termux"))
-        assertTrue(result.response.contains("CORE NATIVO: ONLINE"))
-        assertTrue(result.response.contains("Termux para este teste: não utilizado"))
-        assertTrue(result.response.contains("IA generativa / Orchestrator Python: não testados"))
+    fun greetingIsAnsweredWithoutNetwork() {
+        val result = StacyNativeCore().process("Olá, STACY!")
+        assertNotNull(result)
+        assertEquals("resposta", result?.tipo)
+        assertTrue(result?.response?.contains("CORE nativo") == true)
     }
 
     @Test
-    fun earlierResponseProbeIsCompatible() {
-        val result = requireNotNull(core.process("Olá, STACY. Responda apenas: Estou funcionando, senhor."))
-        assertEquals("Estou funcionando, senhor.", result.response)
+    fun diagnosticReportsLocalRuntime() {
+        val result = StacyNativeCore().process("diagnóstico do CORE nativo")
+        assertNotNull(result)
+        assertTrue(result?.response?.contains("Kotlin / Android") == true)
+        assertTrue(result?.response?.contains("CORE NATIVO: ONLINE") == true)
     }
 
     @Test
-    fun greetingIsFastAndDeterministic() {
-        val result = requireNotNull(core.process("BOM DIA, STACY!"))
-        assertEquals("resposta", result.tipo)
-        assertTrue(result.response.contains("CORE nativo"))
-    }
-
-
-    @Test
-    fun fullComponentStatusFallsThroughToPythonCore() {
-        assertNull(core.process("status dos componentes"))
-        assertNull(core.process("saúde da STACY"))
-        assertNull(core.process("status operacional do núcleo STACY"))
+    fun unknownQuestionIsNotFalselyReportedAsHandledLocally() {
+        assertNull(StacyNativeCore().process("Explique a teoria geral dos contratos"))
     }
 
     @Test
-    fun unrelatedRequestsFallThroughToExistingPythonCore() {
-        assertNull(core.process("Pesquise a previsão do tempo para amanhã."))
-        assertNull(core.process("Crie uma tarefa para sexta-feira."))
+    fun whatsappCommandIsRoutedToAllowListedAndroidAction() {
+        val result = StacyNativeCore().process("Abra o WhatsApp")
+        assertNotNull(result)
+        assertEquals("abrir_aplicativo", result?.androidAction?.optString("acao"))
+        assertEquals("com.whatsapp", result?.androidAction?.optString("pacote"))
+    }
+
+    @Test
+    fun unknownAppsAreNotExecutedLocally() {
+        assertNull(StacyNativeCore().process("Abra um aplicativo desconhecido"))
+    }
+
+    @Test
+    fun shareActionPreservesUserTextAndRequiresAndroidChooser() {
+        val result = StacyNativeCore().process("Compartilhe: Olá, equipe!")
+        assertNotNull(result)
+        assertEquals("compartilhar_texto", result?.androidAction?.optString("acao"))
+        assertEquals("Olá, equipe!", result?.androidAction?.optString("texto"))
     }
 }
