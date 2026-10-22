@@ -206,9 +206,9 @@ class MainActivity : ComponentActivity() {
             maxLines = 1
         }
         val message = if (hasSavedKey) {
-            "Uma chave já está salva com criptografia do Android. Informe outra para substituí-la ou deixe vazio para testar a chave atual."
+            "Uma chave já está salva com criptografia do Android. Informe outra para substituí-la ou deixe vazio para testar a chave atual. As mensagens são enviadas ao Google; a STACY usa o ID de interação armazenado no aparelho para manter o contexto no serviço."
         } else {
-            "Configure uma chave Gemini API para ativar a conversa generativa. Crie uma chave em https://aistudio.google.com/apikey. A chave é cifrada no aparelho e não é enviada ao repositório."
+            "Configure uma chave Gemini API para ativar a conversa generativa. Crie uma chave em https://aistudio.google.com/apikey. A chave é cifrada no aparelho e não é enviada ao repositório. As mensagens são enviadas ao Google; para manter o contexto, o serviço armazena as interações de acordo com a retenção da conta. Não envie senhas ou segredos."
         }
         val dialog = AlertDialog.Builder(this)
             .setTitle("Conectar IA da STACY")
@@ -235,9 +235,9 @@ class MainActivity : ComponentActivity() {
                     CoreResultStore.publish(this@MainActivity, result)
                 }
             }
-            .setNeutralButton("Apagar chave") { _, _ ->
+            .setNeutralButton("Apagar chave e contexto") { _, _ ->
                 store.clearGeminiApiKey()
-                webResponse("A chave da IA foi removida. Os comandos locais continuam disponíveis.", "resposta")
+                webResponse("A chave da IA e o vínculo de contexto foram removidos deste aparelho. Os comandos locais continuam disponíveis.", "resposta")
                 webState("online")
             }
             .setNegativeButton("Cancelar", null)

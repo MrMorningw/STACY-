@@ -14,6 +14,7 @@ import javax.crypto.spec.GCMParameterSpec
 /**
  * Encrypted storage for the user's Gemini API key.
  * The AES key is generated and kept by Android Keystore; plaintext is not persisted.
+ * The interaction ID is an opaque conversation pointer, not a credential.
  */
 internal class StacySecretStore(context: Context) {
     private val preferences = context.applicationContext.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
@@ -50,11 +51,31 @@ internal class StacySecretStore(context: Context) {
         val envelope = ByteArray(iv.size + ciphertext.size)
         System.arraycopy(iv, 0, envelope, 0, iv.size)
         System.arraycopy(ciphertext, 0, envelope, iv.size, ciphertext.size)
-        preferences.edit().putString(ENCRYPTED_KEY, Base64.encodeToString(envelope, Base64.NO_WRAP)).apply()
+        preferences.edit()
+            .putString(ENCRYPTED_KEY, Base64.encodeToString(envelope, Base64.NO_WRAP))
+            .remove(PREVIOUS_INTERACTION_ID)
+            .apply()
     }
 
     fun clearGeminiApiKey() = synchronized(LOCK) {
-        preferences.edit().remove(ENCRYPTED_KEY).apply()
+        preferences.edit()
+            .remove(ENCRYPTED_KEY)
+            .remove(PREVIOUS_INTERACTION_ID)
+            .apply()
+    }
+
+    fun getPreviousInteractionId(): String? = synchronized(LOCK) {
+        preferences.getString(PREVIOUS_INTERACTION_ID, null)?.takeIf { it.isNotBlank() }
+    }
+
+    fun savePreviousInteractionId(value: String) = synchronized(LOCK) {
+        val cleaned = value.trim()
+        if (cleaned.isEmpty()) return@synchronized
+        preferences.edit().putString(PREVIOUS_INTERACTION_ID, cleaned).apply()
+    }
+
+    fun clearPreviousInteractionId() = synchronized(LOCK) {
+        preferences.edit().remove(PREVIOUS_INTERACTION_ID).apply()
     }
 
     private fun getOrCreateKey(): SecretKey {
@@ -81,6 +102,7 @@ internal class StacySecretStore(context: Context) {
     private companion object {
         const val PREFERENCES = "stacy_secure_settings"
         const val ENCRYPTED_KEY = "gemini_api_key_encrypted"
+        const val PREVIOUS_INTERACTION_ID = "gemini_previous_interaction_id"
         const val KEY_ALIAS = "stacy.gemini.api-key.aes"
         const val ANDROID_KEYSTORE = "AndroidKeyStore"
         const val TRANSFORMATION = "AES/GCM/NoPadding"

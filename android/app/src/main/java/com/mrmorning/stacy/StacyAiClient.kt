@@ -13,14 +13,14 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.Executors
 
 /**
- * Native Gemini transport. The user's key is read from Android Keystore-backed
- * storage and sent only in the HTTPS header; it is never placed in the URL or logs.
+ * Native Gemini Interactions API transport.
+ * The key is sent only in the HTTPS header. Conversation continuity is handled by
+ * the provider's previous_interaction_id instead of fabricating model turns.
  */
 internal class StacyAiClient(context: Context) {
     private val secrets = StacySecretStore(context.applicationContext)
     private val executor = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val history = ArrayList<JSONObject>()
 
     fun chat(message: String, callback: (CoreResult) -> Unit) {
         executor.execute {
@@ -44,36 +44,30 @@ internal class StacyAiClient(context: Context) {
     private fun requestGemini(apiKey: String, message: String): CoreResult {
         var connection: HttpURLConnection? = null
         try {
-            val contents = JSONArray()
-            history.forEach { contents.put(it) }
-            val userMessage = JSONObject()
-                .put("role", "user")
-                .put("parts", JSONArray().put(JSONObject().put("text", message)))
-            contents.put(userMessage)
-
             val payload = JSONObject()
+                .put("model", MODEL)
+                .put("input", message)
+                .put("system_instruction", SYSTEM_INSTRUCTION)
                 .put(
-                    "systemInstruction",
-                    JSONObject().put(
-                        "parts",
-                        JSONArray().put(
-                            JSONObject().put(
-                                "text",
-                                "Você é STACY, uma assistente pessoal em português brasileiro. " +
-                                    "Sua postura é elegante, respeitosa, inteligente, precisa e prestativa. " +
-                                    "Responda com clareza e sem fingir que executou ações que não foram executadas. " +
-                                    "Quando faltar informação, declare a limitação de forma direta.",
-                            ),
-                        ),
+                    "generation_config",
+                    JSONObject()
+                        .put("thinking_level", "low")
+                        .put("max_output_tokens", 2048),
+                )
+                .put(
+                    "tools",
+                    JSONArray().put(
+                        JSONObject()
+                            .put("type", "google_search")
+                            .put("search_types", JSONArray().put("web_search")),
                     ),
                 )
-                .put("contents", contents)
-                .put(
-                    "generationConfig",
-                    JSONObject().put("maxOutputTokens", 2048),
-                )
-                // Gemini 3.8 Flash can ground answers in Google Search when useful.
-                .put("tools", JSONArray().put(JSONObject().put("google_search", JSONObject())))
+                // Retaining the interaction allows the next request to continue context.
+                .put("store", true)
+
+            secrets.getPreviousInteractionId()?.let { previousId ->
+                payload.put("previous_interaction_id", previousId)
+            }
 
             connection = (URL(ENDPOINT).openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"
@@ -89,8 +83,8 @@ internal class StacyAiClient(context: Context) {
                 stream.write(payload.toString().toByteArray(StandardCharsets.UTF_8))
             }
 
-            val status = connection.responseCode
-            val responseStream = if (status in 200..299) connection.inputStream else connection.errorStream
+            val statusCode = connection.responseCode
+            val responseStream = if (statusCode in 200..299) connection.inputStream else connection.errorStream
             val responseText = responseStream?.bufferedReader(StandardCharsets.UTF_8)?.use { it.readText() }.orEmpty()
             val responseJson = try {
                 JSONObject(responseText)
@@ -98,59 +92,40 @@ internal class StacyAiClient(context: Context) {
                 JSONObject()
             }
 
-            if (status !in 200..299) {
+            if (statusCode !in 200..299) {
                 val detail = responseJson.optJSONObject("error")?.optString("message").orEmpty()
-                val explanation = when (status) {
-                    400 -> "A API recusou a solicitação (HTTP 400)."
+                val explanation = when (statusCode) {
+                    400 -> "A API Gemini recusou a solicitação (HTTP 400)."
                     401, 403 -> "A chave Gemini foi recusada ou não tem permissão para este modelo."
+                    404 -> "A API Gemini não encontrou o recurso solicitado. Confira o modelo e a conexão."
                     429 -> "A cota ou o limite de solicitações da API Gemini foi atingido."
-                    else -> "A API Gemini retornou HTTP " + status + "."
+                    else -> "A API Gemini retornou HTTP " + statusCode + "."
                 }
-                val fullMessage = if (detail.isBlank()) explanation else explanation + " Detalhe: " + detail.take(MAX_ERROR_DETAIL)
+                val fullMessage = if (detail.isBlank()) {
+                    explanation
+                } else {
+                    explanation + " Detalhe: " + detail.take(MAX_ERROR_DETAIL)
+                }
                 return errorResult(fullMessage)
             }
 
-            val parts = responseJson.optJSONArray("candidates")
-                ?.optJSONObject(0)
-                ?.optJSONObject("content")
-                ?.optJSONArray("parts")
-            val answer = if (parts == null) "" else (0 until parts.length())
-                .mapNotNull { index -> parts.optJSONObject(index)?.optString("text")?.takeIf { it.isNotBlank() } }
-                .joinToString("\n")
-                .trim()
-
+            val answer = extractText(responseJson)
             if (answer.isBlank()) {
-                val blockReason = responseJson.optJSONObject("promptFeedback")?.optString("blockReason").orEmpty()
+                val status = responseJson.optString("status")
                 return errorResult(
-                    if (blockReason.isNotBlank()) {
-                        "A solicitação não foi respondida pela API Gemini (motivo: " + blockReason + ")."
-                    } else {
-                        "A API Gemini respondeu sem conteúdo textual. Tente reformular a solicitação."
+                    when (status) {
+                        "requires_action" -> "A API solicitou uma ação adicional que esta versão da STACY ainda não executa."
+                        "incomplete" -> "A resposta da IA ficou incompleta. Reformule a solicitação ou peça uma resposta mais curta."
+                        else -> "A API Gemini terminou sem devolver texto. Tente novamente.",
                     },
                 )
             }
 
-            history.add(userMessage)
-            history.add(
-                JSONObject()
-                    .put("role", "model")
-                    .put("parts", JSONArray().put(JSONObject().put("text", answer))),
-            )
-            while (history.size > MAX_HISTORY_MESSAGES) history.removeAt(0)
+            responseJson.optString("id")
+                .takeIf { it.isNotBlank() && it != "null" }
+                ?.let(secrets::savePreviousInteractionId)
 
-            val sources = JSONArray()
-            val chunks = responseJson.optJSONArray("candidates")
-                ?.optJSONObject(0)
-                ?.optJSONObject("groundingMetadata")
-                ?.optJSONArray("groundingChunks")
-            if (chunks != null) {
-                for (index in 0 until chunks.length()) {
-                    val web = chunks.optJSONObject(index)?.optJSONObject("web") ?: continue
-                    val uri = web.optString("uri").takeIf { it.startsWith("https://") } ?: continue
-                    val title = web.optString("title").ifBlank { "Fonte consultada" }.take(180)
-                    sources.put(JSONObject().put("titulo", title).put("url", uri))
-                }
-            }
+            val sources = extractSources(responseJson.optJSONArray("steps"))
             return CoreResult(
                 tipo = "resposta",
                 response = answer,
@@ -163,7 +138,7 @@ internal class StacyAiClient(context: Context) {
         } catch (_: SocketTimeoutException) {
             return errorResult("A IA demorou demais para responder. Verifique a conexão e tente novamente.")
         } catch (error: Exception) {
-            val detail = error.message?.take(220).orEmpty()
+            val detail = error.message?.take(MAX_ERROR_DETAIL).orEmpty()
             return errorResult(
                 if (detail.isBlank()) "Não foi possível conectar à IA Gemini." else "Falha na conexão com a IA Gemini: " + detail,
             )
@@ -172,14 +147,60 @@ internal class StacyAiClient(context: Context) {
         }
     }
 
+    private fun extractText(response: JSONObject): String {
+        val steps = response.optJSONArray("steps") ?: return ""
+        val output = ArrayList<String>()
+        for (i in 0 until steps.length()) {
+            val step = steps.optJSONObject(i) ?: continue
+            if (step.optString("type") != "model_output") continue
+            val content = step.optJSONArray("content") ?: continue
+            for (j in 0 until content.length()) {
+                val part = content.optJSONObject(j) ?: continue
+                if (part.optString("type") != "text") continue
+                part.optString("text").takeIf { it.isNotBlank() }?.let(output::add)
+            }
+        }
+        return output.joinToString("\n").trim()
+    }
+
+    /**
+     * Extract links if the provider supplies structured URLs in search result steps.
+     * Response shapes that don't supply URLs produce no source list.
+     */
+    private fun extractSources(steps: JSONArray?): JSONArray {
+        val sources = JSONArray()
+        if (steps == null) return sources
+        for (i in 0 until steps.length()) {
+            val step = steps.optJSONObject(i) ?: continue
+            if (step.optString("type") != "google_search_result") continue
+            val results = step.optJSONArray("result") ?: continue
+            for (j in 0 until results.length()) {
+                val item = results.optJSONObject(j) ?: continue
+                val url = (item.optString("url").ifBlank { item.optString("uri") })
+                    .takeIf { it.startsWith("https://") } ?: continue
+                val title = item.optString("title").ifBlank { "Fonte consultada" }.take(180)
+                if ((0 until sources.length()).none { k -> sources.optJSONObject(k)?.optString("url") == url }) {
+                    sources.put(JSONObject().put("titulo", title).put("url", url))
+                }
+            }
+        }
+        return sources
+    }
+
     private fun errorResult(message: String) =
         CoreResult(tipo = "erro", response = message, exitCode = 1, stderr = message)
 
     private companion object {
-        const val ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent"
+        const val ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/interactions"
+        const val MODEL = "gemini-3.8-flash"
         const val CONNECT_TIMEOUT_MS = 15_000
         const val READ_TIMEOUT_MS = 90_000
         const val MAX_ERROR_DETAIL = 320
-        const val MAX_HISTORY_MESSAGES = 12
+        const val SYSTEM_INSTRUCTION =
+            "Você é STACY, uma assistente pessoal em português brasileiro. " +
+                "Sua postura é elegante, respeitosa, inteligente, precisa e prestativa. " +
+                "Responda com clareza e sem fingir que executou ações que não foram executadas. " +
+                "Quando faltar informação, declare a limitação de forma direta. " +
+                "Quando uma informação atual ou verificável for necessária, utilize a busca na web e diferencie fatos de inferências."
     }
 }

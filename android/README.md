@@ -2,7 +2,7 @@
 
 ## Núcleo nativo
 
-O APK usa Kotlin para comandos locais e chama a API Gemini diretamente por HTTPS para conversa generativa. O caminho principal do Android **não depende de Termux, Python, daemon local ou servidor em localhost**. Os scripts Python/Termux que permanecem no repositório são legados/ferramentas de desenvolvimento, não requisitos para conversar pelo APK.
+O APK usa Kotlin para comandos locais e chama a API Gemini Interactions diretamente por HTTPS para conversa generativa. O caminho principal do Android **não depende de Termux, Python, daemon local ou servidor em localhost**. A API oferece continuidade de conversa pelo `previous_interaction_id` e pesquisa web via Google Search. Os scripts Python/Termux que permanecem no repositório são legados/ferramentas de desenvolvimento, não requisitos para conversar pelo APK.
 
 ### Primeira configuração da IA
 
@@ -11,7 +11,7 @@ O APK usa Kotlin para comandos locais e chama a API Gemini diretamente por HTTPS
 3. Cole a chave no diálogo e selecione **Salvar e testar**.
 4. A STACY testa a conexão na hora e devolve o resultado no chat. A chave é cifrada com AES-GCM usando uma chave gerenciada pelo Android Keystore; ela não é gravada no código, URL, log ou repositório.
 
-A API generativa precisa de internet e de uma chave válida; o uso pode estar sujeito à quota e às condições da conta Google. Sem chave ou sem internet, os comandos locais continuam disponíveis e a STACY retorna um diagnóstico explícito em vez de ficar aguardando o Termux.
+A API generativa precisa de internet e de uma chave válida; o uso pode estar sujeito à quota e às condições da conta Google. Para manter o contexto entre mensagens, a API Interactions mantém as interações no lado do serviço e a STACY guarda apenas o identificador da interação no armazenamento privado do app; a retenção depende da modalidade da conta e das configurações do Google. Não envie senhas ou conteúdo que não queira processar no serviço externo. Sem chave ou sem internet, os comandos locais continuam disponíveis e a STACY retorna um diagnóstico explícito em vez de ficar aguardando o Termux.
 
 ## Comandos nativos e recursos
 
