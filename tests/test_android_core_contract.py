@@ -70,7 +70,7 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
         self.assertIn("abrir_aplicativo", self.native)
         self.assertIn('"whatsapp" to ("com.whatsapp" to "WhatsApp")', self.native)
         self.assertIn('androidAction("compartilhar_texto", shareText = text)', self.native)
-        self.assertIn('androidAction("abrir_aplicativo"', self.native)
+        self.assertIn('operation = "abrir_aplicativo"', self.native)
         local_store = (ROOT / "android/app/src/main/java/com/mrmorning/stacy/StacyLocalStore.kt").read_text(encoding="utf-8")
         self.assertIn("CREATE TABLE tasks", local_store)
         self.assertIn("CREATE TABLE memories", local_store)
