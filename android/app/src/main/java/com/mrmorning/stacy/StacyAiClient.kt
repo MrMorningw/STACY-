@@ -22,11 +22,10 @@ internal class StacyAiClient(context: Context) {
         executor.execute {
             val key = secrets.getGeminiApiKey()
             val result = if (key.isNullOrBlank()) {
-                errorResult(
-                    "Os comandos locais estão ativos, senhor, mas a IA generativa ainda não foi conectada. " +
-                        "Abra Menu → Ajustes e configure uma chave Gemini API. O Termux não é necessário.",
-                )
-            } else requestGemini(key, message)
+                errorResult("Os comandos locais estão ativos, senhor, mas a IA generativa ainda não foi conectada. Abra Menu → Ajustes e configure uma chave Gemini API. O Termux não é necessário.")
+            } else {
+                requestGemini(key, message)
+            }
             mainHandler.post { callback(result) }
         }
     }
@@ -76,15 +75,15 @@ internal class StacyAiClient(context: Context) {
 
             val answer = extractText(json)
             if (answer.isBlank()) {
-                return errorResult(
-                    when (json.optString("status")) {
-                        "requires_action" -> "A IA solicitou uma ação adicional que esta versão ainda não executa."
-                        "incomplete" -> "A resposta da IA ficou incompleta. Peça uma resposta mais curta ou tente novamente."
-                        "failed" -> "A interação com a IA falhou. Tente novamente."
-                        "queued", "in_progress" -> "A IA ainda está processando a solicitação. Tente novamente em instantes."
-                        else -> "A API Gemini terminou sem devolver texto. Tente novamente."
-                    },
-                )
+                val status = json.optString("status")
+                val explanation = when (status) {
+                    "requires_action" -> "A IA solicitou uma ação adicional que esta versão ainda não executa."
+                    "incomplete" -> "A resposta da IA ficou incompleta. Peça uma resposta mais curta ou tente novamente."
+                    "failed" -> "A interação com a IA falhou. Tente novamente."
+                    "queued", "in_progress" -> "A IA ainda está processando a solicitação. Tente novamente em instantes."
+                    else -> "A API Gemini terminou sem devolver texto. Tente novamente."
+                }
+                return errorResult(explanation)
             }
 
             json.optString("id").takeIf { it.isNotBlank() && it != "null" }?.let(secrets::savePreviousInteractionId)
@@ -103,7 +102,6 @@ internal class StacyAiClient(context: Context) {
     }
 
     private fun extractText(response: JSONObject): String {
-        response.optString("output_text").takeIf { it.isNotBlank() }?.let { return it.trim() }
         val steps = response.optJSONArray("steps") ?: return ""
         val output = ArrayList<String>()
         for (i in 0 until steps.length()) {
@@ -112,7 +110,10 @@ internal class StacyAiClient(context: Context) {
             val content = step.optJSONArray("content") ?: continue
             for (j in 0 until content.length()) {
                 val part = content.optJSONObject(j) ?: continue
-                if (part.optString("type") == "text") part.optString("text").takeIf { it.isNotBlank() }?.let(output::add)
+                if (part.optString("type") == "text") {
+                    val text = part.optString("text")
+                    if (text.isNotBlank()) output.add(text)
+                }
             }
         }
         return output.joinToString("\n").trim()
@@ -130,7 +131,9 @@ internal class StacyAiClient(context: Context) {
                 val url = item.optString("url").ifBlank { item.optString("uri") }
                 if (!url.startsWith("https://")) continue
                 val title = item.optString("title").ifBlank { "Fonte consultada" }.take(180)
-                if ((0 until sources.length()).none { k -> sources.optJSONObject(k)?.optString("url") == url }) sources.put(JSONObject().put("titulo", title).put("url", url))
+                if ((0 until sources.length()).none { k -> sources.optJSONObject(k)?.optString("url") == url }) {
+                    sources.put(JSONObject().put("titulo", title).put("url", url))
+                }
             }
         }
         return sources
