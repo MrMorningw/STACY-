@@ -58,7 +58,7 @@ internal class StacyNativeCore(private val localStore: StacyLocalStore? = null) 
                 return localResponse("Não consegui salvar a tarefa: " + (error.message ?: "erro local"), "erro")
             }
             val dueText = task.dueHint?.let { " Prazo anotado: $it." }.orEmpty()
-            return localResponse("Tarefa \${task.id} salva no armazenamento local: “\${task.title}”.$dueText")
+            return localResponse("Tarefa " + task.id + " salva no armazenamento local: “" + task.title + "”." + dueText)
         }
 
         if (isListTasksRequest(normalized)) {
@@ -67,7 +67,7 @@ internal class StacyNativeCore(private val localStore: StacyLocalStore? = null) 
             return if (tasks.isEmpty()) localResponse("Não há tarefas pendentes salvas neste aparelho.")
             else localResponse("Tarefas pendentes salvas neste aparelho:\n" + tasks.joinToString("\n") { task ->
                 val due = task.dueHint?.let { " — prazo: $it" }.orEmpty()
-                "• [\${task.id}] \${task.title}$due"
+                "• [" + task.id + "] " + task.title + due"
             })
         }
 
@@ -77,7 +77,7 @@ internal class StacyNativeCore(private val localStore: StacyLocalStore? = null) 
             val query = completeMatch.groupValues[1].trim()
             val completed = try { store.completeTask(query) } catch (_: Exception) { null }
             return if (completed == null) localResponse("Não encontrei uma tarefa pendente correspondente a “$query”. Peça para listar as tarefas e use o título ou número.", "erro")
-            else localResponse("Tarefa \${completed.id} marcada como concluída: “\${completed.title}”.")
+            else localResponse("Tarefa " + completed.id + " marcada como concluída: “" + completed.title + "”.")
         }
 
         val rememberMatch = REMEMBER_PATTERN.matchEntire(rawText)
@@ -97,7 +97,7 @@ internal class StacyNativeCore(private val localStore: StacyLocalStore? = null) 
             if (store == null) return localResponse("O armazenamento local de memória não está conectado.", "erro")
             val memories = store.listMemories()
             return if (memories.isEmpty()) localResponse("A memória local ainda não tem anotações explícitas.")
-            else localResponse("Anotações guardadas localmente:\n" + memories.mapIndexed { index, value -> "\${index + 1}. $value" }.joinToString("\n"))
+            else localResponse("Anotações guardadas localmente:\n" + memories.mapIndexed { index, value -> (index + 1).toString() + ". " + value }.joinToString("\n"))
         }
         return null
     }
@@ -118,7 +118,7 @@ internal class StacyNativeCore(private val localStore: StacyLocalStore? = null) 
 
     private fun isListMemoryRequest(text: String): Boolean =
         text in LIST_MEMORY_PHRASES || text.startsWith("mostre minha memoria") ||
-            text.startsWith("consulte a memoria local") || text.startsWith("o que voce lembra")
+            text.startsWith("consulte a memoria local") || text.startsWith("mostre o estado atual da memoria") || text.startsWith("o que voce lembra")
 
     private fun localResponse(text: String, type: String = "resposta") = CoreResult(
         tipo = type, response = text, exitCode = if (type == "erro") 1 else 0,
