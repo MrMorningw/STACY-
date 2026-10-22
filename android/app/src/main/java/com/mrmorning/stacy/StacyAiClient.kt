@@ -116,7 +116,7 @@ internal class StacyAiClient(context: Context) {
                     when (status) {
                         "requires_action" -> "A API solicitou uma ação adicional que esta versão da STACY ainda não executa."
                         "incomplete" -> "A resposta da IA ficou incompleta. Reformule a solicitação ou peça uma resposta mais curta."
-                        else -> "A API Gemini terminou sem devolver texto. Tente novamente.",
+                        else -> "A API Gemini terminou sem devolver texto. Tente novamente."
                     },
                 )
             }
