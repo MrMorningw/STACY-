@@ -85,8 +85,6 @@ class MainActivity : ComponentActivity() {
 
         CoreResultStore.subscribe { result ->
             runOnUiThread {
-                // A result from the CORE is authoritative for completion. Even if
-                // its phase events were lost, the response itself must drive the UI.
                 val action = result.androidAction
                 if (action != null) {
                     webState("respondendo")
@@ -94,11 +92,6 @@ class MainActivity : ComponentActivity() {
                 } else if (result.response.isNotBlank()) {
                     val isError = result.tipo.equals("erro", ignoreCase = true) ||
                         result.tipo.equals("error", ignoreCase = true)
-                    // A real result wins over phase telemetry: update the state first,
-                    // then deliver text/TTS, and return to ONLINE after the response settles.
-                    // Deliver the actual payload before state telemetry. ERROR state
-                    // can replace the pending UI bubble; ordering this way avoids hiding
-                    // the returned diagnostic behind a generic placeholder.
                     vm.onCoreResponse(result)
                     webResponse(formatResponseWithSources(result), result.tipo)
                     webState(if (isError) "erro" else "respondendo")
@@ -299,17 +292,42 @@ class MainActivity : ComponentActivity() {
 
     private fun webState(state: String) {
         if (!::webView.isInitialized) return
-        webView.evaluateJavascript("window.stacyNativeState && window.stacyNativeState(" + JSONObject.quote(state) + ")", null)
+        webView.evaluateJavascript("(function(s){try{if(typeof window.stacyNativeState==='function'){window.stacyNativeState(s);return;}var app=document.getElementById('app');if(app){app.classList.remove('online','ouvindo','pensando','pesquisando','executando','respondendo','offline','erro');app.classList.add(s);}})(" + JSONObject.quote(state) + ")", null)
     }
 
     private fun webUpdateStatus(status: String) {
         if (!::webView.isInitialized) return
-        webView.evaluateJavascript("window.stacyNativeUpdateStatus && window.stacyNativeUpdateStatus(" + JSONObject.quote(status) + ")", null)
+        webView.evaluateJavascript("(function(s){try{if(typeof window.stacyNativeUpdateStatus==='function'){window.stacyNativeUpdateStatus(s);return;}}catch(e){} })(" + JSONObject.quote(status) + ")", null)
     }
 
     private fun webResponse(response: String, tipo: String) {
         if (!::webView.isInitialized) return
-        webView.evaluateJavascript("window.stacyNativeResponse && window.stacyNativeResponse(" + JSONObject.quote(response) + "," + JSONObject.quote(tipo) + ")", null)
+        val responseJson = JSONObject.quote(response)
+        val typeJson = JSONObject.quote(tipo)
+        val script = """
+            (function(r,t){
+                var delivered=false;
+                try{
+                    if(typeof window.stacyNativeResponse==='function'){
+                        try{window.stacyNativeResponse(r,t);delivered=true;}catch(e){}
+                    }
+                }catch(e){}
+                if(delivered)return;
+                try{
+                    var app=document.getElementById('app');
+                    var panel=document.querySelector('.responsePanel');
+                    var bubble=document.querySelector('.responseBubble');
+                    if(bubble){
+                        bubble.textContent=r;
+                        bubble.style.opacity='1';
+                        bubble.style.transform='translateY(0)';
+                    }
+                    if(panel)panel.style.display='block';
+                    if(app)app.classList.add('has-response');
+                }catch(e){}
+            }($responseJson,$typeJson));
+        """.trimIndent()
+        webView.evaluateJavascript(script, null)
     }
 
     override fun onDestroy() {
