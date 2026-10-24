@@ -89,7 +89,8 @@ class StacyWebViewBridgeTest {
 
             evaluate(
                 webView,
-                "(function(){ Android.stacySend('Explique a teoria geral dos contratos'); return 'sent'; })()
+                "(function(){ Android.stacySend('Explique a teoria geral dos contratos'); return 'sent'; })()",
+            )
 
             assertTrue(
                 "A missing API key must produce one real diagnostic bubble, not a generic placeholder plus a duplicate",
