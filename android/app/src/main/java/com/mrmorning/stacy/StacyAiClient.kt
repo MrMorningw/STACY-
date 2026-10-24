@@ -45,7 +45,22 @@ internal class StacyAiClient(context: Context) {
         executor.shutdownNow()
     }
 
-    private fun requestGemini(apiKey: String, message: String, useWebSearch: Boolean): CoreResult {
+    private fun requestGemini(apiKey: String, message: String, useWebSearch: Boolean): CoreResult =
+        requestGemini(
+            apiKey = apiKey,
+            message = message,
+            useWebSearch = useWebSearch,
+            previousInteractionId = secrets.getPreviousInteractionId(),
+            retriedWithoutPreviousInteraction = false,
+        )
+
+    private fun requestGemini(
+        apiKey: String,
+        message: String,
+        useWebSearch: Boolean,
+        previousInteractionId: String?,
+        retriedWithoutPreviousInteraction: Boolean,
+    ): CoreResult {
         var connection: HttpURLConnection? = null
         try {
             val payload = JSONObject()
@@ -56,7 +71,7 @@ internal class StacyAiClient(context: Context) {
                     "generation_config",
                     JSONObject()
                         .put("thinking_level", "low")
-                        .put("max_output_tokens", 1024),
+                        .put("max_output_tokens", 4096),
                 )
                 // Keep normal chat light; attach Google Search only when explicitly needed.
                 .put("store", true)
@@ -64,7 +79,7 @@ internal class StacyAiClient(context: Context) {
             if (useWebSearch) {
                 payload.put("tools", JSONArray().put(JSONObject().put("type", "google_search")))
             }
-            secrets.getPreviousInteractionId()?.let { previousId ->
+            previousInteractionId?.let { previousId ->
                 payload.put("previous_interaction_id", previousId)
             }
 
@@ -93,6 +108,24 @@ internal class StacyAiClient(context: Context) {
 
             if (statusCode !in 200..299) {
                 val detail = responseJson.optJSONObject("error")?.optString("message").orEmpty()
+                if (
+                    !retriedWithoutPreviousInteraction &&
+                    previousInteractionId != null &&
+                    indicatesExpiredInteraction(statusCode, detail)
+                ) {
+                    // Free-tier interaction history expires after a limited retention
+                    // period. Drop a stale pointer and retry once as a fresh conversation
+                    // instead of leaving subsequent chat requests permanently broken.
+                    secrets.clearPreviousInteractionId()
+                    connection.disconnect()
+                    return requestGemini(
+                        apiKey = apiKey,
+                        message = message,
+                        useWebSearch = useWebSearch,
+                        previousInteractionId = null,
+                        retriedWithoutPreviousInteraction = true,
+                    )
+                }
                 val explanation = when (statusCode) {
                     400 -> "A API Gemini recusou a solicitação (HTTP 400)."
                     401, 403 -> "A chave Gemini foi recusada ou não tem permissão para este modelo."
@@ -144,6 +177,14 @@ internal class StacyAiClient(context: Context) {
         } finally {
             connection?.disconnect()
         }
+    }
+
+    private fun indicatesExpiredInteraction(statusCode: Int, detail: String): Boolean {
+        if (statusCode != 400 && statusCode != 404) return false
+        val normalized = detail.lowercase(java.util.Locale.ROOT)
+        if (normalized.contains("previous_interaction_id")) return true
+        return normalized.contains("interaction") &&
+            listOf("not found", "expired", "unknown").any(normalized::contains)
     }
 
     private fun extractText(response: JSONObject): String {
