@@ -32,11 +32,15 @@ class StacyCoreBridge(private val context: Context) {
         val useWebSearch = shouldUseWebSearch(normalized)
         CorePhaseStore.publish(context, if (useWebSearch) "pesquisando" else "pensando")
         aiClient.chat(normalized, useWebSearch) { result ->
+            // Deliver the authoritative payload before final phase telemetry.
+            // The WebView's ERROR-state handler replaces a pending bubble with a
+            // generic message; publishing the phase first can create a duplicate
+            // bubble and hide the detailed API diagnostic.
+            CoreResultStore.publish(context, result)
             CorePhaseStore.publish(
                 context,
                 if (result.tipo.equals("erro", ignoreCase = true) || result.tipo.equals("error", ignoreCase = true)) "erro" else "respondendo",
             )
-            CoreResultStore.publish(context, result)
         }
     }
 

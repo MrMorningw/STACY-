@@ -9,10 +9,11 @@ android {
 
     defaultConfig {
         applicationId = "com.mrmorning.stacy"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         minSdk = 26
         targetSdk = 36
-        versionCode = 27
-        versionName = "0.3.6"
+        versionCode = 28
+        versionName = "0.3.7"
     }
 
     signingConfigs {
@@ -55,4 +56,7 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.activity:activity-compose:1.13.0")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    androidTestImplementation("androidx.test:core-ktx:1.6.1")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
 }

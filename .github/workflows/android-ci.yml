@@ -1,5 +1,9 @@
 name: STACY Android CI
 
+concurrency:
+  group: stacy-android-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches:
@@ -16,6 +20,7 @@ on:
 jobs:
   android:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: android
@@ -35,10 +40,6 @@ jobs:
         with:
           gradle-version: "9.6.0"
 
-      - name: Patch STACY web animation states
-        working-directory: .
-        run: python scripts/fix_stacy_web_animation.py
-
       - name: Validate STACY web animation states
         working-directory: .
         run: grep -F 'online:0,ouvindo:1,pensando:2,pesquisando:1,executando:1,respondendo:2' android/app/src/main/assets/stacy_prototipo36.html
@@ -57,8 +58,61 @@ jobs:
           python -c "from pathlib import Path; p=Path('android/app/src/main/assets/stacy_prototipo36.html'); assert len(p.read_text(encoding='utf-8')) > 170000"
 
 
-      - name: Build and unit tests
-        run: gradle assembleDebug testDebugUnitTest
+      - name: Validate inline JavaScript syntax
+        working-directory: .
+        run: |
+          python - <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+          import subprocess
+          import tempfile
+
+          html = Path("android/app/src/main/assets/stacy_prototipo36.html").read_text(encoding="utf-8")
+
+          class InlineScriptParser(HTMLParser):
+              def __init__(self):
+                  super().__init__(convert_charrefs=False)
+                  self.scripts = []
+                  self.current = None
+
+              def handle_starttag(self, tag, attrs):
+                  if tag.lower() == "script":
+                      attrs = dict(attrs)
+                      self.current = {"attrs": attrs, "parts": []}
+
+              def handle_data(self, data):
+                  if self.current is not None:
+                      self.current["parts"].append(data)
+
+              def handle_endtag(self, tag):
+                  if tag.lower() == "script" and self.current is not None:
+                      self.scripts.append(self.current)
+                      self.current = None
+
+          parser = InlineScriptParser()
+          parser.feed(html)
+          checked = 0
+          with tempfile.TemporaryDirectory() as tmp:
+              for index, script in enumerate(parser.scripts):
+                  attrs = script["attrs"]
+                  source = "".join(script["parts"])
+                  script_type = attrs.get("type", "").lower()
+                  if attrs.get("src") or not source.strip():
+                      continue
+                  if script_type in {"importmap", "application/json", "application/ld+json"}:
+                      continue
+                  suffix = ".mjs" if script_type == "module" else ".js"
+                  file = Path(tmp) / f"inline-{index}{suffix}"
+                  file.write_text(source, encoding="utf-8")
+                  subprocess.run(["node", "--check", str(file)], check=True)
+                  checked += 1
+          if checked == 0:
+              raise SystemExit("No inline JavaScript blocks were validated.")
+          print(f"Validated JavaScript syntax in {checked} inline script blocks.")
+          PY
+
+      - name: Build, unit tests, and instrumentation package
+        run: gradle assembleDebug testDebugUnitTest assembleDebugAndroidTest
 
       - name: Upload STACY APK
         if: success()

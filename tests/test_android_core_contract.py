@@ -98,8 +98,8 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
         self.assertIn("CorePhaseContext", (ROOT / "core_phase_context.py").read_text(encoding="utf-8"))
 
     def test_released_build_advances_version_so_installed_app_can_update(self):
-        self.assertIn("versionCode = 27", self.gradle)
-        self.assertIn('versionName = "0.3.6"', self.gradle)
+        self.assertIn("versionCode = 28", self.gradle)
+        self.assertIn('versionName = "0.3.7"', self.gradle)
 
 
 if __name__ == "__main__":
