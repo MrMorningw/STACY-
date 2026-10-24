@@ -40,6 +40,11 @@ class StacyWebViewBridgeTest {
                 },
             )
 
+            // STACY intentionally runs a continuous requestAnimationFrame loop.
+            // Pause only the test instance so Android instrumentation can finish
+            // destroying the Activity without waiting for perpetual animation frames.
+            evaluate(webView, "window.stacySetAnimationsEnabled && window.stacySetAnimationsEnabled(false)")
+
             evaluate(
                 webView,
                 "(function(){ Android.stacySend('diagnóstico do CORE nativo'); return 'sent'; })()",
@@ -80,10 +85,11 @@ class StacyWebViewBridgeTest {
                 },
             )
 
+            evaluate(webView, "window.stacySetAnimationsEnabled && window.stacySetAnimationsEnabled(false)")
+
             evaluate(
                 webView,
-                "(function(){ Android.stacySend('Explique a teoria geral dos contratos'); return 'sent'; })()",
-            )
+                "(function(){ Android.stacySend('Explique a teoria geral dos contratos'); return 'sent'; })()
 
             assertTrue(
                 "A missing API key must produce one real diagnostic bubble, not a generic placeholder plus a duplicate",
