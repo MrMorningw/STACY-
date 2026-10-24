@@ -111,7 +111,8 @@ class StacyWebViewBridgeTest {
         val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs)
         while (System.nanoTime() < deadline) {
             if (condition()) return true
-            InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+            // The production scene continuously uses requestAnimationFrame; waiting
+            // for a completely idle main queue can block this test forever.
             Thread.sleep(100)
         }
         return condition()
