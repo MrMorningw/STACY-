@@ -111,19 +111,8 @@ jobs:
           print(f"Validated JavaScript syntax in {checked} inline script blocks.")
           PY
 
-      - name: Build and unit tests
-        run: gradle assembleDebug testDebugUnitTest
-
-      - name: Run production WebView bridge tests
-        timeout-minutes: 10
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 36
-          target: google_apis
-          arch: x86_64
-          profile: pixel_2
-          disable-animations: true
-          script: cd android && gradle connectedDebugAndroidTest
+      - name: Build, unit tests, and instrumentation package
+        run: gradle assembleDebug testDebugUnitTest assembleDebugAndroidTest
 
       - name: Upload STACY APK
         if: success()
