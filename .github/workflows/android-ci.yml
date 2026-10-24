@@ -35,10 +35,6 @@ jobs:
         with:
           gradle-version: "9.6.0"
 
-      - name: Patch STACY web animation states
-        working-directory: .
-        run: python scripts/fix_stacy_web_animation.py
-
       - name: Validate STACY web animation states
         working-directory: .
         run: grep -F 'online:0,ouvindo:1,pensando:2,pesquisando:1,executando:1,respondendo:2' android/app/src/main/assets/stacy_prototipo36.html
