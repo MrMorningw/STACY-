@@ -1,9 +1,10 @@
-name: STACY CI
+name: STACY Core CI
 
 on:
   push:
     branches: ["main"]
   pull_request:
+    branches: ["main"]
 
 jobs:
   test:
@@ -13,7 +14,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.13"
 
@@ -22,7 +23,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Compile
+      - name: Compile Python
         run: python -m py_compile *.py
 
       - name: Validate Termux bootstrap syntax
@@ -30,3 +31,14 @@ jobs:
 
       - name: Core regression tests
         run: python -m unittest discover -v
+
+      - name: Validate closed MPEF sequence
+        run: |
+          python - <<'PY'
+          import ctac, mepo
+          assert mepo.validar_sequencia()
+          assert all(item["status"] == "fechado" for item in mepo.listar())
+          assert mepo.proximo_aberto() is None
+          assert ctac.validar_coerencia()["coerente"]
+          print("STACY CORE: MP-01..MP-12 fechados e CTAC coerente")
+          PY
