@@ -47,7 +47,13 @@ class StacyWebViewBridgeTest {
 
             evaluate(
                 webView,
-                "(function(){ Android.stacySend('diagnóstico do CORE nativo'); return 'sent'; })()",
+                "(function(){ " +
+                    "var input=document.getElementById('message'); " +
+                    "if(!input) return 'missing-input'; " +
+                    "input.value='diagnóstico do CORE nativo'; " +
+                    "window.sendComposerMessage(); " +
+                    "return 'sent'; " +
+                "})()",
             )
 
             assertTrue(
@@ -89,7 +95,13 @@ class StacyWebViewBridgeTest {
 
             evaluate(
                 webView,
-                "(function(){ Android.stacySend('Explique a teoria geral dos contratos'); return 'sent'; })()",
+                "(function(){ " +
+                    "var input=document.getElementById('message'); " +
+                    "if(!input) return 'missing-input'; " +
+                    "input.value='Explique a teoria geral dos contratos'; " +
+                    "window.sendComposerMessage(); " +
+                    "return 'sent'; " +
+                "})()",
             )
 
             assertTrue(
