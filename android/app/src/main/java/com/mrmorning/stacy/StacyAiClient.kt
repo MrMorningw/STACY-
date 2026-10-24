@@ -17,7 +17,10 @@ import java.util.concurrent.Executors
  * The key is sent only in the HTTPS header. Conversation continuity is handled by
  * the provider's previous_interaction_id instead of fabricating model turns.
  */
-internal class StacyAiClient(context: Context) {
+internal class StacyAiClient(
+    context: Context,
+    private val endpoint: String = ENDPOINT,
+) {
     private val secrets = StacySecretStore(context.applicationContext)
     private val executor = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -83,7 +86,7 @@ internal class StacyAiClient(context: Context) {
                 payload.put("previous_interaction_id", previousId)
             }
 
-            connection = (URL(ENDPOINT).openConnection() as HttpURLConnection).apply {
+            connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"
                 connectTimeout = CONNECT_TIMEOUT_MS
                 readTimeout = if (useWebSearch) SEARCH_READ_TIMEOUT_MS else READ_TIMEOUT_MS
