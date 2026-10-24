@@ -49,9 +49,10 @@ class StacyWebViewBridgeTest {
                 webView,
                 "(function(){ " +
                     "var input=document.getElementById('message'); " +
-                    "if(!input) return 'missing-input'; " +
+                    "var send=document.getElementById('send'); " +
+                    "if(!input || !send) return 'missing-composer'; " +
                     "input.value='diagnóstico do CORE nativo'; " +
-                    "window.sendComposerMessage(); " +
+                    "send.click(); " +
                     "return 'sent'; " +
                 "})()",
             )
@@ -97,9 +98,10 @@ class StacyWebViewBridgeTest {
                 webView,
                 "(function(){ " +
                     "var input=document.getElementById('message'); " +
-                    "if(!input) return 'missing-input'; " +
+                    "var send=document.getElementById('send'); " +
+                    "if(!input || !send) return 'missing-composer'; " +
                     "input.value='Explique a teoria geral dos contratos'; " +
-                    "window.sendComposerMessage(); " +
+                    "send.click(); " +
                     "return 'sent'; " +
                 "})()",
             )
