@@ -95,9 +95,12 @@ jobs:
               for index, script in enumerate(parser.scripts):
                   attrs = script["attrs"]
                   source = "".join(script["parts"])
+                  script_type = attrs.get("type", "").lower()
                   if attrs.get("src") or not source.strip():
                       continue
-                  suffix = ".mjs" if attrs.get("type", "").lower() == "module" else ".js"
+                  if script_type in {"importmap", "application/json", "application/ld+json"}:
+                      continue
+                  suffix = ".mjs" if script_type == "module" else ".js"
                   file = Path(tmp) / f"inline-{index}{suffix}"
                   file.write_text(source, encoding="utf-8")
                   subprocess.run(["node", "--check", str(file)], check=True)
