@@ -86,12 +86,17 @@ class StacyWebViewBridgeTest {
             )
 
             assertTrue(
-                "A missing API key must produce a visible diagnostic in the chat",
+                "A missing API key must produce one real diagnostic bubble, not a generic placeholder plus a duplicate",
                 awaitCondition(webView, timeoutMs = 8_000) {
                     evaluate(
                         webView,
-                        "(function(){ var log=document.getElementById('stacyChatLog'); " +
-                            "return !!log && log.innerText.includes('IA generativa ainda não foi conectada'); })()",
+                        "(function(){ " +
+                            "var log=document.getElementById('stacyChatLog'); " +
+                            "var replies=log ? log.querySelectorAll('.stacy-chat-row.assistant .stacy-chat-bubble') : []; " +
+                            "return replies.length === 1 && " +
+                            "replies[0].innerText.includes('IA generativa ainda não foi conectada') && " +
+                            "!log.innerText.includes('Não foi possível concluir. Verifique a conexão da IA ou tente novamente.'); " +
+                        "})()",
                     ) == "true"
                 },
             )
