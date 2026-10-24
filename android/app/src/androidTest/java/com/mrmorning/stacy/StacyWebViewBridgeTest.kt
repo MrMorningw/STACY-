@@ -29,6 +29,17 @@ class StacyWebViewBridgeTest {
                     ?: throw AssertionError("MainActivity is not displaying its production WebView")
             }
 
+            // Pause the test scene before asserting the bridge. If bridge
+            // initialization fails, ActivityScenario must still be able to close
+            // the production Activity without a perpetual requestAnimationFrame loop.
+            assertTrue(
+                "STACY scene did not expose animation control",
+                awaitCondition(webView, timeoutMs = 12_000) {
+                    evaluate(webView, "typeof window.stacySetAnimationsEnabled === 'function'") == "true"
+                },
+            )
+            evaluate(webView, "window.stacySetAnimationsEnabled(false)")
+
             assertTrue(
                 "STACY WebView did not finish exposing its native bridge",
                 awaitCondition(webView, timeoutMs = 12_000) {
@@ -39,11 +50,6 @@ class StacyWebViewBridgeTest {
                     ) == "true"
                 },
             )
-
-            // STACY intentionally runs a continuous requestAnimationFrame loop.
-            // Pause only the test instance so Android instrumentation can finish
-            // destroying the Activity without waiting for perpetual animation frames.
-            evaluate(webView, "window.stacySetAnimationsEnabled && window.stacySetAnimationsEnabled(false)")
 
             evaluate(
                 webView,
@@ -82,6 +88,14 @@ class StacyWebViewBridgeTest {
             }
 
             assertTrue(
+                "STACY scene did not expose animation control",
+                awaitCondition(webView, timeoutMs = 12_000) {
+                    evaluate(webView, "typeof window.stacySetAnimationsEnabled === 'function'") == "true"
+                },
+            )
+            evaluate(webView, "window.stacySetAnimationsEnabled(false)")
+
+            assertTrue(
                 "STACY WebView or native bridge did not become ready",
                 awaitCondition(webView, timeoutMs = 12_000) {
                     evaluate(
@@ -91,8 +105,6 @@ class StacyWebViewBridgeTest {
                     ) == "true"
                 },
             )
-
-            evaluate(webView, "window.stacySetAnimationsEnabled && window.stacySetAnimationsEnabled(false)")
 
             evaluate(
                 webView,
