@@ -28,7 +28,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var webView: WebView
     private lateinit var vm: StacyViewModel
     private var voiceEnabled = true
-    private lateinit var updater: StacyUpdater
+    private lateinit var ars: StacyArs
     private var pendingFileChooser: ValueCallback<Array<Uri>>? = null
     private val responseHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private val fileChooserResult = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -60,7 +60,14 @@ class MainActivity : ComponentActivity() {
         coreBridge = StacyCoreBridge(this)
         androidAutomation = AndroidAutomation(this)
         textToSpeech = AndroidTextToSpeech(this)
-        updater = StacyUpdater(this) { status -> runOnUiThread { webUpdateStatus(status) } }
+        ars = StacyArs(
+            context = this,
+            onStatus = { status -> runOnUiThread { webUpdateStatus(status) } },
+            onReport = { report ->
+                runOnUiThread { publishDiagnosticCallback("stacyArsReport", report) }
+            },
+            onInstallIntent = { intent -> runOnUiThread { startActivity(intent) } },
+        )
 
         voiceInput = AndroidVoiceInput(
             context = this,
@@ -407,7 +414,9 @@ class MainActivity : ComponentActivity() {
         @JavascriptInterface fun stacyConfigureAi() {
             runOnUiThread { configureAiProvider() }
         }
-        @JavascriptInterface fun stacyCheckUpdate() { updater.checkAndUpdate() }
+        @JavascriptInterface fun stacyCheckUpdate() { ars.atualizar() }
+        @JavascriptInterface fun stacyArsConsult() { ars.consultar() }
+        @JavascriptInterface fun stacyArsUpdate() { ars.atualizar() }
         @JavascriptInterface fun stacyOpenAppSettings() {
             runOnUiThread { startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))) }
         }
@@ -479,6 +488,11 @@ class MainActivity : ComponentActivity() {
         webView.evaluateJavascript(script, null)
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (::ars.isInitialized) ars.verificarInstalacaoPendente()
+    }
+
     override fun onDestroy() {
         pendingFileChooser?.onReceiveValue(null)
         pendingFileChooser = null
@@ -488,6 +502,7 @@ class MainActivity : ComponentActivity() {
         if (::voiceInput.isInitialized) voiceInput.destroy()
         if (::textToSpeech.isInitialized) textToSpeech.shutdown()
         if (::coreBridge.isInitialized) coreBridge.shutdown()
+        if (::ars.isInitialized) ars.encerrar()
         if (::webView.isInitialized) { webView.removeJavascriptInterface("Android"); webView.destroy() }
         super.onDestroy()
     }
