@@ -148,9 +148,16 @@ class StacyWebViewBridgeTest {
             }
 
             assertTrue(
-                "STACY scene did not expose animation control",
+                "STACY page or diagnostic bridge did not become ready",
                 awaitCondition(webView, timeoutMs = 12_000) {
-                    evaluate(webView, "typeof window.stacySetAnimationsEnabled === 'function'") == "true"
+                    evaluate(
+                        webView,
+                        "typeof window.stacySetAnimationsEnabled === 'function' && " +
+                            "typeof window.stacyOpenPage === 'function' && " +
+                            "typeof window.stacyDiagnosticUpdate === 'function' && " +
+                            "typeof window.Android === 'object' && " +
+                            "typeof window.Android.stacyRunDiagnostics === 'function'",
+                    ) == "true"
                 },
             )
             evaluate(webView, "window.stacySetAnimationsEnabled(false)")
