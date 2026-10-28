@@ -26,6 +26,7 @@
         android:label="STACY"
         android:supportsRtl="true"
         android:theme="@style/Theme.STACY"
+        android:networkSecurityConfig="@xml/stacy_network_security"
 >
 
         <provider
