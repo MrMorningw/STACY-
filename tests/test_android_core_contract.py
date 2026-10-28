@@ -83,7 +83,7 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
         self.assertIn("arsConsultar", self.html)
         self.assertIn("arsAtualizar", self.html)
         self.assertIn("window.stacyArsReport=function(raw)", self.html)
-        self.assertIn("data-stacy-action=\\"ars\\"", self.html)
+        self.assertIn('data-stacy-action="ars"', self.html)
         self.assertIn("UP_TO_DATE", self.ars_policy)
         self.assertIn("CHANNEL_OUTDATED", self.ars_policy)
         self.assertIn("CHANNEL_INCONSISTENT", self.ars_policy)
