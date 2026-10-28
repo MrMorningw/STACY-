@@ -17,6 +17,9 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
         cls.gradle = (ROOT / "android/app/build.gradle.kts").read_text(encoding="utf-8")
         cls.manifest = (ROOT / "android/app/src/main/AndroidManifest.xml").read_text(encoding="utf-8")
         cls.ai = (ROOT / "android/app/src/main/java/com/mrmorning/stacy/StacyAiClient.kt").read_text(encoding="utf-8")
+        cls.ars = (ROOT / "android/app/src/main/java/com/mrmorning/stacy/StacyArs.kt").read_text(encoding="utf-8")
+        cls.ars_policy = (ROOT / "android/app/src/main/java/com/mrmorning/stacy/StacyArsPolicy.kt").read_text(encoding="utf-8")
+        cls.updater = (ROOT / "android/app/src/main/java/com/mrmorning/stacy/StacyUpdater.kt").read_text(encoding="utf-8")
 
     def test_message_has_a_complete_ui_to_core_and_back_path(self):
         self.assertIn('Android.stacySend(text)', self.html)
@@ -61,6 +64,30 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
         self.assertIn('window.stacyBridgePingResult=function(raw)', self.html)
         self.assertIn('75000', self.html)
         self.assertIn('"not_used"', self.activity)
+
+    def test_ars_owns_self_consult_and_safe_self_update(self):
+        self.assertIn("class StacyArs", self.ars)
+        self.assertIn("fun consultar()", self.ars)
+        self.assertIn("fun atualizar()", self.ars)
+        self.assertIn("fun verificarInstalacaoPendente()", self.ars)
+        self.assertIn("StacyArs(", self.activity)
+        self.assertIn("fun stacyArsConsult()", self.activity)
+        self.assertIn("fun stacyArsUpdate()", self.activity)
+        self.assertIn("fun consult(onReport: (JSONObject) -> Unit)", self.updater)
+        self.assertIn("verifyPendingInstallation()", self.updater)
+        self.assertIn("KEY_PENDING_VERSION_CODE", self.updater)
+        self.assertIn("StacyArsPolicy.evaluate", self.updater)
+        self.assertIn("isApprovedDownloadUrl", self.updater)
+        self.assertIn("actualCertificate != expectedCertificate", self.updater)
+        self.assertIn("downloadedVersionName != expectedVersionName", self.updater)
+        self.assertIn("arsConsultar", self.html)
+        self.assertIn("arsAtualizar", self.html)
+        self.assertIn("window.stacyArsReport=function(raw)", self.html)
+        self.assertIn("data-stacy-action=\\"ars\\"", self.html)
+        self.assertIn("UP_TO_DATE", self.ars_policy)
+        self.assertIn("CHANNEL_OUTDATED", self.ars_policy)
+        self.assertIn("CHANNEL_INCONSISTENT", self.ars_policy)
+        self.assertIn("raw.githubusercontent.com", self.ars_policy)
 
     def test_no_termux_runtime_entrypoints_or_command_adapters_remain(self):
         runtime_files = (
