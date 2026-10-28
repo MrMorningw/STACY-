@@ -12,9 +12,11 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
         cls.activity = (ROOT / "android/app/src/main/java/com/mrmorning/stacy/MainActivity.kt").read_text(encoding="utf-8")
         cls.bridge = (ROOT / "android/app/src/main/java/com/mrmorning/stacy/StacyCoreBridge.kt").read_text(encoding="utf-8")
         cls.native = (ROOT / "android/app/src/main/java/com/mrmorning/stacy/StacyNativeCore.kt").read_text(encoding="utf-8")
-        cls.daemon = (ROOT / "android/termux_widget/stacy-core-daemon.sh").read_text(encoding="utf-8")
+        cls.store = (ROOT / "android/app/src/main/java/com/mrmorning/stacy/StacyLocalStore.kt").read_text(encoding="utf-8")
         cls.server = (ROOT / "core_server.py").read_text(encoding="utf-8")
         cls.gradle = (ROOT / "android/app/build.gradle.kts").read_text(encoding="utf-8")
+        cls.manifest = (ROOT / "android/app/src/main/AndroidManifest.xml").read_text(encoding="utf-8")
+        cls.ai = (ROOT / "android/app/src/main/java/com/mrmorning/stacy/StacyAiClient.kt").read_text(encoding="utf-8")
 
     def test_message_has_a_complete_ui_to_core_and_back_path(self):
         self.assertIn('Android.stacySend(text)', self.html)
@@ -26,43 +28,65 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
         self.assertIn('webResponse(formatResponseWithSources(result), result.tipo)', self.activity)
         self.assertIn('window.stacyNativeResponse=function(response,tipo)', self.html)
 
-    def test_android_chat_path_is_independent_of_termux_and_localhost(self):
-        manifest = (ROOT / "android/app/src/main/AndroidManifest.xml").read_text(encoding="utf-8")
-        ai = (ROOT / "android/app/src/main/java/com/mrmorning/stacy/StacyAiClient.kt").read_text(encoding="utf-8")
+    def test_android_chat_path_uses_native_kotlin_and_https_not_a_local_daemon(self):
         self.assertIn('StacyAiClient(context.applicationContext)', self.bridge)
         self.assertNotIn('StacyHttpCoreClient', self.bridge)
         self.assertNotIn('RUN_COMMAND', self.bridge)
         self.assertNotIn('localhost', self.bridge.lower())
-        self.assertNotIn('com.termux.permission.RUN_COMMAND', manifest)
-        self.assertNotIn('android:name="com.termux"', manifest)
-        self.assertIn('https://generativelanguage.googleapis.com/v1beta/interactions', ai)
-        self.assertIn('previous_interaction_id', ai)
+        self.assertNotIn('com.termux.permission.RUN_COMMAND', self.manifest)
+        self.assertNotIn('android:name="com.termux"', self.manifest)
+        self.assertIn('https://generativelanguage.googleapis.com/v1/interactions', self.ai)
+        self.assertIn('previous_interaction_id', self.ai)
         self.assertIn('StacyLocalStore', self.bridge)
         self.assertGreater(len(self.html), 170_000, "Approved STACY UI must be preserved")
         self.assertIn('data-stacy-action="configurarIA"', self.html)
         self.assertIn('fun stacyConfigureAi()', self.activity)
 
-    def test_daemon_does_not_restart_a_healthy_core_for_the_same_app_version(self):
-        self.assertIn('--app-version-code=', self.daemon)
-        self.assertIn('.stacy-core-app-version', self.daemon)
-        self.assertIn('HEALTH" = "ok"', self.daemon)
-        self.assertIn('CORE já está saudável para o aplicativo código', self.daemon)
-        self.assertIn('LOCK_VERSION="$(cat "$START_LOCK/version"', self.daemon)
-        self.assertIn('core_health_error()', self.daemon)
-        self.assertIn('READY=0', self.daemon)
-        self.assertIn('if [ "$READY" != "1" ]', self.daemon)
-        self.assertIn('rm -f "$VERSION_MARKER"', self.daemon)
-        self.assertIn('for ((attempt=0; attempt<80; attempt++))', self.daemon)
-        self.assertLess(self.daemon.index('if [ "$HEALTH" = "ok"'), self.daemon.index("pkill -f"))
-        self.assertGreater(self.daemon.index('rm -rf "$START_LOCK"', self.daemon.index("core_server.py iniciado")), self.daemon.index("core_server.py iniciado"))
+    def test_core_panel_runs_layered_diagnostics_and_displays_real_build_info(self):
+        self.assertIn('data-stacy-action="diagnosticoCore"', self.html)
+        self.assertIn('data-stacy-action="diagnosticoPonte"', self.html)
+        self.assertIn('data-stacy-action="buildInfo"', self.html)
+        self.assertIn('fun stacyRunDiagnostics(requestId: String)', self.activity)
+        self.assertIn('fun stacyPingBridge(requestId: String)', self.activity)
+        self.assertIn('fun stacyGetBuildInfo(): String', self.activity)
+        self.assertIn('coreBridge.runNativeDiagnostic()', self.activity)
+        self.assertIn('coreBridge.checkLocalStorage()', self.activity)
+        self.assertIn('fun healthCheck(): Boolean', self.store)
+        self.assertIn('window.stacyDiagnosticUpdate=function(raw)', self.html)
+        self.assertIn('window.stacyBridgePingResult=function(raw)', self.html)
+        self.assertIn('75000', self.html)
+        self.assertIn('"not_used"', self.activity)
+
+    def test_no_termux_runtime_entrypoints_or_command_adapters_remain(self):
+        runtime_files = (
+            "stacy.py",
+            "interface.py",
+            "ai.py",
+            "android/app/src/main/AndroidManifest.xml",
+            "android/app/src/main/java/com/mrmorning/stacy/MainActivity.kt",
+            "android/app/src/main/java/com/mrmorning/stacy/StacyCoreBridge.kt",
+        )
+        forbidden = (
+            "termux-speech-to-text",
+            "termux-tts-speak",
+            "termux-notification",
+            "com.termux.permission.RUN_COMMAND",
+            "AndroidInterface",
+        )
+        for relative_path in runtime_files:
+            text = (ROOT / relative_path).read_text(encoding="utf-8").lower()
+            for token in forbidden:
+                self.assertNotIn(token.lower(), text, f"{token} remains in {relative_path}")
+        self.assertFalse((ROOT / "termux_repair.sh").exists())
+        self.assertFalse((ROOT / "android/termux_widget").exists())
 
     def test_native_core_has_local_greetings_actions_tasks_and_memory(self):
         self.assertIn("private val nativeCore = StacyNativeCore(localStore)", self.bridge)
         self.assertIn("private val localStore = StacyLocalStore", self.bridge)
         self.assertIn("routeLocalData(message, normalized)", self.native)
-        self.assertNotIn(r"\${task.", self.native)
-        self.assertNotIn(r"\${completed.", self.native)
-        self.assertNotIn(r"\${index + 1}", self.native)
+        self.assertNotIn("$" + "{task.", self.native)
+        self.assertNotIn("$" + "{completed.", self.native)
+        self.assertNotIn("$" + "{index + 1}", self.native)
         self.assertIn("store.addTask", self.native)
         self.assertIn("store.saveMemory", self.native)
         self.assertIn("conclu[ií]da", self.native)
@@ -71,23 +95,9 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
         self.assertIn('"whatsapp" to ("com.whatsapp" to "WhatsApp")', self.native)
         self.assertIn('androidAction("compartilhar_texto", shareText = text)', self.native)
         self.assertIn('operation = "abrir_aplicativo"', self.native)
-        local_store = (ROOT / "android/app/src/main/java/com/mrmorning/stacy/StacyLocalStore.kt").read_text(encoding="utf-8")
-        self.assertIn("CREATE TABLE tasks", local_store)
-        self.assertIn("CREATE TABLE memories", local_store)
+        self.assertIn("CREATE TABLE tasks", self.store)
+        self.assertIn("CREATE TABLE memories", self.store)
         self.assertNotIn("StacyHttpCoreClient", self.bridge)
-
-    def test_runtime_sync_includes_the_new_evolution_components_and_skills(self):
-        for path in (
-            "agent_modes.py", "skills_registry.py", "verification_gate.py", "core_phase_context.py", "requirements.txt",
-            "skills/README.md", "skills/research/SKILL.md",
-            "skills/verification/SKILL.md", "skills/memory/SKILL.md",
-            "skills/android/SKILL.md", "skills/automation/SKILL.md",
-            "skills/engineering/SKILL.md",
-        ):
-            self.assertIn(path, self.daemon)
-        self.assertIn("import requests", self.daemon)
-        self.assertIn("pkg install -y python-requests", self.daemon)
-        self.assertIn("requirements.txt", self.daemon)
 
     def test_phase_events_are_correlated_to_the_request_thread(self):
         self.assertIn("CorePhaseContext", self.server)
