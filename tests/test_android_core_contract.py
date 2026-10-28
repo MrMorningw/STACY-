@@ -104,13 +104,20 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
         self.assertIn("CREATE TABLE memories", self.store)
         self.assertNotIn("StacyHttpCoreClient", self.bridge)
 
-    def test_phase_events_are_correlated_to_the_request_thread(self):
-        self.assertIn("CorePhaseContext", self.server)
-        self.assertIn("current_execution_id()", self.server)
-        self.assertIn("set_current_execution_id(execution_id)", self.server)
-        self.assertIn("clear_current_execution_id()", self.server)
-        self.assertNotIn('getattr(self, "execution_id", None)', self.server)
-        self.assertIn("CorePhaseContext", (ROOT / "core_phase_context.py").read_text(encoding="utf-8"))
+    def test_python_adapters_are_platform_neutral_and_do_not_broadcast_to_android(self):
+        python_adapters = (
+            ROOT / "android_core.py",
+            ROOT / "android_session.py",
+            ROOT / "core_server.py",
+        )
+        for path in python_adapters:
+            source = path.read_text(encoding="utf-8")
+            self.assertNotIn("Termux", source, f"Termux reference remains in {path.name}")
+            self.assertNotIn("/system/bin/am", source, f"Android shell broadcast remains in {path.name}")
+            self.assertNotIn("StacyCorePhaseReceiver", source, f"Android phase receiver remains in {path.name}")
+        self.assertNotIn("CorePhaseContext", self.server)
+        self.assertNotIn("phase_callback=self._phase", self.server)
+        self.assertIn("StacyOrchestrator", self.server)
 
     def test_released_build_advances_version_so_installed_app_can_update(self):
         self.assertIn("versionCode = 29", self.gradle)
