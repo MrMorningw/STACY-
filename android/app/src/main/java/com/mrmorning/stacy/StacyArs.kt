@@ -16,7 +16,7 @@ class StacyArs(
     context: Context,
     onStatus: (String) -> Unit,
     private val onReport: (JSONObject) -> Unit,
-    onInstallIntent: (Intent) -> Unit,
+    onInstallIntent: (Intent) -> Boolean,
 ) {
     private val updater = StacyUpdater(
         context = context.applicationContext,
