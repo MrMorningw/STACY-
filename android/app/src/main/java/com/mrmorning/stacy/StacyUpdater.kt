@@ -164,6 +164,7 @@ class StacyUpdater(
                             expectedDigest = release.digest,
                             expectedCertificate = release.certificate,
                             assetVersionCode = release.publishedCode,
+                            expectedVersionName = release.publishedName,
                             currentVersionCode = release.installedCode,
                         )
                         onState(
@@ -244,6 +245,9 @@ class StacyUpdater(
             packageName != appContext.packageName
         ) {
             throw IllegalStateException("Canal inválido: identidade ou versão do pacote não corresponde à STACY.")
+        }
+        if (asset.optString("name", "") != "$APK_PREFIX-$publishedName.apk") {
+            throw IllegalStateException("Canal inconsistente: nome do ativo não corresponde à versão publicada.")
         }
         if (minAndroid < 1) {
             throw IllegalStateException("Canal inválido: versão mínima do Android não foi publicada.")
@@ -384,6 +388,7 @@ class StacyUpdater(
         expectedDigest: String,
         expectedCertificate: String,
         assetVersionCode: Long,
+        expectedVersionName: String,
         currentVersionCode: Long,
     ) {
         if (!file.isFile || file.length() <= 0L) {
@@ -425,6 +430,9 @@ class StacyUpdater(
             archiveInfo.versionCode.toLong()
         }
         val downloadedVersionName = archiveInfo.versionName ?: ""
+        if (downloadedVersionName != expectedVersionName) {
+            throw SecurityException("O versionName do APK não corresponde à versão oficial publicada.")
+        }
         if (assetVersionCode <= 0L || downloadedVersionCode != assetVersionCode) {
             throw SecurityException("O versionCode do APK não corresponde ao manifesto publicado.")
         }
