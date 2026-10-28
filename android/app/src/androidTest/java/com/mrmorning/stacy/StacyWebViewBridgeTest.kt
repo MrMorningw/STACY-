@@ -136,6 +136,64 @@ class StacyWebViewBridgeTest {
         }
     }
 
+    @Test
+    fun coreDiagnosticsShowIndependentLocalAndGeminiResults() {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            lateinit var webView: WebView
+            scenario.onActivity { activity ->
+                StacySecretStore(activity).clearGeminiApiKey()
+                val content = activity.findViewById<ViewGroup>(android.R.id.content)
+                webView = content.getChildAt(0) as? WebView
+                    ?: throw AssertionError("MainActivity is not displaying its production WebView")
+            }
+
+            assertTrue(
+                "STACY scene did not expose animation control",
+                awaitCondition(webView, timeoutMs = 12_000) {
+                    evaluate(webView, "typeof window.stacySetAnimationsEnabled === 'function'") == "true"
+                },
+            )
+            evaluate(webView, "window.stacySetAnimationsEnabled(false)")
+            evaluate(webView, "window.stacyOpenPage('nucleo')")
+
+            assertTrue(
+                "The diagnostic action is missing from the CORE page",
+                awaitCondition(webView, timeoutMs = 5_000) {
+                    evaluate(
+                        webView,
+                        "!!document.querySelector('[data-stacy-action=diagnosticoCore]')",
+                    ) == "true"
+                },
+            )
+
+            evaluate(
+                webView,
+                "document.querySelector('[data-stacy-action=diagnosticoCore]').click()",
+            )
+
+            assertTrue(
+                "The panel did not report local CORE success separately from a missing Gemini key",
+                awaitCondition(webView, timeoutMs = 10_000) {
+                    evaluate(
+                        webView,
+                        "(function(){ " +
+                            "var summary=document.getElementById('stacyDiagnosticSummary'); " +
+                            "var core=document.querySelector('[data-diagnostic-row=core] [data-diagnostic-status]'); " +
+                            "var storage=document.querySelector('[data-diagnostic-row=sqlite] [data-diagnostic-status]'); " +
+                            "var gemini=document.querySelector('[data-diagnostic-row=gemini] [data-diagnostic-status]'); " +
+                            "var termux=document.querySelector('[data-diagnostic-row=termux] [data-diagnostic-status]'); " +
+                            "return !!summary && summary.innerText.includes('Falha localizada em: Gemini / API generativa.') && " +
+                            "!!core && core.innerText === 'OK' && " +
+                            "!!storage && storage.innerText === 'OK' && " +
+                            "!!gemini && gemini.innerText === 'FALHA' && " +
+                            "!!termux && termux.innerText === 'NÃO UTILIZADO'; " +
+                        "})()",
+                    ) == "true"
+                },
+            )
+        }
+    }
+
     private fun awaitCondition(
         webView: WebView,
         timeoutMs: Long,
