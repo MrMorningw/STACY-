@@ -38,7 +38,7 @@ class StacyArsPolicyTest {
     fun rejectsMissingOrMalformedVersionMetadata() {
         assertEquals(
             StacyArsPolicy.ChannelState.CHANNEL_INCONSISTENT,
-            StacyArsPolicy.evaluate(29, "0.3.8", -1, ""),
+            StacyArsPolicy.evaluate(29, "0.3.8", -1, "").state,
         )
         assertFalse(StacyArsPolicy.isValidSha256(""))
         assertFalse(StacyArsPolicy.isValidSha256("abc"))
