@@ -423,7 +423,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun publishDiagnosticCallback(functionName: String, payload: JSONObject) {
-        if (!::webView.isInitialized) return
+        if (!::webView.isInitialized || isFinishing || isDestroyed) return
         val serialized = JSONObject.quote(payload.toString())
         webView.evaluateJavascript(
             "window.$functionName && window.$functionName($serialized)",
