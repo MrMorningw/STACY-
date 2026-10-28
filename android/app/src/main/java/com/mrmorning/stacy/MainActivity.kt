@@ -349,10 +349,12 @@ class MainActivity : ComponentActivity() {
                 setCheck("gemini", "Gemini / API generativa", "checking", "Teste HTTPS real em andamento; exige chave válida e internet.")
 
                 runOnUiThread {
+                    if (isFinishing || isDestroyed) return@runOnUiThread
                     publish()
                     val apiStarted = SystemClock.elapsedRealtime()
                     coreBridge.testConnection { result ->
                         runOnUiThread {
+                            if (isFinishing || isDestroyed) return@runOnUiThread
                             val apiOk = result.exitCode == 0 &&
                                 !result.tipo.equals("erro", ignoreCase = true) &&
                                 !result.tipo.equals("error", ignoreCase = true) &&
