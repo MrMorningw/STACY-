@@ -341,6 +341,12 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
 .stacy-diagnostic-status.checking{color:#ff9b45;border-color:rgba(255,155,69,.4)}
 .stacy-diagnostic-status.not_used{color:#b0a49a;border-color:rgba(176,164,154,.25)}
 .stacy-build-info{margin-top:10px;color:#aaa095;font-size:10px;line-height:1.55;overflow-wrap:anywhere}
+.stacy-ars-report{display:grid;gap:0;margin-top:10px}
+.stacy-ars-line{padding:10px 0;border-bottom:1px solid rgba(255,116,24,.13)}
+.stacy-ars-line:last-child{border-bottom:0}
+.stacy-ars-line strong{display:block;color:#eee8e2;font-size:11px;font-weight:500;margin-bottom:4px}
+.stacy-ars-line span{display:block;color:#948980;font-size:10px;line-height:1.5;overflow-wrap:anywhere}
+.stacy-ars-status{margin-top:10px}
 .stacy-input{flex:1;min-width:0;border:1px solid rgba(255,117,31,.22);border-radius:11px;background:rgba(0,0,0,.35);color:#eee;padding:10px;font-size:12px;outline:none}
 .stacy-input:focus{border-color:rgba(255,117,31,.55)}
 body.stacy-no-animations *{animation:none!important;transition:none!important}
@@ -977,7 +983,8 @@ animationFrameId=requestAnimationFrame(animate);
     memoria:{title:'Memória',kicker:'NÚCLEO DE MEMÓRIA',html:'<div class="stacy-card"><div class="stacy-card-label">MEMÓRIA</div><div class="stacy-card-title">Contexto da STACY</div><div class="stacy-card-text">Consulte o estado atual da memória pelo núcleo.</div><button class="stacy-action" data-stacy-action="memoria">CONSULTAR MEMÓRIA</button></div>'},
     ferramentas:{title:'Ferramentas',kicker:'CENTRAL DE FERRAMENTAS',html:'<div class="stacy-card"><div class="stacy-card-label">FERRAMENTAS DO DISPOSITIVO</div><div class="stacy-card-title">Funções disponíveis</div><div class="stacy-card-text">Ações Android conectadas à ponte nativa da STACY.</div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Calendário</div><div class="stacy-setting-desc">Abrir o calendário do Android.</div></div><button class="stacy-action small" data-stacy-action="calendarioAndroid">ABRIR</button></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Configurações do Android</div><div class="stacy-setting-desc">Abrir configurações do sistema.</div></div><button class="stacy-action small" data-stacy-action="configAndroid">ABRIR</button></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Compartilhar resposta</div><div class="stacy-setting-desc">Compartilhar a última resposta da STACY.</div></div><button class="stacy-action small" data-stacy-action="compartilhar">COMPARTILHAR</button></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">CORE</div><div class="stacy-setting-desc">Consultar estado e tarefas do núcleo.</div></div><button class="stacy-action small" data-stacy-action="status">VERIFICAR</button></div></div><div class="stacy-card"><div class="stacy-card-label">FERRAMENTAS DISPONÍVEIS</div><div class="stacy-card-text">Esta lista mostra integrações implementadas no app. Ela não declara serviços externos ou plugins que não estejam realmente conectados.</div></div>'},
     permissoes:{title:'Permissões',kicker:'ACESSO E PRIVACIDADE',html:'<div class="stacy-card"><div class="stacy-card-label">PERMISSÕES DO APLICATIVO</div><div class="stacy-card-title">Controle de acesso</div><div class="stacy-card-text">Abra as configurações do Android para revisar ou conceder permissões. O sistema mostrará as permissões efetivamente disponíveis para esta instalação.</div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Microfone</div><div class="stacy-setting-desc">Necessário para entrada por voz.</div></div><button class="stacy-action small" data-stacy-action="privacidade">GERENCIAR</button></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Fotos e arquivos</div><div class="stacy-setting-desc">Acesso mediado pelo seletor seguro do Android.</div></div><button class="stacy-action small" data-stacy-action="privacidade">GERENCIAR</button></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Outras permissões</div><div class="stacy-setting-desc">Consulte o painel oficial do aplicativo no Android.</div></div><button class="stacy-action small" data-stacy-action="privacidade">ABRIR CONFIGURAÇÕES</button></div></div>'},
-    config:{title:'Configurações',kicker:'SISTEMA',html:'<div class="stacy-card"><div class="stacy-setting-row"><div><div class="stacy-setting-name">Voz da STACY</div><div class="stacy-setting-desc">Ativar ou silenciar respostas faladas.</div></div><button class="stacy-action small" data-stacy-action="voz">VOZ: <span id="voiceSetting">ATIVA</span></button></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Animações</div><div class="stacy-setting-desc">Controlar o movimento visual do núcleo.</div></div><button class="stacy-action small" data-stacy-action="animacoes">ANIMAÇÕES: <span id="animSetting">ATIVAS</span></button></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Privacidade e permissões</div><div class="stacy-setting-desc">Abrir as permissões e configurações do aplicativo.</div></div><button class="stacy-action small" data-stacy-action="privacidade">ABRIR</button></div><div class="stacy-setting-row"><div><div class="stacy-setting-row"><div><div class="stacy-setting-name">IA generativa</div><div class="stacy-setting-desc">Conectar a IA, testar a chave e gerenciar o contexto de conversa.</div></div><button class="stacy-action small" data-stacy-action="configurarIA">CONECTAR</button></div><div class="stacy-setting-name">Núcleo STACY</div><div class="stacy-setting-desc">Central de controle do CORE, arquitetura, integridade e etapas de migração.</div></div><button class="stacy-action small" data-stacy-action="nucleo">GERENCIAR</button></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Atualização da STACY</div><div class="stacy-setting-desc">Verificar uma nova versão oficial, validar o pacote e iniciar a atualização.</div><div class="stacy-update-status" id="stacyUpdateStatus">Pronta para verificar.</div></div><button class="stacy-action small" data-stacy-action="atualizacao">VERIFICAR</button></div></div>'},
+    config:{title:'Configurações',kicker:'SISTEMA',html:'<div class="stacy-card"><div class="stacy-setting-row"><div><div class="stacy-setting-name">Voz da STACY</div><div class="stacy-setting-desc">Ativar ou silenciar respostas faladas.</div></div><button class="stacy-action small" data-stacy-action="voz">VOZ: <span id="voiceSetting">ATIVA</span></button></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Animações</div><div class="stacy-setting-desc">Controlar o movimento visual do núcleo.</div></div><button class="stacy-action small" data-stacy-action="animacoes">ANIMAÇÕES: <span id="animSetting">ATIVAS</span></button></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Privacidade e permissões</div><div class="stacy-setting-desc">Abrir as permissões e configurações do aplicativo.</div></div><button class="stacy-action small" data-stacy-action="privacidade">ABRIR</button></div><div class="stacy-setting-row"><div><div class="stacy-setting-row"><div><div class="stacy-setting-name">IA generativa</div><div class="stacy-setting-desc">Conectar a IA, testar a chave e gerenciar o contexto de conversa.</div></div><button class="stacy-action small" data-stacy-action="configurarIA">CONECTAR</button></div><div class="stacy-setting-name">Núcleo STACY</div><div class="stacy-setting-desc">Central de controle do CORE, arquitetura, integridade e etapas de migração.</div></div><button class="stacy-action small" data-stacy-action="nucleo">GERENCIAR</button></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">ARS — Autoconsulta e atualização</div><div class="stacy-setting-desc">A STACY consulta a própria versão, verifica o canal oficial e coordena atualizações verificadas.</div></div><button class="stacy-action small" data-stacy-action="ars">ABRIR ARS</button></div></div>'},
+    ars:{title:'ARS — STACY',kicker:'AUTOCONSULTA E ATUALIZAÇÃO',html:'<div class="stacy-card"><div class="stacy-card-label">ARS / ESTADO REAL</div><div class="stacy-card-title">A STACY consulta a si mesma</div><div class="stacy-card-text">A ARS compara a versão instalada com o canal oficial, verifica a identidade do pacote e a integridade dos metadados. A consulta não altera nada. Quando há nova versão, a ARS baixa e valida o APK oficial; a confirmação final da instalação continua sendo feita pelo Android.</div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Versão instalada</div><div class="stacy-setting-desc">Lida diretamente do PackageManager do Android.</div></div><button class="stacy-action small" data-stacy-action="arsVersao">CONSULTAR APK</button></div><div id="stacyArsBuildInfo" class="stacy-build-info" role="status">Versão ainda não consultada.</div><div id="stacyArsSummary" class="stacy-diagnostic-summary" role="status" aria-live="polite">Aguardando consulta do canal oficial.</div><div class="stacy-ars-report"><div class="stacy-ars-line"><strong>Instalada</strong><span id="stacyArsInstalled">Aguardando consulta.</span></div><div class="stacy-ars-line"><strong>Canal oficial</strong><span id="stacyArsPublished">Aguardando consulta.</span></div><div class="stacy-ars-line"><strong>Integridade do canal</strong><span id="stacyArsIntegrity">Ainda não validada.</span></div><div class="stacy-ars-line"><strong>Termux</strong><span>Não utilizado pelo APK nem pela ARS Android.</span></div></div><div class="stacy-action-row"><button class="stacy-action" data-stacy-action="arsConsultar">CONSULTAR CANAL</button><button class="stacy-action" data-stacy-action="arsAtualizar">VERIFICAR E ATUALIZAR</button></div><div class="stacy-update-status stacy-ars-status" id="stacyUpdateStatus" role="status" aria-live="polite">ARS pronta para consultar.</div><div id="stacyArsCheckedAt" class="stacy-build-info"></div></div><div class="stacy-card"><div class="stacy-card-label">ATUALIZAÇÃO SEGURA</div><div class="stacy-card-title">Sem atalhos ou falsas confirmações</div><div class="stacy-card-text">A ARS só considera o canal atual quando versionCode e versionName coincidem. Para atualizar, exige origem oficial, pacote correto, versão mais nova, SHA-256 e certificado de assinatura. A atualização só será registrada como instalada depois que o Android confirmar a nova versão.</div><div class="stacy-card-text">A ARS atualiza a aplicação e os módulos incorporados no APK. Ela não baixa nem executa scripts arbitrários em segundo plano e não depende do Termux.</div></div>'},
     nucleo:{title:'Núcleo STACY',kicker:'CENTRAL DO CORE',html:'<div class="stacy-card"><div class="stacy-card-label">ARQUITETURA ATIVA</div><div class="stacy-card-title">CORE nativo Kotlin / Android</div><div class="stacy-card-text">O APK processa comandos locais em Kotlin, grava tarefas e anotações em SQLite e utiliza a API Gemini por HTTPS para conversa generativa. O fluxo do aplicativo não inicia Python, servidor local ou Termux. O painel abaixo testa cada camada separadamente e mostra o erro retornado, sem presumir que uma camada está saudável.</div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Ponte WebView / Android</div><div class="stacy-setting-desc">Teste real de ida e volta entre JavaScript e Kotlin.</div></div><button class="stacy-action small" data-stacy-action="diagnosticoPonte">TESTAR PONTE</button></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Versão instalada</div><div class="stacy-setting-desc">Ler versão e código do APK em execução.</div></div><button class="stacy-action small" data-stacy-action="buildInfo">VERSÃO</button></div><div id="stacyBuildInfo" class="stacy-build-info" role="status">Versão ainda não consultada.</div></div><div class="stacy-card"><div class="stacy-card-label">DIAGNÓSTICO POR CAMADA</div><div class="stacy-card-title">Localizar a falha</div><div class="stacy-card-text">Execute o teste completo para verificar HTML, ponte, CORE Kotlin, banco SQLite e conexão Gemini. A prova da Gemini exige internet e chave válida. “Não utilizado” significa que o componente está fora do caminho do APK.</div><div id="stacyDiagnosticSummary" class="stacy-diagnostic-summary" role="status" aria-live="polite">Diagnóstico não executado. Os indicadores não presumem nenhum estado.</div><div id="stacyDiagnosticList" class="stacy-diagnostic-list"><div class="stacy-diagnostic-row" data-diagnostic-row="html"><div><div class="stacy-diagnostic-name">HTML / JavaScript</div><div class="stacy-diagnostic-detail" data-diagnostic-detail>À espera do teste.</div></div><span class="stacy-diagnostic-status" data-diagnostic-status>AGUARDANDO</span></div><div class="stacy-diagnostic-row" data-diagnostic-row="bridge"><div><div class="stacy-diagnostic-name">Ponte WebView / Android</div><div class="stacy-diagnostic-detail" data-diagnostic-detail>À espera do teste.</div></div><span class="stacy-diagnostic-status" data-diagnostic-status>AGUARDANDO</span></div><div class="stacy-diagnostic-row" data-diagnostic-row="core"><div><div class="stacy-diagnostic-name">CORE Kotlin / Android</div><div class="stacy-diagnostic-detail" data-diagnostic-detail>À espera do teste.</div></div><span class="stacy-diagnostic-status" data-diagnostic-status>AGUARDANDO</span></div><div class="stacy-diagnostic-row" data-diagnostic-row="sqlite"><div><div class="stacy-diagnostic-name">Banco local SQLite</div><div class="stacy-diagnostic-detail" data-diagnostic-detail>À espera do teste.</div></div><span class="stacy-diagnostic-status" data-diagnostic-status>AGUARDANDO</span></div><div class="stacy-diagnostic-row" data-diagnostic-row="gemini"><div><div class="stacy-diagnostic-name">Gemini / API generativa</div><div class="stacy-diagnostic-detail" data-diagnostic-detail>À espera do teste.</div></div><span class="stacy-diagnostic-status" data-diagnostic-status>AGUARDANDO</span></div><div class="stacy-diagnostic-row" data-diagnostic-row="termux"><div><div class="stacy-diagnostic-name">Termux / daemon Python</div><div class="stacy-diagnostic-detail" data-diagnostic-detail>Fora da arquitetura do APK.</div></div><span class="stacy-diagnostic-status not_used" data-diagnostic-status>NÃO UTILIZADO</span></div></div><div class="stacy-action-row"><button class="stacy-action" data-stacy-action="diagnosticoCore">EXECUTAR DIAGNÓSTICO COMPLETO</button></div><div id="stacyDiagnosticTimestamp" class="stacy-build-info" role="status"></div></div><div class="stacy-card"><div class="stacy-card-label">INTEGRIDADE E RECUPERAÇÃO</div><div class="stacy-card-title">Mudanças com controle</div><div class="stacy-card-text">O painel consulta estado operacional; não faz backup nem altera o núcleo. Alterações de código devem permanecer em branch separada, passar pelos testes e ser aprovadas antes de chegar à versão principal.</div><div class="stacy-card-text">A interface não declara a IA como funcional só porque o CORE local respondeu. A camada Gemini recebe um teste HTTPS real e informa erros de credencial, rede, cota ou resposta inválida quando o serviço os retornar.</div></div><div class="stacy-card"><div class="stacy-card-label">DEPENDÊNCIAS</div><div class="stacy-card-title">Execução independente</div><div class="stacy-card-text">O aplicativo Android não precisa do Termux, de Python nem de um daemon local. A voz e as ações do APK usam os recursos nativos do Android; a conversa generativa usa a API Gemini diretamente por HTTPS.</div></div>'},
     sobre:{title:'Sobre',kicker:'IDENTIDADE',html:'<div class="stacy-card"><div class="stacy-card-label">STACY AI</div><div class="stacy-card-title">Assistente pessoal inteligente</div><div class="stacy-card-text">Núcleo visual, voz, memória, pesquisa, automação e integrações reunidos em uma única experiência.</div><button class="stacy-action" data-stacy-action="status">VERIFICAR NÚCLEO</button></div><div class="stacy-card"><div class="stacy-card-label">IDENTIDADE VISUAL</div><div class="stacy-card-title">Átomo · Espaço · Laranja</div><div class="stacy-card-text">Interface definitiva em evolução contínua.</div></div>'}
   };
@@ -988,7 +995,18 @@ animationFrameId=requestAnimationFrame(animate);
     title.textContent=p.title;
     kicker.textContent=p.kicker;
     body.innerHTML=p.html;
+    renderCachedUpdateStatus();
     if(key==='nucleo')renderCachedDiagnostics();
+    if(key==='ars'){
+      renderCachedArsReport();
+      showStacyBuildInfo();
+      if(window.Android && typeof Android.stacyArsConsult==='function'){
+        window.stacyNativeUpdateStatus('ARS: consultando a versão instalada e o canal oficial…');
+        Android.stacyArsConsult();
+      }else{
+        window.stacyNativeUpdateStatus('ARS: ponte nativa indisponível; o canal não foi consultado.');
+      }
+    }
     view.classList.add('open');
     view.setAttribute('aria-hidden','false');
     view.inert=false;
@@ -1078,9 +1096,50 @@ animationFrameId=requestAnimationFrame(animate);
     }
   }
   window.stacyNativeSend=nativeSend;
-  window.stacyNativeUpdateStatus=function(status){
+  let latestUpdateStatus='ARS pronta para consultar.';
+  let latestArsReport=null;
+  function renderCachedUpdateStatus(){
     const el=document.getElementById('stacyUpdateStatus');
-    if(el)el.textContent=String(status||'');
+    if(el)el.textContent=latestUpdateStatus;
+  }
+  window.stacyNativeUpdateStatus=function(status){
+    latestUpdateStatus=String(status||'');
+    renderCachedUpdateStatus();
+  };
+  function renderCachedArsReport(){
+    if(!latestArsReport)return;
+    const report=latestArsReport;
+    const summary=document.getElementById('stacyArsSummary');
+    const installed=document.getElementById('stacyArsInstalled');
+    const published=document.getElementById('stacyArsPublished');
+    const integrity=document.getElementById('stacyArsIntegrity');
+    const checkedAt=document.getElementById('stacyArsCheckedAt');
+    if(summary)summary.textContent=String(report.summary||'A ARS não retornou um resumo.');
+    if(installed){
+      const current=report.installed||{};
+      installed.textContent=current.versionName
+        ?String(current.versionName)+' (código '+String(current.versionCode)+')'
+        :'Versão instalada não confirmada.';
+    }
+    if(published){
+      const release=report.published||{};
+      published.textContent=release.versionName
+        ?String(release.versionName)+' (código '+String(release.versionCode)+')'
+        :'Versão publicada indisponível.';
+    }
+    if(integrity){
+      const checks=report.integrity||{};
+      integrity.textContent=checks.manifestValid&&checks.sha256MetadataConsistent&&checks.certificateMetadataValid&&checks.downloadOriginApproved
+        ?'Manifesto, SHA-256, certificado e endereço do pacote passaram a validação de metadados.'
+        :'Validação incompleta. A ARS não deve declarar o canal confiável.';
+    }
+    if(checkedAt&&report.checkedAt)checkedAt.textContent='Última consulta ARS: '+new Date(Number(report.checkedAt)).toLocaleString();
+  }
+  window.stacyArsReport=function(raw){
+    try{latestArsReport=typeof raw==='string'?JSON.parse(raw):raw;}catch(_){
+      latestArsReport={status:'error',summary:'ARS: resposta de diagnóstico inválida.'};
+    }
+    renderCachedArsReport();
   };
   let activeCoreDiagnosticId=null;
   let activeBridgePingId=null;
@@ -1216,18 +1275,21 @@ animationFrameId=requestAnimationFrame(animate);
     }
   }
   function showStacyBuildInfo(){
-    const output=document.getElementById('stacyBuildInfo');
-    if(!output)return;
+    const outputs=[document.getElementById('stacyBuildInfo'),document.getElementById('stacyArsBuildInfo')].filter(Boolean);
+    if(!outputs.length)return;
     if(!window.Android||typeof Android.stacyGetBuildInfo!=='function'){
-      output.textContent='Não foi possível consultar a versão: ponte Android indisponível.';
+      outputs.forEach(output=>output.textContent='Não foi possível consultar a versão: ponte Android indisponível.');
       return;
     }
     try{
       const info=JSON.parse(Android.stacyGetBuildInfo());
-      if(info.error){output.textContent=String(info.error);return;}
+      if(info.error){outputs.forEach(output=>output.textContent=String(info.error));return;}
       if(!info.versionName||info.versionCode===undefined||!info.applicationId)throw new Error('Metadados da versão incompletos.');
-      output.textContent='Versão '+info.versionName+' (código '+info.versionCode+') • Android API '+info.androidApi+' • '+info.applicationId;
-    }catch(error){output.textContent='Falha ao consultar a versão do APK: '+(error&&error.message?error.message:'resposta inválida');}
+      const label='Versão '+info.versionName+' (código '+info.versionCode+') • Android API '+info.androidApi+' • '+info.applicationId;
+      outputs.forEach(output=>output.textContent=label);
+    }catch(error){
+      outputs.forEach(output=>output.textContent='Falha ao consultar a versão do APK: '+(error&&error.message?error.message:'resposta inválida'));
+    }
   }
   document.body.addEventListener('click',function(e){
     const action=e.target.closest('[data-stacy-action]');
@@ -1266,14 +1328,25 @@ animationFrameId=requestAnimationFrame(animate);
       if(typeof window.stacyOpenPage==='function')window.stacyOpenPage('nucleo');
       return;
     }
-    if(key==='atualizacao'){
-      const status=document.getElementById('stacyUpdateStatus');
-      if(status)status.textContent='Verificando…';
-      if(window.Android && typeof Android.stacyCheckUpdate==='function'){
-        Android.stacyCheckUpdate();
-      }else if(status){
-        status.textContent='Ponte nativa indisponível.';
-      }
+    if(key==='ars'){
+      if(typeof window.stacyOpenPage==='function')window.stacyOpenPage('ars');
+      return;
+    }
+    if(key==='arsVersao'){
+      showStacyBuildInfo();
+      return;
+    }
+    if(key==='arsConsultar'){
+      window.stacyNativeUpdateStatus('ARS: consultando a versão instalada e o canal oficial…');
+      if(window.Android && typeof Android.stacyArsConsult==='function')Android.stacyArsConsult();
+      else window.stacyNativeUpdateStatus('ARS: ponte nativa indisponível; o canal não foi consultado.');
+      return;
+    }
+    if(key==='arsAtualizar'||key==='atualizacao'){
+      window.stacyNativeUpdateStatus('ARS: verificando o canal e preparando a atualização com segurança…');
+      if(window.Android && typeof Android.stacyArsUpdate==='function')Android.stacyArsUpdate();
+      else if(window.Android && typeof Android.stacyCheckUpdate==='function')Android.stacyCheckUpdate();
+      else window.stacyNativeUpdateStatus('ARS: ponte nativa indisponível; atualização não iniciada.');
       return;
     }
     if(key==='configAndroid'){
