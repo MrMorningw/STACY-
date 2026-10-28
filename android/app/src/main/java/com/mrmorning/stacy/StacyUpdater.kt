@@ -97,6 +97,7 @@ class StacyUpdater(
                             .put("manifestValid", true)
                             .put("sha256MetadataConsistent", true)
                             .put("certificateMetadataValid", true)
+                            .put("installedSignatureMatchesOfficial", true)
                             .put("downloadOriginApproved", true),
                     )
                     .put("termux", "not_used")
@@ -120,6 +121,7 @@ class StacyUpdater(
                             .put("manifestValid", false)
                             .put("sha256MetadataConsistent", false)
                             .put("certificateMetadataValid", false)
+                            .put("installedSignatureMatchesOfficial", false)
                             .put("downloadOriginApproved", false),
                     )
                     .put("termux", "not_used")
@@ -264,6 +266,10 @@ class StacyUpdater(
         if (!StacyArsPolicy.isValidSha256(certificate)) {
             throw IllegalStateException("Canal inválido: certificado oficial não foi publicado corretamente.")
         }
+        val installedCertificate = installedSigningCertificateSha256()
+        if (installedCertificate == null || installedCertificate != certificate) {
+            throw SecurityException("A assinatura instalada não corresponde ao certificado oficial do canal. Esta instalação não pode confirmar identidade ou atualizar com segurança.")
+        }
         val downloadUrl = asset.optString("browser_download_url", "").trim()
         if (!StacyArsPolicy.isApprovedDownloadUrl(downloadUrl, publishedName)) {
             throw SecurityException("Canal inválido: o download não aponta para o APK versionado do repositório oficial.")
@@ -284,7 +290,9 @@ class StacyUpdater(
     }
 
     private fun fetchLatestRelease(): JSONObject {
-        val connection = (URL(API_URL).openConnection() as HttpURLConnection).apply {
+        // A cache-busting query avoids stale raw-content CDN responses after publishing.
+        val freshUrl = "$API_URL?ars_check=${System.currentTimeMillis()}"
+        val connection = (URL(freshUrl).openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
             connectTimeout = 12_000
             readTimeout = 20_000
@@ -483,6 +491,32 @@ class StacyUpdater(
                 .apply()
             throw error
         }
+    }
+
+    private fun installedSigningCertificateSha256(): String? {
+        @Suppress("DEPRECATION")
+        val signingFlags = if (Build.VERSION.SDK_INT >= 28) {
+            PackageManager.GET_SIGNING_CERTIFICATES
+        } else {
+            PackageManager.GET_SIGNATURES
+        }
+        val info = if (Build.VERSION.SDK_INT >= 33) {
+            appContext.packageManager.getPackageInfo(
+                appContext.packageName,
+                PackageManager.PackageInfoFlags.of(signingFlags.toLong()),
+            )
+        } else {
+            @Suppress("DEPRECATION")
+            appContext.packageManager.getPackageInfo(appContext.packageName, signingFlags)
+        }
+        val certificateBytes = if (Build.VERSION.SDK_INT >= 28) {
+            info.signingInfo?.apkContentsSigners?.firstOrNull()?.toByteArray()
+        } else {
+            @Suppress("DEPRECATION")
+            info.signatures?.firstOrNull()?.toByteArray()
+        } ?: return null
+        return MessageDigest.getInstance("SHA-256").digest(certificateBytes)
+            .joinToString("") { "%02x".format(it) }
     }
 
     private fun currentVersionCode(): Long = installedPackageInfo().let { info ->
