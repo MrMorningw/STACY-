@@ -35,6 +35,15 @@ internal class StacyLocalStore(context: Context) :
     }
 
     @Synchronized
+    fun healthCheck(): Boolean = try {
+        readableDatabase.rawQuery("SELECT 1", null).use { cursor ->
+            cursor.moveToFirst() && cursor.getInt(0) == 1
+        }
+    } catch (_: Exception) {
+        false
+    }
+
+    @Synchronized
     fun addTask(title: String, dueHint: String? = null): StacyTask {
         val cleanedTitle = title.trim()
         require(cleanedTitle.isNotEmpty()) { "A tarefa precisa ter um título." }
