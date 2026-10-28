@@ -123,9 +123,7 @@ jobs:
           arch: x86_64
           disable-animations: true
           emulator-boot-timeout: 1200
-          script: |
-            cd android
-            timeout 12m gradle connectedDebugAndroidTest
+          script: timeout 12m gradle connectedDebugAndroidTest
 
       - name: Upload Android instrumentation diagnostics
         if: always()
