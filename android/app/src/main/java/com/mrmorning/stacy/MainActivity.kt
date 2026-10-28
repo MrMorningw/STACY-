@@ -267,7 +267,7 @@ class MainActivity : ComponentActivity() {
 
         @JavascriptInterface
         fun stacyRunDiagnostics(requestId: String) {
-            runOnUiThread {
+            Thread({
                 val startedAt = SystemClock.elapsedRealtime()
                 val checks = org.json.JSONArray()
                 val report = JSONObject()
@@ -300,9 +300,10 @@ class MainActivity : ComponentActivity() {
 
                 fun publish() = publishDiagnosticCallback("stacyDiagnosticUpdate", report)
 
-                // Entering this method proves the page JavaScript and bridge are live.
+                // Reaching this method proves that JavaScript can invoke the Android bridge.
                 setCheck("html", "HTML / JavaScript", "ok", "JavaScript ativo; a página iniciou o diagnóstico.")
                 setCheck("bridge", "Ponte WebView / Android", "ok", "A ponte recebeu a chamada de diagnóstico.")
+
                 val coreStarted = SystemClock.elapsedRealtime()
                 try {
                     val result = coreBridge.runNativeDiagnostic()
@@ -335,36 +336,38 @@ class MainActivity : ComponentActivity() {
 
                 setCheck("termux", "Termux / daemon Python", "not_used", "Não participa do APK; nenhum serviço Termux foi consultado.")
                 setCheck("gemini", "Gemini / API generativa", "checking", "Teste HTTPS real em andamento; exige chave válida e internet.")
-                publish()
 
-                val apiStarted = SystemClock.elapsedRealtime()
-                coreBridge.testConnection { result ->
-                    runOnUiThread {
-                        val apiOk = result.exitCode == 0 &&
-                            !result.tipo.equals("erro", ignoreCase = true) &&
-                            !result.tipo.equals("error", ignoreCase = true) &&
-                            result.response.isNotBlank()
-                        val detail = if (apiOk) {
-                            "A API respondeu ao teste real: " + result.response.trim().take(240)
-                        } else {
-                            result.response.ifBlank { result.stderr }.ifBlank {
-                                "A API não retornou uma resposta válida."
-                            }.take(420)
+                runOnUiThread {
+                    publish()
+                    val apiStarted = SystemClock.elapsedRealtime()
+                    coreBridge.testConnection { result ->
+                        runOnUiThread {
+                            val apiOk = result.exitCode == 0 &&
+                                !result.tipo.equals("erro", ignoreCase = true) &&
+                                !result.tipo.equals("error", ignoreCase = true) &&
+                                result.response.isNotBlank()
+                            val detail = if (apiOk) {
+                                "A API respondeu ao teste real: " + result.response.trim().take(240)
+                            } else {
+                                result.response.ifBlank { result.stderr }.ifBlank {
+                                    "A API não retornou uma resposta válida."
+                                }.take(420)
+                            }
+                            setCheck(
+                                "gemini",
+                                "Gemini / API generativa",
+                                if (apiOk) "ok" else "fail",
+                                detail,
+                                SystemClock.elapsedRealtime() - apiStarted,
+                            )
+                            report.put("completed", true)
+                            report.put("completedAt", System.currentTimeMillis())
+                            report.put("elapsedMs", SystemClock.elapsedRealtime() - startedAt)
+                            publish()
                         }
-                        setCheck(
-                            "gemini",
-                            "Gemini / API generativa",
-                            if (apiOk) "ok" else "fail",
-                            detail,
-                            SystemClock.elapsedRealtime() - apiStarted,
-                        )
-                        report.put("completed", true)
-                        report.put("completedAt", System.currentTimeMillis())
-                        report.put("elapsedMs", SystemClock.elapsedRealtime() - startedAt)
-                        publish()
                     }
                 }
-            }
+            }, "stacy-core-diagnostics").start()
         }
 
         @JavascriptInterface
