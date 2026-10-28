@@ -201,6 +201,49 @@ class StacyWebViewBridgeTest {
         }
     }
 
+    @Test
+    fun arsPageExposesSelfConsultAndSafeUpdateControls() {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            lateinit var webView: WebView
+            scenario.onActivity { activity ->
+                val content = activity.findViewById<ViewGroup>(android.R.id.content)
+                webView = content.getChildAt(0) as? WebView
+                    ?: throw AssertionError("MainActivity is not displaying its production WebView")
+            }
+
+            assertTrue(
+                "ARS JavaScript or native methods did not become ready",
+                awaitCondition(webView, timeoutMs = 12_000) {
+                    evaluate(
+                        webView,
+                        "typeof window.stacyOpenPage === 'function' && " +
+                            "typeof window.stacyArsReport === 'function' && " +
+                            "typeof window.Android === 'object' && " +
+                            "typeof window.Android.stacyArsConsult === 'function' && " +
+                            "typeof window.Android.stacyArsUpdate === 'function' && " +
+                            "typeof window.Android.stacyGetBuildInfo === 'function'",
+                    ) == "true"
+                },
+            )
+
+            evaluate(webView, "window.stacyOpenPage('ars')")
+
+            assertTrue(
+                "ARS page did not render the self-consult and update controls",
+                awaitCondition(webView, timeoutMs = 5_000) {
+                    evaluate(
+                        webView,
+                        "!!document.getElementById('stacyArsSummary') && " +
+                            "!!document.querySelector('[data-stacy-action=arsConsultar]') && " +
+                            "!!document.querySelector('[data-stacy-action=arsAtualizar]') && " +
+                            "!!document.getElementById('stacyArsInstalled') && " +
+                            "!!document.getElementById('stacyArsPublished')",
+                    ) == "true"
+                },
+            )
+        }
+    }
+
     private fun awaitCondition(
         webView: WebView,
         timeoutMs: Long,
