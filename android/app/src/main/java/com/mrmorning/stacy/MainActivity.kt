@@ -245,12 +245,23 @@ class MainActivity : ComponentActivity() {
 
     inner class StacyJsBridge {
         @JavascriptInterface
-        fun stacyGetBuildInfo(): String = JSONObject()
-            .put("versionName", BuildConfig.VERSION_NAME)
-            .put("versionCode", BuildConfig.VERSION_CODE)
-            .put("applicationId", BuildConfig.APPLICATION_ID)
-            .put("androidApi", android.os.Build.VERSION.SDK_INT)
-            .toString()
+        fun stacyGetBuildInfo(): String = try {
+            val packageInfo = packageManager.getPackageInfo(packageName, 0)
+            val installedCode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                packageInfo.longVersionCode
+            } else {
+                @Suppress("DEPRECATION")
+                packageInfo.versionCode.toLong()
+            }
+            JSONObject()
+                .put("versionName", packageInfo.versionName ?: "desconhecida")
+                .put("versionCode", installedCode)
+                .put("applicationId", packageName)
+                .put("androidApi", android.os.Build.VERSION.SDK_INT)
+                .toString()
+        } catch (error: Exception) {
+            JSONObject().put("error", error.message ?: "Não foi possível ler a versão instalada.").toString()
+        }
 
         @JavascriptInterface
         fun stacyPingBridge(requestId: String) {
