@@ -1,4 +1,8 @@
 # RBI — Correção de roteamento de fases do CORE STACY
+
+> **Nota de estado (2026-10-28):** registro histórico da integração antiga de estados via daemon Termux. Essa ponte foi removida do fluxo ativo do APK; o painel atual reporta o CORE Kotlin/Android diretamente. Consulte `docs/ARS-AUTOATUALIZACAO-SEGURA.md` para a atualização atual da arquitetura.
+
+
 Data: 18 de outubro de 2026
 
 ## Objetivo
