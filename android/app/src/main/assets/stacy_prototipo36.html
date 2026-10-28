@@ -1000,11 +1000,14 @@ animationFrameId=requestAnimationFrame(animate);
     if(key==='ars'){
       renderCachedArsReport();
       showStacyBuildInfo();
-      if(window.Android && typeof Android.stacyArsConsult==='function'){
+      const reportFresh=latestArsReport&&Number(latestArsReport.checkedAt)>0&&(Date.now()-Number(latestArsReport.checkedAt))<60000;
+      if(!reportFresh&&window.Android&&typeof Android.stacyArsConsult==='function'){
         window.stacyNativeUpdateStatus('ARS: consultando a versão instalada e o canal oficial…');
         Android.stacyArsConsult();
-      }else{
+      }else if(!window.Android||typeof Android.stacyArsConsult!=='function'){
         window.stacyNativeUpdateStatus('ARS: ponte nativa indisponível; o canal não foi consultado.');
+      }else{
+        window.stacyNativeUpdateStatus(latestArsReport.summary||latestUpdateStatus);
       }
     }
     view.classList.add('open');
@@ -1129,8 +1132,8 @@ animationFrameId=requestAnimationFrame(animate);
     }
     if(integrity){
       const checks=report.integrity||{};
-      integrity.textContent=checks.manifestValid&&checks.sha256MetadataConsistent&&checks.certificateMetadataValid&&checks.downloadOriginApproved
-        ?'Manifesto, SHA-256, certificado e endereço do pacote passaram a validação de metadados.'
+      integrity.textContent=checks.manifestValid&&checks.sha256MetadataConsistent&&checks.certificateMetadataValid&&checks.installedSignatureMatchesOfficial&&checks.downloadOriginApproved
+        ?'Manifesto, SHA-256, assinatura instalada/oficial e endereço do pacote passaram a validação de metadados.'
         :'Validação incompleta. A ARS não deve declarar o canal confiável.';
     }
     if(checkedAt&&report.checkedAt)checkedAt.textContent='Última consulta ARS: '+new Date(Number(report.checkedAt)).toLocaleString();
