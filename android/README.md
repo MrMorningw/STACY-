@@ -35,6 +35,8 @@ gradle assembleDebug testDebugUnitTest
 
 O CI valida a rota nativa, compila o APK e executa testes unitários e de regressão. A validação em CI não substitui teste físico do APK com uma chave Gemini válida; esse teste de ponta a ponta precisa ser concluído no Android antes de declarar liberação final.
 
-## Componentes legados
+## Independência de runtime
 
-Scripts do CORE Python e arquivos Termux permanecem no repositório para referência e desenvolvimento. Eles não são invocados pela rota principal de mensagens do APK, e a permissão de execução do Termux foi removida do manifesto Android.
+O APK não contém inicializador de daemon Python, widget de shell, integração por comando ou dependência do Termux. O fluxo ativo é HTML/WebView → ponte Kotlin → CORE Kotlin/Android → Gemini por HTTPS. Voz, persistência local e automação do dispositivo são providas por APIs nativas do Android.
+
+Os módulos Python restantes são um runtime de console separado, em modo texto. Eles não são chamados pelo APK e não são necessários para instalar, iniciar, diagnosticar ou usar a STACY Android.
