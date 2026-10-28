@@ -13,6 +13,8 @@ import android.net.Uri
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import java.util.concurrent.FutureTask
+import java.util.concurrent.TimeUnit
 import android.webkit.WebChromeClient
 import android.webkit.ValueCallback
 import androidx.activity.ComponentActivity
@@ -67,7 +69,23 @@ class MainActivity : ComponentActivity() {
             onReport = { report ->
                 runOnUiThread { publishDiagnosticCallback("stacyArsReport", report) }
             },
-            onInstallIntent = { intent -> runOnUiThread { startActivity(intent) } },
+            onInstallIntent = { intent ->
+                val task = FutureTask<Boolean> {
+                    try {
+                        startActivity(intent)
+                        true
+                    } catch (error: Exception) {
+                        webUpdateStatus("ARS: não foi possível abrir a tela do Android — " + (error.message ?: "erro desconhecido"))
+                        false
+                    }
+                }
+                runOnUiThread { task.run() }
+                try {
+                    task.get(10, TimeUnit.SECONDS)
+                } catch (_: Exception) {
+                    false
+                }
+            },
         )
 
         voiceInput = AndroidVoiceInput(
