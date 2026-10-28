@@ -7,6 +7,7 @@ import android.view.WindowManager
 import android.widget.EditText
 import android.annotation.SuppressLint
 import android.os.Bundle
+import android.os.SystemClock
 import android.content.Intent
 import android.net.Uri
 import android.webkit.JavascriptInterface
@@ -244,6 +245,129 @@ class MainActivity : ComponentActivity() {
 
     inner class StacyJsBridge {
         @JavascriptInterface
+        fun stacyGetBuildInfo(): String = JSONObject()
+            .put("versionName", BuildConfig.VERSION_NAME)
+            .put("versionCode", BuildConfig.VERSION_CODE)
+            .put("applicationId", BuildConfig.APPLICATION_ID)
+            .put("androidApi", android.os.Build.VERSION.SDK_INT)
+            .toString()
+
+        @JavascriptInterface
+        fun stacyPingBridge(requestId: String) {
+            runOnUiThread {
+                publishDiagnosticCallback(
+                    "stacyBridgePingResult",
+                    JSONObject()
+                        .put("requestId", requestId)
+                        .put("status", "ok")
+                        .put("detail", "A chamada chegou à ponte Kotlin e retornou ao WebView."),
+                )
+            }
+        }
+
+        @JavascriptInterface
+        fun stacyRunDiagnostics(requestId: String) {
+            runOnUiThread {
+                val startedAt = SystemClock.elapsedRealtime()
+                val checks = org.json.JSONArray()
+                val report = JSONObject()
+                    .put("requestId", requestId)
+                    .put("checks", checks)
+                    .put("startedAt", System.currentTimeMillis())
+
+                fun setCheck(
+                    id: String,
+                    label: String,
+                    status: String,
+                    detail: String,
+                    latencyMs: Long? = null,
+                ) {
+                    val item = JSONObject()
+                        .put("id", id)
+                        .put("label", label)
+                        .put("status", status)
+                        .put("detail", detail)
+                    if (latencyMs != null) item.put("latencyMs", latencyMs)
+                    var index = -1
+                    for (i in 0 until checks.length()) {
+                        if (checks.optJSONObject(i)?.optString("id") == id) {
+                            index = i
+                            break
+                        }
+                    }
+                    if (index >= 0) checks.put(index, item) else checks.put(item)
+                }
+
+                fun publish() = publishDiagnosticCallback("stacyDiagnosticUpdate", report)
+
+                // Entering this method proves the page JavaScript and bridge are live.
+                setCheck("html", "HTML / JavaScript", "ok", "JavaScript ativo; a página iniciou o diagnóstico.")
+                setCheck("bridge", "Ponte WebView / Android", "ok", "A ponte recebeu a chamada de diagnóstico.")
+                val coreStarted = SystemClock.elapsedRealtime()
+                try {
+                    val result = coreBridge.runNativeDiagnostic()
+                    val coreOk = result?.response?.contains("CORE NATIVO: ONLINE", ignoreCase = true) == true
+                    setCheck(
+                        "core",
+                        "CORE Kotlin / Android",
+                        if (coreOk) "ok" else "fail",
+                        result?.response?.ifBlank { "O núcleo não retornou o diagnóstico local esperado." }
+                            ?: "O roteador nativo não reconheceu o comando de diagnóstico.",
+                        SystemClock.elapsedRealtime() - coreStarted,
+                    )
+                } catch (error: Exception) {
+                    setCheck("core", "CORE Kotlin / Android", "fail", error.message ?: "Falha ao consultar o núcleo.")
+                }
+
+                val storageStarted = SystemClock.elapsedRealtime()
+                try {
+                    val storageOk = coreBridge.checkLocalStorage()
+                    setCheck(
+                        "sqlite",
+                        "Banco local SQLite",
+                        if (storageOk) "ok" else "fail",
+                        if (storageOk) "Consulta SELECT 1 concluída no banco local." else "O banco local não passou na verificação.",
+                        SystemClock.elapsedRealtime() - storageStarted,
+                    )
+                } catch (error: Exception) {
+                    setCheck("sqlite", "Banco local SQLite", "fail", error.message ?: "Falha ao consultar o banco local.")
+                }
+
+                setCheck("termux", "Termux / daemon Python", "not_used", "Não participa do APK; nenhum serviço Termux foi consultado.")
+                setCheck("gemini", "Gemini / API generativa", "checking", "Teste HTTPS real em andamento; exige chave válida e internet.")
+                publish()
+
+                val apiStarted = SystemClock.elapsedRealtime()
+                coreBridge.testConnection { result ->
+                    runOnUiThread {
+                        val apiOk = result.exitCode == 0 &&
+                            !result.tipo.equals("erro", ignoreCase = true) &&
+                            !result.tipo.equals("error", ignoreCase = true) &&
+                            result.response.isNotBlank()
+                        val detail = if (apiOk) {
+                            "A API respondeu ao teste real: " + result.response.trim().take(240)
+                        } else {
+                            result.response.ifBlank { result.stderr }.ifBlank {
+                                "A API não retornou uma resposta válida."
+                            }.take(420)
+                        }
+                        setCheck(
+                            "gemini",
+                            "Gemini / API generativa",
+                            if (apiOk) "ok" else "fail",
+                            detail,
+                            SystemClock.elapsedRealtime() - apiStarted,
+                        )
+                        report.put("completed", true)
+                        report.put("completedAt", System.currentTimeMillis())
+                        report.put("elapsedMs", SystemClock.elapsedRealtime() - startedAt)
+                        publish()
+                    }
+                }
+            }
+        }
+
+        @JavascriptInterface
         fun stacySend(message: String) {
             runOnUiThread {
                 responseHandler.removeCallbacksAndMessages(null)
@@ -293,6 +417,15 @@ class MainActivity : ComponentActivity() {
     private fun webState(state: String) {
         if (!::webView.isInitialized) return
         webView.evaluateJavascript("(function(s){try{if(typeof window.stacyNativeState==='function'){window.stacyNativeState(s);return;}var app=document.getElementById('app');if(app){app.classList.remove('online','ouvindo','pensando','pesquisando','executando','respondendo','offline','erro');app.classList.add(s);}})(" + JSONObject.quote(state) + ")", null)
+    }
+
+    private fun publishDiagnosticCallback(functionName: String, payload: JSONObject) {
+        if (!::webView.isInitialized) return
+        val serialized = JSONObject.quote(payload.toString())
+        webView.evaluateJavascript(
+            "window.$functionName && window.$functionName($serialized)",
+            null,
+        )
     }
 
     private fun webUpdateStatus(status: String) {
