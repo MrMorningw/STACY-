@@ -241,13 +241,14 @@ class StacyUpdater(
         if (pendingCode <= 0L) return
 
         val pendingName = preferences.getString(KEY_PENDING_VERSION_NAME, "desconhecida") ?: "desconhecida"
-        val currentCode = try {
-            currentVersionCode()
+        val installedBuild = try {
+            currentVersionCode() to currentVersionName()
         } catch (error: Exception) {
             onState("ARS: não foi possível confirmar a instalação — ${friendlyError(error)}")
             return
         }
-        val currentName = currentVersionName()
+        val currentCode = installedBuild.first
+        val currentName = installedBuild.second
 
         preferences.edit()
             .remove(KEY_PENDING_VERSION_CODE)
@@ -255,7 +256,7 @@ class StacyUpdater(
             .remove(KEY_PENDING_AT)
             .apply()
 
-        if (currentCode >= pendingCode && currentName == pendingName) {
+        if (currentCode == pendingCode && currentName == pendingName) {
             onState("ARS: atualização instalada e confirmada pelo Android — versão $currentName (código $currentCode).")
         } else {
             onState(
