@@ -61,8 +61,8 @@ class StacyAiClientTransportTest {
             val secondBody = server.requests[1]
             assertTrue(firstBody.contains("\"previous_interaction_id\":\"expired-interaction\""))
             assertFalse(secondBody.contains("previous_interaction_id"))
-            assertTrue(firstBody.contains("\"max_output_tokens\":4096"))
-            assertTrue(secondBody.contains("\"max_output_tokens\":4096"))
+            assertTrue(firstBody.contains("\"max_output_tokens\":32768"))
+            assertTrue(secondBody.contains("\"max_output_tokens\":32768"))
             assertEquals("fresh-interaction", secrets.getPreviousInteractionId())
             assertEquals(null, server.failure.get())
         } finally {
