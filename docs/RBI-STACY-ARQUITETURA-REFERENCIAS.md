@@ -37,8 +37,8 @@ Preservar fundo preto, neon laranja, átomo/orbe com núcleo “S”, Space Stac
 | Voz | Ouvir, entender, responder e refletir o estado real | Entrada/saída de voz existe no app; acionamento por palavra-chave/assistente padrão não está provado | Testes em dispositivo real, permissões, interrupção, fallback para texto e botão lateral |
 | Interface reativa | Painéis e estados ligados ao sistema real | HUD WebView e páginas de navegação existem | Cada painel deve mostrar dados reais ou declarar claramente que ainda não está conectado |
 | Ações Android | Abrir apps/configurações, calendário, notificações e compartilhamento | Há implementações nativas de ações, mas o despacho a partir do CORE precisa ser confirmado | Teste por ação, permissões, cancelamento e retorno de sucesso/erro |
-| Atualizações | Distribuição verificável e reversível | Canal de APK e verificação de integridade/assinatura existem | Testar instalação real, preservação de dados, falha de download e rollback |
-| Privacidade | Segredos e memória fora do código versionado | Memória local existe; configuração da chave Gemini precisa ser inequívoca no Termux | Arquivo privado fora do repositório, permissões restritas e nenhuma chave em logs/JSON de resposta |
+| Atualizações / ARS | Autoconsulta e atualização verificável da STACY | Página ARS, comparação de versão e validação de manifesto/APK estão implementadas na branch | Executar testes instrumentados, testar instalação real e confirmar versão após retorno do instalador |
+| Privacidade | Segredos e memória fora do código versionado | Chave Gemini é gerida pelo Android Keystore; o APK não depende do Termux | Confirmar armazenamento/recuperação da chave no dispositivo e evitar segredos em logs/JSON |
 | Identidade visual | Preto/laranja e UI em português | Protótipo implementado | Regressão visual sem alterar a identidade aprovada |
 
 ## 3. Contrato arquitetural obrigatório
@@ -57,7 +57,7 @@ Regras:
 7. Dados temporários da conversa não devem ser confundidos com memória pessoal persistente.
 8. O protocolo Android deve emitir uma única resposta JSON em stdout; diagnósticos vão para stderr.
 9. O estado entre processos deve ser validado, limitado, protegido por permissões e gravado atomicamente.
-10. A atualização do aplicativo é distinta da Atualização Pessoal/RIC. Nenhuma delas pode alterar regras ou módulos sem validação e trilha de auditoria.
+10. A ARS consulta e atualiza o APK pelo canal assinado; Atualização Pessoal/RIC é fluxo separado. Nenhum dos fluxos pode executar scripts arbitrários ou marcar sucesso sem confirmação verificável.
 
 ## 4. Critérios de aceite do núcleo
 
@@ -71,15 +71,15 @@ Regras:
 - [ ] Cada ferramenta Android é exercitada no aparelho e devolve o resultado real.
 - [ ] Voz, botão lateral e seleção como assistente padrão são testados no dispositivo-alvo.
 - [ ] A interface não apresenta conteúdo fictício como dado conectado.
-- [ ] Atualização do APK é testada de uma versão anterior para a nova, verificando assinatura e preservação de dados.
+- [ ] A ARS é testada do canal consultado até a abertura do instalador; o retorno do Android confirma a versão realmente instalada e a preservação de dados.
 - [ ] RBI de fechamento registra commit, APK, resultados de CI, testes no dispositivo e limitações restantes.
 
 ## 5. Estado do trabalho nesta rodada
 
-A branch `stacy-core-integration-final-20261012` contém uma primeira etapa de integração: entrada JSON do CORE, sincronização de resposta, persistência privada de sessão entre processos, leitura da chave Gemini em configuração privada, roteamento nativo restrito a ações explícitas, fila serializada para preservar a ordem das respostas e encaminhamento filtrado das fontes HTTPS da pesquisa.
+A branch de correção mantém o fluxo ativo do APK em HTML/WebView → ponte Kotlin → CORE Kotlin/Android → Gemini por HTTPS. A ARS foi adicionada como mecanismo nativo para consultar versão/canal, classificar canal atualizado/atrasado/inconsistente e conduzir atualização de APK validado.
 
-**Ainda não declarar o núcleo encerrado:** a validação da versão mais recente precisa concluir, as alterações ainda precisam ser integradas à `main`, e os testes físicos de Android não podem ser substituídos por CI.
+O último teste instrumentado foi cancelado pelo limite de 20 minutos do job antes de produzir resultado; o log mostra que o emulador levou cerca de 15 minutos para inicializar. O workflow foi ajustado para dar tempo à inicialização e coletar os resultados dos testes. A compilação e a suíte Python passaram em execuções anteriores, mas a validação instrumentada no commit final ainda é necessária.
 
-## 6. Limite arquitetural atual
+## 6. Limites arquiteturais e de liberação
 
-O APK atual invoca Python por meio do Termux e depende do CORE instalado em `$HOME/stacy`. Isso é uma arquitetura de integração válida para a fase atual, mas não é um APK autossuficiente. Eliminar essa dependência exige uma decisão arquitetural própria, implementação e testes específicos; não deve ser prometido por documentação ou por mudança visual.
+O APK não usa Termux, Python ou daemon local no caminho de mensagens. A ARS não instala silenciosamente nem executa código arbitrário: verifica o canal oficial, valida o pacote e pede a confirmação final ao instalador Android. O canal público só será atualizado quando o PR for integrado à main e o workflow de release assinado executar com os secrets corretos. Teste físico, preservação de dados e instalação real continuam pendentes.
