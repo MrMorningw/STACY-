@@ -1155,7 +1155,7 @@ animationFrameId=requestAnimationFrame(animate);
     try{latestArsReport=typeof raw==='string'?JSON.parse(raw):raw;}catch(_){
       latestArsReport={status:'error',summary:'ARS: resposta de diagnóstico inválida.'};
     }
-    if(latestArsReport.status!=='busy')arsConsultInProgress=false;
+    arsConsultInProgress=false;
     renderCachedArsReport();
   };
   let activeCoreDiagnosticId=null;
