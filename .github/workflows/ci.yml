@@ -26,8 +26,34 @@ jobs:
       - name: Compile Python
         run: python -m py_compile *.py
 
-      - name: Validate Termux bootstrap syntax
-        run: bash -n termux_repair.sh android/termux_widget/stacy-core-daemon.sh
+      - name: Validate Termux-independent runtime
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          runtime_files = [
+              Path("stacy.py"),
+              Path("interface.py"),
+              Path("ai.py"),
+              Path("android/app/src/main/AndroidManifest.xml"),
+              Path("android/app/src/main/java/com/mrmorning/stacy/MainActivity.kt"),
+              Path("android/app/src/main/java/com/mrmorning/stacy/StacyCoreBridge.kt"),
+          ]
+          forbidden = (
+              "termux-speech-to-text",
+              "termux-tts-speak",
+              "termux-notification",
+              "com.termux.permission.RUN_COMMAND",
+              "android/termux_widget",
+          )
+          for path in runtime_files:
+              text = path.read_text(encoding="utf-8").lower()
+              for token in forbidden:
+                  assert token.lower() not in text, f"{token} remains in {path}"
+          assert not Path("termux_repair.sh").exists()
+          assert not Path("android/termux_widget").exists()
+          print("STACY runtime: no Termux bootstrap or command integration")
+          PY
 
       - name: Core regression tests
         run: python -m unittest discover -v
