@@ -15,7 +15,7 @@ import org.json.JSONObject
 class StacyArs(
     context: Context,
     onStatus: (String) -> Unit,
-    onReport: (JSONObject) -> Unit,
+    private val onReport: (JSONObject) -> Unit,
     onInstallIntent: (Intent) -> Unit,
 ) {
     private val updater = StacyUpdater(
