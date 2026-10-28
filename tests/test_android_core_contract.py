@@ -35,6 +35,8 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
         self.assertNotIn('localhost', self.bridge.lower())
         self.assertNotIn('com.termux.permission.RUN_COMMAND', self.manifest)
         self.assertNotIn('android:name="com.termux"', self.manifest)
+        self.assertNotIn("networkSecurityConfig", self.manifest)
+        self.assertFalse((ROOT / "android/app/src/main/res/xml/stacy_network_security.xml").exists())
         self.assertIn('https://generativelanguage.googleapis.com/v1/interactions', self.ai)
         self.assertIn('previous_interaction_id', self.ai)
         self.assertIn('StacyLocalStore', self.bridge)
