@@ -17,6 +17,7 @@ import java.net.URL
 import java.security.MessageDigest
 import java.util.Locale
 import java.util.concurrent.ExecutorService
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.Executors
 
 /**
@@ -50,6 +51,7 @@ class StacyUpdater(
     private val appContext = context.applicationContext
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
     private val preferences = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val requestInProgress = AtomicBoolean(false)
 
     private data class ReleaseSnapshot(
         val asset: JSONObject,
@@ -64,9 +66,23 @@ class StacyUpdater(
 
     /** Consults installed build vs. official channel without downloading or installing. */
     fun consult(onReport: (JSONObject) -> Unit) {
+        if (!requestInProgress.compareAndSet(false, true)) {
+            val report = JSONObject()
+                .put("status", "busy")
+                .put("summary", "ARS: já existe uma consulta ou atualização em andamento.")
+                .put("checkedAt", System.currentTimeMillis())
+                .put("installed", JSONObject())
+                .put("published", JSONObject())
+                .put("integrity", JSONObject())
+                .put("termux", "not_used")
+            onState(report.optString("summary"))
+            onReport(report)
+            return
+        }
         onState("ARS: consultando a versão instalada e o canal oficial…")
         executor.execute {
-            val report = try {
+            try {
+                val report = try {
                 val snapshot = loadValidatedRelease()
                 val decision = StacyArsPolicy.evaluate(
                     snapshot.installedCode,
@@ -126,14 +142,21 @@ class StacyUpdater(
                     )
                     .put("termux", "not_used")
             }
-            val summary = report.optString("summary", "ARS: consulta concluída sem resumo.")
-            onState(summary)
-            onReport(report)
+                val summary = report.optString("summary", "ARS: consulta concluída sem resumo.")
+                onState(summary)
+                onReport(report)
+            } finally {
+                requestInProgress.set(false)
+            }
         }
     }
 
     /** Checks the official channel and starts the verified Android installer only when needed. */
     fun checkAndUpdate() {
+        if (!requestInProgress.compareAndSet(false, true)) {
+            onState("ARS: já existe uma consulta ou atualização em andamento.")
+            return
+        }
         onState("ARS: verificando o canal oficial…")
         executor.execute {
             try {
@@ -177,6 +200,8 @@ class StacyUpdater(
                 }
             } catch (error: Exception) {
                 onState("ARS: atualização não concluída — ${friendlyError(error)}")
+            } finally {
+                requestInProgress.set(false)
             }
         }
     }
