@@ -163,7 +163,7 @@ def render_status() -> str:
     else:
         lines.append(
             "• IA generativa: INDISPONÍVEL — servidor local 127.0.0.1:8080 offline "
-            "e chave Gemini ausente. Configure ~/.stacy/secrets.json no Termux."
+            "e chave Gemini ausente. Configure GEMINI_API_KEY no processo Python ou use o arquivo privado ~/.stacy/secrets.json."
         )
     for name, component in data["components"].items():
         lines.append(f"• {name}: {component['status']} — {component['path']}")
