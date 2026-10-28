@@ -29,6 +29,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var vm: StacyViewModel
     private var voiceEnabled = true
     private lateinit var ars: StacyArs
+    private var arsStartupConsultationStarted = false
     private var pendingFileChooser: ValueCallback<Array<Uri>>? = null
     private val responseHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private val fileChooserResult = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -126,7 +127,20 @@ class MainActivity : ComponentActivity() {
             settings.domStorageEnabled = true
             settings.allowFileAccess = true
             settings.allowContentAccess = true
-            webViewClient = WebViewClient()
+            webViewClient = object : WebViewClient() {
+                override fun onPageFinished(view: WebView?, url: String?) {
+                    super.onPageFinished(view, url)
+                    if (url == "file:///android_asset/stacy_prototipo36.html" &&
+                        !arsStartupConsultationStarted &&
+                        ::ars.isInitialized &&
+                        !isFinishing &&
+                        !isDestroyed
+                    ) {
+                        arsStartupConsultationStarted = true
+                        ars.consultar()
+                    }
+                }
+            }
             webChromeClient = object : WebChromeClient() {
                 override fun onShowFileChooser(webView: WebView?, filePathCallback: ValueCallback<Array<Uri>>?, fileChooserParams: FileChooserParams?): Boolean {
                     pendingFileChooser?.onReceiveValue(null)
@@ -454,7 +468,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun webUpdateStatus(status: String) {
-        if (!::webView.isInitialized) return
+        if (!::webView.isInitialized || isFinishing || isDestroyed) return
         webView.evaluateJavascript("(function(s){try{if(typeof window.stacyNativeUpdateStatus==='function'){window.stacyNativeUpdateStatus(s);return;}}catch(e){} })(" + JSONObject.quote(status) + ")", null)
     }
 
