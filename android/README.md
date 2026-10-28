@@ -39,4 +39,4 @@ O CI valida a rota nativa, compila o APK e executa testes unitários e de regres
 
 O APK não contém inicializador de daemon Python, widget de shell, integração por comando ou dependência do Termux. O fluxo ativo é HTML/WebView → ponte Kotlin → CORE Kotlin/Android → Gemini por HTTPS. Voz, persistência local e automação do dispositivo são providas por APIs nativas do Android.
 
-Os módulos Python restantes são um runtime de console separado, em modo texto. Eles não são chamados pelo APK e não são necessários para instalar, iniciar, diagnosticar ou usar a STACY Android.
+Os módulos Python restantes formam um runtime separado (CLI e servidor local opcional), independente de plataforma. Eles não são chamados pelo APK e não são necessários para instalar, iniciar, diagnosticar ou usar a STACY Android.
