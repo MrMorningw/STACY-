@@ -31,8 +31,13 @@ import java.util.concurrent.Executors
 class StacyUpdater(
     context: Context,
     private val onState: (String) -> Unit,
-    private val onInstallIntent: (Intent) -> Unit = { intent ->
-        context.startActivity(intent)
+    private val onInstallIntent: (Intent) -> Boolean = { intent ->
+        try {
+            context.startActivity(intent)
+            true
+        } catch (_: Exception) {
+            false
+        }
     },
 ) {
     companion object {
@@ -167,6 +172,10 @@ class StacyUpdater(
 
     /** Checks the official channel and starts the verified Android installer only when needed. */
     fun checkAndUpdate() {
+        if (preferences.getLong(KEY_PENDING_VERSION_CODE, -1L) > 0L) {
+            onState("ARS: há uma instalação iniciada; aguardando a confirmação do Android antes de iniciar outra.")
+            return
+        }
         if (!requestInProgress.compareAndSet(false, true)) {
             onState("ARS: já existe uma consulta ou atualização em andamento.")
             return
@@ -499,12 +508,15 @@ class StacyUpdater(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
             !appContext.packageManager.canRequestPackageInstalls()
         ) {
-            onInstallIntent(
+            val openedSettings = onInstallIntent(
                 Intent(
                     Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
                     Uri.parse("package:${appContext.packageName}"),
                 )
             )
+            if (!openedSettings) {
+                throw IllegalStateException("Não foi possível abrir as configurações de instalação do Android.")
+            }
             onState("ARS: autorize a instalação de atualizações nas configurações do Android e toque em ATUALIZAR novamente.")
             return
         }
@@ -524,7 +536,9 @@ class StacyUpdater(
             .putLong(KEY_PENDING_AT, System.currentTimeMillis())
             .apply()
         try {
-            onInstallIntent(intent)
+            if (!onInstallIntent(intent)) {
+                throw IllegalStateException("O Android não conseguiu abrir o instalador.")
+            }
         } catch (error: Exception) {
             preferences.edit()
                 .remove(KEY_PENDING_VERSION_CODE)
