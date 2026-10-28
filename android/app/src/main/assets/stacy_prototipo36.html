@@ -1168,7 +1168,6 @@ animationFrameId=requestAnimationFrame(animate);
       return;
     }
     // Native callback measures the round trip using this start timestamp.
-    const original=window.stacyBridgePingResult;
     // Store the timing in a side map without exposing Android objects to the page.
     window.__stacyBridgePingStartedAt=startedAt;
   }
@@ -1225,6 +1224,8 @@ animationFrameId=requestAnimationFrame(animate);
     }
     try{
       const info=JSON.parse(Android.stacyGetBuildInfo());
+      if(info.error){output.textContent=String(info.error);return;}
+      if(!info.versionName||info.versionCode===undefined||!info.applicationId)throw new Error('Metadados da versão incompletos.');
       output.textContent='Versão '+info.versionName+' (código '+info.versionCode+') • Android API '+info.androidApi+' • '+info.applicationId;
     }catch(error){output.textContent='Falha ao consultar a versão do APK: '+(error&&error.message?error.message:'resposta inválida');}
   }
