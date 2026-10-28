@@ -35,6 +35,16 @@ gradle assembleDebug testDebugUnitTest
 
 O CI valida a rota nativa, compila o APK e executa testes unitários e de regressão. A validação em CI não substitui teste físico do APK com uma chave Gemini válida; esse teste de ponta a ponta precisa ser concluído no Android antes de declarar liberação final.
 
+## ARS — autoconsulta e atualização
+
+Abra **Configurações → ARS — Autoconsulta e atualização**. Ao entrar, a STACY consulta a versão instalada e o canal oficial. A consulta distingue versão atual, atualização disponível, canal atrasado, metadados inconsistentes e erro de rede.
+
+Ao selecionar **Verificar e atualizar**, a ARS valida o caminho do APK, packageName, versão, SHA-256 e certificado antes de abrir o instalador Android. A instalação só é considerada concluída depois que o app retorna e o PackageManager confirma a versão-alvo. O Android pode exigir confirmação do usuário; a ARS não contorna essa proteção.
+
+O mecanismo atualiza a aplicação e os módulos distribuídos dentro do APK. Não executa scripts ou código arbitrário baixado e não requer Termux.
+
+Para validar localmente, use `gradle assembleDebug testDebugUnitTest assembleDebugAndroidTest`. O CI também executa os testes instrumentados no emulador; essa execução precisa terminar com sucesso para concluir a validação da ponte e da página ARS.
+
 ## Independência de runtime
 
 O APK não contém inicializador de daemon Python, widget de shell, integração por comando ou dependência do Termux. O fluxo ativo é HTML/WebView → ponte Kotlin → CORE Kotlin/Android → Gemini por HTTPS. Voz, persistência local e automação do dispositivo são providas por APIs nativas do Android.
