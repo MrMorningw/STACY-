@@ -25,7 +25,7 @@ def main():
         entidades=entidades
     )
 
-    ui = interface.AndroidInterface()
+    ui = interface.ConsoleInterface()
     modo = "voz" if "--voz" in sys.argv else interface.modo_interface_padrao()
 
     print("""
@@ -50,8 +50,8 @@ def main():
         status = ui.status()
         if not status.voz_entrada:
             print(
-                "AVISO: entrada por voz indisponível. "
-                "Continuando em modo texto."
+                "AVISO: a interface Python aceita texto. "
+                "Para voz, use o aplicativo Android nativo."
             )
             modo = "texto"
         elif status.voz_saida:
