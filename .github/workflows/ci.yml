@@ -35,6 +35,9 @@ jobs:
               Path("stacy.py"),
               Path("interface.py"),
               Path("ai.py"),
+              Path("android_core.py"),
+              Path("android_session.py"),
+              Path("core_server.py"),
               Path("android/app/src/main/AndroidManifest.xml"),
               Path("android/app/src/main/java/com/mrmorning/stacy/MainActivity.kt"),
               Path("android/app/src/main/java/com/mrmorning/stacy/StacyCoreBridge.kt"),
@@ -44,6 +47,9 @@ jobs:
               "termux-tts-speak",
               "termux-notification",
               "com.termux.permission.RUN_COMMAND",
+              "/system/bin/am",
+              "stacycorephasereceiver",
+              "termux launches",
               "android/termux_widget",
           )
           for path in runtime_files:
