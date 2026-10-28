@@ -11,6 +11,7 @@ on:
       - mp08-automacao-android-20260922
       - stacy-final-android-20260924
       - mp-ef10-android-assistant-ready
+      - fix/core-diagnostics-no-termux-20261027
   pull_request:
     branches:
       - mp08-automacao-android-20260922
@@ -43,6 +44,7 @@ jobs:
       - name: Validate STACY web animation states
         working-directory: .
         run: grep -F 'online:0,ouvindo:1,pensando:2,pesquisando:1,executando:1,respondendo:2' android/app/src/main/assets/stacy_prototipo36.html
+
       - name: Validate native CORE contract
         working-directory: .
         run: |
@@ -123,7 +125,7 @@ jobs:
           arch: x86_64
           disable-animations: true
           emulator-boot-timeout: 1200
-          script: timeout 12m gradle connectedDebugAndroidTest
+          script: cd android && timeout 12m gradle connectedDebugAndroidTest
 
       - name: Upload Android instrumentation diagnostics
         if: always()
