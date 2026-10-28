@@ -62,6 +62,7 @@ class StacyUpdater(
         val digest: String,
         val certificate: String,
         val minAndroid: Int,
+        val installedSignatureMatchesOfficial: Boolean,
     )
 
     /** Consults installed build vs. official channel without downloading or installing. */
@@ -90,9 +91,22 @@ class StacyUpdater(
                     snapshot.publishedCode,
                     snapshot.publishedName,
                 )
+                val effectiveStatus = if (snapshot.installedSignatureMatchesOfficial) {
+                    decision.state.name.lowercase(Locale.ROOT)
+                } else {
+                    "identity_mismatch"
+                }
+                val effectiveSummary = if (snapshot.installedSignatureMatchesOfficial) {
+                    decision.message
+                } else {
+                    "ARS: a assinatura desta instalação não corresponde ao certificado oficial. " +
+                        "Instalado ${snapshot.installedName} (${snapshot.installedCode}); " +
+                        "canal ${snapshot.publishedName} (${snapshot.publishedCode}). " +
+                        "A atualização está bloqueada por segurança."
+                }
                 JSONObject()
-                    .put("status", decision.state.name.lowercase(Locale.ROOT))
-                    .put("summary", decision.message)
+                    .put("status", effectiveStatus)
+                    .put("summary", effectiveSummary)
                     .put("checkedAt", System.currentTimeMillis())
                     .put(
                         "installed",
@@ -113,7 +127,7 @@ class StacyUpdater(
                             .put("manifestValid", true)
                             .put("sha256MetadataConsistent", true)
                             .put("certificateMetadataValid", true)
-                            .put("installedSignatureMatchesOfficial", true)
+                            .put("installedSignatureMatchesOfficial", snapshot.installedSignatureMatchesOfficial)
                             .put("downloadOriginApproved", true),
                     )
                     .put("termux", "not_used")
@@ -161,6 +175,9 @@ class StacyUpdater(
         executor.execute {
             try {
                 val release = loadValidatedRelease()
+                if (!release.installedSignatureMatchesOfficial) {
+                    throw SecurityException("A assinatura desta instalação não corresponde ao certificado oficial do canal; atualização bloqueada.")
+                }
                 val decision = StacyArsPolicy.evaluate(
                     release.installedCode,
                     release.installedName,
@@ -292,9 +309,8 @@ class StacyUpdater(
             throw IllegalStateException("Canal inválido: certificado oficial não foi publicado corretamente.")
         }
         val installedCertificate = installedSigningCertificateSha256()
-        if (installedCertificate == null || installedCertificate != certificate) {
-            throw SecurityException("A assinatura instalada não corresponde ao certificado oficial do canal. Esta instalação não pode confirmar identidade ou atualizar com segurança.")
-        }
+        val installedSignatureMatchesOfficial =
+            installedCertificate != null && installedCertificate == certificate
         val downloadUrl = asset.optString("browser_download_url", "").trim()
         if (!StacyArsPolicy.isApprovedDownloadUrl(downloadUrl, publishedName)) {
             throw SecurityException("Canal inválido: o download não aponta para o APK versionado do repositório oficial.")
@@ -311,6 +327,7 @@ class StacyUpdater(
             digest = publishedDigest,
             certificate = certificate,
             minAndroid = minAndroid,
+            installedSignatureMatchesOfficial = installedSignatureMatchesOfficial,
         )
     }
 
