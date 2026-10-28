@@ -51,7 +51,7 @@ class CoreRuntime:
             with contextlib.redirect_stdout(sys.stderr):
                 memoria = memory.carregar_memoria()
                 entidades = entity_store.carregar_entidades()
-                self.orchestrator = StacyOrchestrator(api_key=load_api_key(), memoria=memoria, entidades=entidades, phase_callback=self._phase)
+                self.orchestrator = StacyOrchestrator(api_key=load_api_key(), memoria=memoria, entidades=entidades)
                 self.warning = restore_session(self.orchestrator)
             self.ready = True
             self.error = None
@@ -107,7 +107,7 @@ class CoreRuntime:
                     self.orchestrator.conversa.registrar_erro("falha no processamento")
                 except Exception:
                     pass
-                # Give Android a useful diagnosis, but never return a stored API key.
+                # Give the caller a useful diagnosis, but never return a stored API key.
                 diagnostic = " ".join(str(exc).split())
                 api_key = getattr(self.orchestrator, "api_key", None)
                 if isinstance(api_key, str) and api_key:
