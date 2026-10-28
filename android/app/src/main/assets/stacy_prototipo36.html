@@ -1000,15 +1000,9 @@ animationFrameId=requestAnimationFrame(animate);
     if(key==='ars'){
       renderCachedArsReport();
       showStacyBuildInfo();
-      const reportFresh=latestArsReport&&Number(latestArsReport.checkedAt)>0&&(Date.now()-Number(latestArsReport.checkedAt))<60000;
-      if(!reportFresh&&window.Android&&typeof Android.stacyArsConsult==='function'){
-        window.stacyNativeUpdateStatus('ARS: consultando a versão instalada e o canal oficial…');
-        Android.stacyArsConsult();
-      }else if(!window.Android||typeof Android.stacyArsConsult!=='function'){
-        window.stacyNativeUpdateStatus('ARS: ponte nativa indisponível; o canal não foi consultado.');
-      }else{
-        window.stacyNativeUpdateStatus(latestArsReport.summary||latestUpdateStatus);
-      }
+      const reportFresh=latestArsReport&&latestArsReport.status!=='busy'&&latestArsReport.status!=='error'&&Number(latestArsReport.checkedAt)>0&&(Date.now()-Number(latestArsReport.checkedAt))<60000;
+      if(!reportFresh)requestArsConsult();
+      else window.stacyNativeUpdateStatus(latestArsReport.summary||latestUpdateStatus);
     }
     view.classList.add('open');
     view.setAttribute('aria-hidden','false');
@@ -1101,12 +1095,31 @@ animationFrameId=requestAnimationFrame(animate);
   window.stacyNativeSend=nativeSend;
   let latestUpdateStatus='ARS pronta para consultar.';
   let latestArsReport=null;
+  let arsConsultInProgress=false;
+  function requestArsConsult(){
+    if(arsConsultInProgress){
+      window.stacyNativeUpdateStatus('ARS: a consulta já está em andamento.');
+      return;
+    }
+    if(!window.Android||typeof Android.stacyArsConsult!=='function'){
+      window.stacyNativeUpdateStatus('ARS: ponte nativa indisponível; o canal não foi consultado.');
+      return;
+    }
+    arsConsultInProgress=true;
+    window.stacyNativeUpdateStatus('ARS: consultando a versão instalada e o canal oficial…');
+    try{Android.stacyArsConsult();}
+    catch(error){
+      arsConsultInProgress=false;
+      window.stacyNativeUpdateStatus('ARS: não foi possível iniciar a consulta nativa.');
+    }
+  }
   function renderCachedUpdateStatus(){
     const el=document.getElementById('stacyUpdateStatus');
     if(el)el.textContent=latestUpdateStatus;
   }
   window.stacyNativeUpdateStatus=function(status){
     latestUpdateStatus=String(status||'');
+    if(latestUpdateStatus.indexOf('ARS: consultando a versão instalada')>=0)arsConsultInProgress=true;
     renderCachedUpdateStatus();
   };
   function renderCachedArsReport(){
@@ -1142,6 +1155,7 @@ animationFrameId=requestAnimationFrame(animate);
     try{latestArsReport=typeof raw==='string'?JSON.parse(raw):raw;}catch(_){
       latestArsReport={status:'error',summary:'ARS: resposta de diagnóstico inválida.'};
     }
+    if(latestArsReport.status!=='busy')arsConsultInProgress=false;
     renderCachedArsReport();
   };
   let activeCoreDiagnosticId=null;
@@ -1340,9 +1354,7 @@ animationFrameId=requestAnimationFrame(animate);
       return;
     }
     if(key==='arsConsultar'){
-      window.stacyNativeUpdateStatus('ARS: consultando a versão instalada e o canal oficial…');
-      if(window.Android && typeof Android.stacyArsConsult==='function')Android.stacyArsConsult();
-      else window.stacyNativeUpdateStatus('ARS: ponte nativa indisponível; o canal não foi consultado.');
+      requestArsConsult();
       return;
     }
     if(key==='arsAtualizar'||key==='atualizacao'){
