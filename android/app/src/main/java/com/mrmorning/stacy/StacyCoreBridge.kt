@@ -58,6 +58,10 @@ class StacyCoreBridge(private val context: Context) {
         return webIntents.any(normalized::contains)
     }
 
+    fun runNativeDiagnostic(): CoreResult? = nativeCore.process("diagnóstico do CORE nativo")
+
+    fun checkLocalStorage(): Boolean = localStore.healthCheck()
+
     fun testConnection(callback: (CoreResult) -> Unit) {
         aiClient.chat("Responda somente com: Conexão da STACY validada.") { result ->
             callback(result)
