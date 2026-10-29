@@ -838,6 +838,14 @@ function sendComposerMessage(){
    window.stacyNativeResponse && window.stacyNativeResponse("A ponte nativa da STACY não está disponível.","erro");
  }
 }
+window.stacySubmitFromVoice=function(rawText){
+ const transcript=String(rawText||"").trim();
+ if(!transcript)return false;
+ if(stacyRequestActive){message.value=transcript;message.focus();return false;}
+ message.value=transcript;
+ sendComposerMessage();
+ return true;
+};
 document.getElementById("send").onclick=sendComposerMessage;
 message.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendComposerMessage();}});
 
