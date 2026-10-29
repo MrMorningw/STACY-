@@ -336,6 +336,7 @@ class StacyWebViewBridgeTest {
                 },
             )
 
+            evaluate(webView, "window.stacySetAnimationsEnabled(false)")
             evaluate(webView, "window.stacyOpenPage('ars')")
 
             assertTrue(
