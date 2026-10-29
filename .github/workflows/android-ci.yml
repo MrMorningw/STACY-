@@ -21,7 +21,7 @@ on:
 jobs:
   android:
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 35
     defaults:
       run:
         working-directory: android
@@ -124,10 +124,10 @@ jobs:
           target: google_apis
           arch: x86_64
           disable-animations: true
-          emulator-boot-timeout: 1500
+          emulator-boot-timeout: 600
           script: |
             set +e
-            timeout 20m gradle -p "$GITHUB_WORKSPACE/android" connectedDebugAndroidTest
+            timeout 10m gradle -p "$GITHUB_WORKSPACE/android" connectedDebugAndroidTest
             test_exit=$?
             if [ "$test_exit" -ne 0 ]; then
               mkdir -p "$GITHUB_WORKSPACE/android/app/build/diagnostics"
