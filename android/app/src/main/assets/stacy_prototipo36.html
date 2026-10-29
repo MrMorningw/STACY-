@@ -778,27 +778,37 @@ function appendStacyChatMessage(text,role,extraClass,showConversation){
 }
 let stacyPhaseTimers=[];
 let stacyRequestActive=false;
+function setStacyComposerBusy(busy){
+ stacyRequestActive=Boolean(busy);
+ const sendButton=document.getElementById("send");
+ if(sendButton){sendButton.disabled=stacyRequestActive;sendButton.setAttribute("aria-disabled",String(stacyRequestActive));}
+ const micButton=document.getElementById("mic");
+ if(micButton){micButton.disabled=stacyRequestActive;micButton.setAttribute("aria-disabled",String(stacyRequestActive));}
+}
+window.stacySetComposerBusyState=setStacyComposerBusy;
+window.stacyComposerIsBusy=function(){return stacyRequestActive;};
 function clearStacyPhaseTimers(){
  stacyPhaseTimers.forEach(id=>clearTimeout(id));stacyPhaseTimers=[];
 }
 function scheduleStacyResponseWatchdog(){
  // The native client allows up to 60s for search reads plus connection time.
- // Keep enough margin so the UI never declares failure before the client timeout.
+ // Allow both HTTP attempts if an expired interaction context triggers a retry.
  stacyPhaseTimers.push(setTimeout(function(){
    if(!stacyRequestActive)return;
    window.stacyNativeResponse(
      "A STACY não recebeu uma resposta do núcleo dentro do limite de espera. Verifique a conexão com a internet e, em Menu → Ajustes, confirme a chave da Gemini API. Os comandos locais continuam disponíveis.",
      "erro"
    );
- },75000));
+ },150000));
 }
 function startStacyProcessingStages(_message){
  clearStacyPhaseTimers();
- stacyRequestActive=true;
+ setStacyComposerBusy(true);
  // Show THINKING immediately; subsequent states must come from native CORE events.
  window.stacyNativeState&&window.stacyNativeState("pensando");
  scheduleStacyResponseWatchdog();
 }
+window.stacyStartProcessingStages=startStacyProcessingStages;
 window.stacyChatSetPending=function(){
  const old=document.getElementById("stacyPendingReply");if(old)old.remove();
  // Keep the home/orb screen visible on the first request. Once chat is open,
@@ -808,6 +818,7 @@ window.stacyChatSetPending=function(){
  if(row)row.id="stacyPendingReply";
 };
 function sendComposerMessage(){
+ if(stacyRequestActive){message.focus();return;}
  let text=message.value.trim();
  if(!text && selectedAttachmentNames.length)text="Ajude-me com os anexos selecionados.";
  if(!text)return;
