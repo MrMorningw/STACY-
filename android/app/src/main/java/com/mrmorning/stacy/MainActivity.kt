@@ -93,8 +93,27 @@ class MainActivity : ComponentActivity() {
             onResult = { result ->
                 runOnUiThread {
                     when (result) {
-                        is VoiceResult.Success -> { webState("pensando"); vm.onVoiceResult(result) }
-                        is VoiceResult.Failure -> { webState("offline"); vm.onVoiceResult(result) }
+                        is VoiceResult.Success -> {
+                            if (::webView.isInitialized) {
+                                val script =
+                                    "(function(text){if(typeof window.stacySubmitFromVoice==='function'){window.stacySubmitFromVoice(text);return true;}return false;})(" +
+                                        JSONObject.quote(result.text) + ")"
+                                webView.evaluateJavascript(script) { submitted ->
+                                    // Prefer the production WebView path so voice and text
+                                    // share one pending bubble, watchdog, and single-flight lock.
+                                    if (submitted != "true") {
+                                        webState("pensando")
+                                        vm.onVoiceResult(result)
+                                    }
+                                }
+                            } else {
+                                vm.onVoiceResult(result)
+                            }
+                        }
+                        is VoiceResult.Failure -> {
+                            webState("offline")
+                            vm.onVoiceResult(result)
+                        }
                     }
                 }
             },
