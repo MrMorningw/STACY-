@@ -21,7 +21,7 @@ on:
 jobs:
   android:
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 60
     defaults:
       run:
         working-directory: android
@@ -124,8 +124,16 @@ jobs:
           target: google_apis
           arch: x86_64
           disable-animations: true
-          emulator-boot-timeout: 1200
-          script: timeout 12m gradle -p "$GITHUB_WORKSPACE/android" connectedDebugAndroidTest
+          emulator-boot-timeout: 1500
+          script: |
+            set +e
+            timeout 20m gradle -p "$GITHUB_WORKSPACE/android" connectedDebugAndroidTest
+            test_exit=$?
+            if [ "$test_exit" -ne 0 ]; then
+              mkdir -p "$GITHUB_WORKSPACE/android/app/build/diagnostics"
+              adb logcat -d -v threadtime > "$GITHUB_WORKSPACE/android/app/build/diagnostics/emulator-logcat.txt" 2>&1 || true
+            fi
+            exit "$test_exit"
 
       - name: Upload Android instrumentation diagnostics
         if: always()
@@ -135,6 +143,7 @@ jobs:
           path: |
             android/app/build/reports/androidTests/connected/
             android/app/build/outputs/androidTest-results/connected/
+            android/app/build/diagnostics/
           if-no-files-found: ignore
           retention-days: 7
 
