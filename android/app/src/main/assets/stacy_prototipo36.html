@@ -702,6 +702,9 @@ function setState(name){
  else if(name==="erro")infoText.textContent="Falha na comunicação com o núcleo";
  else infoText.textContent="Núcleo STACY • sistema operacional";
 }
+// Explicit exports are required because the UI scene runs in an ES module while
+// the Android callback adapters below are classic scripts.
+window.stacyRenderState=setState;
 
 /* INTERFACE DEFINITIVA: o toque no orbe NÃO altera estados.
    Os estados são controlados exclusivamente pelos eventos reais do Android/CORE. */
@@ -790,6 +793,7 @@ window.stacyComposerIsBusy=function(){return stacyRequestActive;};
 function clearStacyPhaseTimers(){
  stacyPhaseTimers.forEach(id=>clearTimeout(id));stacyPhaseTimers=[];
 }
+window.stacyClearComposerTimers=clearStacyPhaseTimers;
 function scheduleStacyResponseWatchdog(){
  // The native client allows up to 60s for search reads plus connection time.
  // Allow both HTTP attempts if an expired interaction context triggers a retry.
@@ -1049,16 +1053,26 @@ animationFrameId=requestAnimationFrame(animate);
 /* ===== STACY DEFINITIVA: controle exclusivamente por eventos reais ===== */
 (function(){
   const stateMap={pesquisa:'pesquisando',pesquisando:'pesquisando',research:'pesquisando',execucao:'executando',execução:'executando',executando:'executando',execution:'executando',task:'executando',erro:'erro',error:'erro',ouvindo:'ouvindo',listening:'ouvindo',pensando:'pensando',thinking:'pensando',respondendo:'respondendo',resposta:'respondendo',online:'online',offline:'offline'};
+  function renderNativeState(name){
+    const normalized=stateMap[name]||name||'online';
+    if(typeof window.stacyRenderState==='function'){window.stacyRenderState(normalized);return;}
+    const root=document.getElementById('app');
+    if(root){root.classList.remove('online','ouvindo','pensando','pesquisando','executando','respondendo','offline','erro');root.classList.add(normalized);}
+  }
+  function clearNativeComposer(){
+    if(typeof window.stacySetComposerBusyState==='function')window.stacySetComposerBusyState(false);
+    if(typeof window.stacyClearComposerTimers==='function')window.stacyClearComposerTimers();
+  }
   window.stacyNativeState=function(name){
     const key=String(name||'').toLowerCase();
     const pendingNow=document.getElementById('stacyPendingReply');
     if(key==='online' && pendingNow)return;
     if(['erro','error','offline'].includes(key)){
-      stacyRequestActive=false;clearStacyPhaseTimers();
+      clearNativeComposer();
       const pending=document.getElementById('stacyPendingReply');
       if(pending){pending.querySelector('.stacy-chat-bubble').textContent='Não foi possível concluir. Verifique a conexão da IA ou tente novamente.';pending.classList.remove('pending');pending.id='';}
     }
-    setState(stateMap[key]||key||'online');
+    renderNativeState(key);
     if(['pensando','ouvindo','pesquisando','executando','thinking','listening','researching','executing'].includes(key)){
       document.getElementById('app').classList.remove('has-response');
     }
@@ -1076,7 +1090,7 @@ animationFrameId=requestAnimationFrame(animate);
     const bubble=document.getElementById('responseBubble');
     if(bubble)bubble.textContent=text;
     document.getElementById('app').classList.add('has-response');
-    stacyRequestActive=false;clearStacyPhaseTimers();
+    clearNativeComposer();
     const pending=document.getElementById('stacyPendingReply');
     const log=document.getElementById('stacyChatLog');
     if(pending && log){
@@ -1091,14 +1105,20 @@ animationFrameId=requestAnimationFrame(animate);
       const answer=document.createElement('div');answer.className='stacy-chat-bubble';answer.textContent=text;
       row.appendChild(answer);log.appendChild(row);log.scrollTop=log.scrollHeight;
     }
-    setState(mapped==='erro'?'erro':'respondendo');
+    renderNativeState(mapped==='erro'?'erro':'respondendo');
   };
   function nativeSend(text){
     const value=String(text||'').trim();
     if(!value)return;
+    if(window.stacyComposerIsBusy&&window.stacyComposerIsBusy()){
+      if(typeof window.stacyNativeUpdateStatus==='function')window.stacyNativeUpdateStatus('CORE: uma solicitação já está em andamento. Aguarde antes de enviar outro comando.');
+      return;
+    }
     if(window.Android && typeof Android.stacySend==='function'){
-      window.stacyNativeState('pensando');
-      Android.stacySend(value);
+      if(typeof window.stacyStartProcessingStages==='function')window.stacyStartProcessingStages(value);
+      else window.stacyNativeState('pensando');
+      try{Android.stacySend(value);}
+      catch(error){window.stacyNativeResponse('Não foi possível enviar a solicitação ao CORE: '+(error&&error.message?error.message:'erro desconhecido'),'erro');}
     }else{
       window.stacyNativeResponse('A ponte nativa da STACY não está disponível.','erro');
     }
