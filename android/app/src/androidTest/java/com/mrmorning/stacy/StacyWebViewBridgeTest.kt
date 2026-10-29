@@ -203,6 +203,50 @@ class StacyWebViewBridgeTest {
     }
 
     @Test
+    fun voiceTranscriptUsesSharedComposerAndReturnsVisibleReply() {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            lateinit var webView: WebView
+            scenario.onActivity { activity ->
+                StacySecretStore(activity).clearGeminiApiKey()
+                val content = activity.findViewById<ViewGroup>(android.R.id.content)
+                webView = content.getChildAt(0) as? WebView
+                    ?: throw AssertionError("MainActivity is not displaying its production WebView")
+            }
+
+            assertTrue(
+                "Voice submission callback or native bridge did not become ready",
+                awaitCondition(webView, timeoutMs = 12_000) {
+                    evaluate(
+                        webView,
+                        "typeof window.stacySubmitFromVoice === 'function' && " +
+                            "typeof window.stacyNativeResponse === 'function' && " +
+                            "typeof window.Android === 'object' && typeof window.Android.stacySend === 'function'",
+                    ) == "true"
+                },
+            )
+            evaluate(webView, "window.stacySetAnimationsEnabled(false)")
+            evaluate(webView, "window.stacySubmitFromVoice('transcrição de voz de teste')")
+
+            assertTrue(
+                "Voice transcription should appear as a user message and receive one visible CORE error",
+                awaitCondition(webView, timeoutMs = 8_000) {
+                    evaluate(
+                        webView,
+                        "(function(){ " +
+                            "var log=document.getElementById('stacyChatLog'); " +
+                            "var users=log?log.querySelectorAll('.stacy-chat-row.user'):[]; " +
+                            "var replies=log?log.querySelectorAll('.stacy-chat-row.assistant .stacy-chat-bubble'):[]; " +
+                            "return !!log && users.length===1 && users[0].innerText.includes('transcrição de voz de teste') && " +
+                                "replies.length===1 && replies[0].innerText.includes('IA generativa ainda não está conectada') && " +
+                                "window.stacyComposerIsBusy()===false; " +
+                        "})()",
+                    ) == "true"
+                },
+            )
+        }
+    }
+
+    @Test
     fun coreDiagnosticsShowIndependentLocalAndGeminiResults() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             lateinit var webView: WebView
