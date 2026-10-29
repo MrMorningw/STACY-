@@ -137,6 +137,72 @@ class StacyWebViewBridgeTest {
     }
 
     @Test
+    fun rapidSecondSubmitKeepsDraftAndDoesNotReplacePendingReply() {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            lateinit var webView: WebView
+            scenario.onActivity { activity ->
+                StacySecretStore(activity).clearGeminiApiKey()
+                val content = activity.findViewById<ViewGroup>(android.R.id.content)
+                webView = content.getChildAt(0) as? WebView
+                    ?: throw AssertionError("MainActivity is not displaying its production WebView")
+            }
+
+            assertTrue(
+                "Composer or native response callbacks did not become ready",
+                awaitCondition(webView, timeoutMs = 12_000) {
+                    evaluate(
+                        webView,
+                        "typeof window.stacySetAnimationsEnabled === 'function' && " +
+                            "typeof window.stacyNativeResponse === 'function' && " +
+                            "typeof window.stacyComposerIsBusy === 'function' && " +
+                            "typeof window.Android === 'object' && typeof window.Android.stacySend === 'function'",
+                    ) == "true"
+                },
+            )
+            evaluate(webView, "window.stacySetAnimationsEnabled(false)")
+
+            assertTrue(
+                "A second submit must be blocked without replacing the active pending response",
+                evaluate(
+                    webView,
+                    "(function(){ " +
+                        "var input=document.getElementById('message'); " +
+                        "var send=document.getElementById('send'); " +
+                        "var log=document.getElementById('stacyChatLog'); " +
+                        "if(!input||!send||!log)return false; " +
+                        "input.value='Primeira solicitação sem chave'; send.click(); " +
+                        "input.value='RASCUNHO_PRESERVADO'; " +
+                        "input.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true})); " +
+                        "return log.querySelectorAll('.stacy-chat-row.user').length===1 && " +
+                            "input.value==='RASCUNHO_PRESERVADO' && send.disabled===true && " +
+                            "window.stacyComposerIsBusy()===true; " +
+                    "})()",
+                ) == "true",
+            )
+
+            assertTrue(
+                "The first reply should complete normally and leave the second draft available",
+                awaitCondition(webView, timeoutMs = 8_000) {
+                    evaluate(
+                        webView,
+                        "(function(){ " +
+                            "var input=document.getElementById('message'); " +
+                            "var send=document.getElementById('send'); " +
+                            "var log=document.getElementById('stacyChatLog'); " +
+                            "var replies=log?log.querySelectorAll('.stacy-chat-row.assistant .stacy-chat-bubble'):[]; " +
+                            "return !!input && !!send && !!log && " +
+                                "log.querySelectorAll('.stacy-chat-row.user').length===1 && replies.length===1 && " +
+                                "replies[0].innerText.includes('IA generativa ainda não está conectada') && " +
+                                "input.value==='RASCUNHO_PRESERVADO' && send.disabled===false && " +
+                                "window.stacyComposerIsBusy()===false; " +
+                        "})()",
+                    ) == "true"
+                },
+            )
+        }
+    }
+
+    @Test
     fun coreDiagnosticsShowIndependentLocalAndGeminiResults() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             lateinit var webView: WebView
