@@ -7,11 +7,14 @@ import android.view.WindowManager
 import android.widget.EditText
 import android.annotation.SuppressLint
 import android.os.Bundle
+import android.os.SystemClock
 import android.content.Intent
 import android.net.Uri
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import java.util.concurrent.FutureTask
+import java.util.concurrent.TimeUnit
 import android.webkit.WebChromeClient
 import android.webkit.ValueCallback
 import androidx.activity.ComponentActivity
@@ -27,7 +30,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var webView: WebView
     private lateinit var vm: StacyViewModel
     private var voiceEnabled = true
-    private lateinit var updater: StacyUpdater
+    private lateinit var ars: StacyArs
+    private var arsStartupConsultationStarted = false
     private var pendingFileChooser: ValueCallback<Array<Uri>>? = null
     private val responseHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private val fileChooserResult = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -59,15 +63,57 @@ class MainActivity : ComponentActivity() {
         coreBridge = StacyCoreBridge(this)
         androidAutomation = AndroidAutomation(this)
         textToSpeech = AndroidTextToSpeech(this)
-        updater = StacyUpdater(this) { status -> runOnUiThread { webUpdateStatus(status) } }
+        ars = StacyArs(
+            context = this,
+            onStatus = { status -> runOnUiThread { webUpdateStatus(status) } },
+            onReport = { report ->
+                runOnUiThread { publishDiagnosticCallback("stacyArsReport", report) }
+            },
+            onInstallIntent = { intent ->
+                val task = FutureTask<Boolean> {
+                    try {
+                        startActivity(intent)
+                        true
+                    } catch (error: Exception) {
+                        webUpdateStatus("ARS: não foi possível abrir a tela do Android — " + (error.message ?: "erro desconhecido"))
+                        false
+                    }
+                }
+                runOnUiThread { task.run() }
+                try {
+                    task.get(10, TimeUnit.SECONDS)
+                } catch (_: Exception) {
+                    false
+                }
+            },
+        )
 
         voiceInput = AndroidVoiceInput(
             context = this,
             onResult = { result ->
                 runOnUiThread {
                     when (result) {
-                        is VoiceResult.Success -> { webState("pensando"); vm.onVoiceResult(result) }
-                        is VoiceResult.Failure -> { webState("offline"); vm.onVoiceResult(result) }
+                        is VoiceResult.Success -> {
+                            if (::webView.isInitialized) {
+                                val script =
+                                    "(function(text){if(typeof window.stacySubmitFromVoice==='function'){window.stacySubmitFromVoice(text);return true;}return false;})(" +
+                                        JSONObject.quote(result.text) + ")"
+                                webView.evaluateJavascript(script) { submitted ->
+                                    // Prefer the production WebView path so voice and text
+                                    // share one pending bubble, watchdog, and single-flight lock.
+                                    if (submitted != "true") {
+                                        webState("pensando")
+                                        vm.onVoiceResult(result)
+                                    }
+                                }
+                            } else {
+                                vm.onVoiceResult(result)
+                            }
+                        }
+                        is VoiceResult.Failure -> {
+                            webState("offline")
+                            vm.onVoiceResult(result)
+                        }
                     }
                 }
             },
@@ -118,7 +164,20 @@ class MainActivity : ComponentActivity() {
             settings.domStorageEnabled = true
             settings.allowFileAccess = true
             settings.allowContentAccess = true
-            webViewClient = WebViewClient()
+            webViewClient = object : WebViewClient() {
+                override fun onPageFinished(view: WebView?, url: String?) {
+                    super.onPageFinished(view, url)
+                    if (url == "file:///android_asset/stacy_prototipo36.html" &&
+                        !arsStartupConsultationStarted &&
+                        ::ars.isInitialized &&
+                        !isFinishing &&
+                        !isDestroyed
+                    ) {
+                        arsStartupConsultationStarted = true
+                        ars.consultar()
+                    }
+                }
+            }
             webChromeClient = object : WebChromeClient() {
                 override fun onShowFileChooser(webView: WebView?, filePathCallback: ValueCallback<Array<Uri>>?, fileChooserParams: FileChooserParams?): Boolean {
                     pendingFileChooser?.onReceiveValue(null)
@@ -244,6 +303,145 @@ class MainActivity : ComponentActivity() {
 
     inner class StacyJsBridge {
         @JavascriptInterface
+        fun stacyGetBuildInfo(): String = try {
+            val packageInfo = packageManager.getPackageInfo(packageName, 0)
+            val installedCode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                packageInfo.longVersionCode
+            } else {
+                @Suppress("DEPRECATION")
+                packageInfo.versionCode.toLong()
+            }
+            JSONObject()
+                .put("versionName", packageInfo.versionName ?: "desconhecida")
+                .put("versionCode", installedCode)
+                .put("applicationId", packageName)
+                .put("androidApi", android.os.Build.VERSION.SDK_INT)
+                .toString()
+        } catch (error: Exception) {
+            JSONObject().put("error", error.message ?: "Não foi possível ler a versão instalada.").toString()
+        }
+
+        @JavascriptInterface
+        fun stacyPingBridge(requestId: String) {
+            runOnUiThread {
+                publishDiagnosticCallback(
+                    "stacyBridgePingResult",
+                    JSONObject()
+                        .put("requestId", requestId)
+                        .put("status", "ok")
+                        .put("detail", "A chamada chegou à ponte Kotlin e retornou ao WebView."),
+                )
+            }
+        }
+
+        @JavascriptInterface
+        fun stacyRunDiagnostics(requestId: String) {
+            Thread({
+                val startedAt = SystemClock.elapsedRealtime()
+                val checks = org.json.JSONArray()
+                val report = JSONObject()
+                    .put("requestId", requestId)
+                    .put("checks", checks)
+                    .put("startedAt", System.currentTimeMillis())
+
+                fun setCheck(
+                    id: String,
+                    label: String,
+                    status: String,
+                    detail: String,
+                    latencyMs: Long? = null,
+                ) {
+                    val item = JSONObject()
+                        .put("id", id)
+                        .put("label", label)
+                        .put("status", status)
+                        .put("detail", detail)
+                    if (latencyMs != null) item.put("latencyMs", latencyMs)
+                    var index = -1
+                    for (i in 0 until checks.length()) {
+                        if (checks.optJSONObject(i)?.optString("id") == id) {
+                            index = i
+                            break
+                        }
+                    }
+                    if (index >= 0) checks.put(index, item) else checks.put(item)
+                }
+
+                fun publish() = publishDiagnosticCallback("stacyDiagnosticUpdate", report)
+
+                // Reaching this method proves that JavaScript can invoke the Android bridge.
+                setCheck("html", "HTML / JavaScript", "ok", "JavaScript ativo; a página iniciou o diagnóstico.")
+                setCheck("bridge", "Ponte WebView / Android", "ok", "A ponte recebeu a chamada de diagnóstico.")
+
+                val coreStarted = SystemClock.elapsedRealtime()
+                try {
+                    val result = coreBridge.runNativeDiagnostic()
+                    val coreOk = result?.response?.contains("CORE NATIVO: ONLINE", ignoreCase = true) == true
+                    setCheck(
+                        "core",
+                        "CORE Kotlin / Android",
+                        if (coreOk) "ok" else "fail",
+                        result?.response?.ifBlank { "O núcleo não retornou o diagnóstico local esperado." }
+                            ?: "O roteador nativo não reconheceu o comando de diagnóstico.",
+                        SystemClock.elapsedRealtime() - coreStarted,
+                    )
+                } catch (error: Exception) {
+                    setCheck("core", "CORE Kotlin / Android", "fail", error.message ?: "Falha ao consultar o núcleo.")
+                }
+
+                val storageStarted = SystemClock.elapsedRealtime()
+                try {
+                    val storageOk = coreBridge.checkLocalStorage()
+                    setCheck(
+                        "sqlite",
+                        "Banco local SQLite",
+                        if (storageOk) "ok" else "fail",
+                        if (storageOk) "Consulta SELECT 1 concluída no banco local." else "O banco local não passou na verificação.",
+                        SystemClock.elapsedRealtime() - storageStarted,
+                    )
+                } catch (error: Exception) {
+                    setCheck("sqlite", "Banco local SQLite", "fail", error.message ?: "Falha ao consultar o banco local.")
+                }
+
+                setCheck("termux", "Termux / daemon Python", "not_used", "Não participa do APK; nenhum serviço Termux foi consultado.")
+                setCheck("gemini", "Gemini / API generativa", "checking", "Teste HTTPS real em andamento; exige chave válida e internet.")
+
+                runOnUiThread {
+                    if (isFinishing || isDestroyed) return@runOnUiThread
+                    publish()
+                    val apiStarted = SystemClock.elapsedRealtime()
+                    coreBridge.testConnection { result ->
+                        runOnUiThread {
+                            if (isFinishing || isDestroyed) return@runOnUiThread
+                            val apiOk = result.exitCode == 0 &&
+                                !result.tipo.equals("erro", ignoreCase = true) &&
+                                !result.tipo.equals("error", ignoreCase = true) &&
+                                result.response.isNotBlank()
+                            val detail = if (apiOk) {
+                                "A API respondeu ao teste real: " + result.response.trim().take(240)
+                            } else {
+                                result.response.ifBlank { result.stderr }.ifBlank {
+                                    "A API não retornou uma resposta válida."
+                                }.take(420)
+                            }
+                            setCheck(
+                                "gemini",
+                                "Gemini / API generativa",
+                                if (apiOk) "ok" else "fail",
+                                detail,
+                                SystemClock.elapsedRealtime() - apiStarted,
+                            )
+                            report.put("completed", true)
+                            report.put("completedAt", System.currentTimeMillis())
+                            report.put("elapsedMs", SystemClock.elapsedRealtime() - startedAt)
+                            publish()
+                        }
+                    }
+                }
+            }, "stacy-core-diagnostics").start()
+        }
+
+        @JavascriptInterface
         fun stacySend(message: String) {
             runOnUiThread {
                 responseHandler.removeCallbacksAndMessages(null)
@@ -267,7 +465,9 @@ class MainActivity : ComponentActivity() {
         @JavascriptInterface fun stacyConfigureAi() {
             runOnUiThread { configureAiProvider() }
         }
-        @JavascriptInterface fun stacyCheckUpdate() { updater.checkAndUpdate() }
+        @JavascriptInterface fun stacyCheckUpdate() { ars.atualizar() }
+        @JavascriptInterface fun stacyArsConsult() { ars.consultar() }
+        @JavascriptInterface fun stacyArsUpdate() { ars.atualizar() }
         @JavascriptInterface fun stacyOpenAppSettings() {
             runOnUiThread { startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))) }
         }
@@ -295,8 +495,17 @@ class MainActivity : ComponentActivity() {
         webView.evaluateJavascript("(function(s){try{if(typeof window.stacyNativeState==='function'){window.stacyNativeState(s);return;}var app=document.getElementById('app');if(app){app.classList.remove('online','ouvindo','pensando','pesquisando','executando','respondendo','offline','erro');app.classList.add(s);}})(" + JSONObject.quote(state) + ")", null)
     }
 
+    private fun publishDiagnosticCallback(functionName: String, payload: JSONObject) {
+        if (!::webView.isInitialized || isFinishing || isDestroyed) return
+        val serialized = JSONObject.quote(payload.toString())
+        webView.evaluateJavascript(
+            "window.$functionName && window.$functionName($serialized)",
+            null,
+        )
+    }
+
     private fun webUpdateStatus(status: String) {
-        if (!::webView.isInitialized) return
+        if (!::webView.isInitialized || isFinishing || isDestroyed) return
         webView.evaluateJavascript("(function(s){try{if(typeof window.stacyNativeUpdateStatus==='function'){window.stacyNativeUpdateStatus(s);return;}}catch(e){} })(" + JSONObject.quote(status) + ")", null)
     }
 
@@ -330,6 +539,11 @@ class MainActivity : ComponentActivity() {
         webView.evaluateJavascript(script, null)
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (::ars.isInitialized) ars.verificarInstalacaoPendente()
+    }
+
     override fun onDestroy() {
         pendingFileChooser?.onReceiveValue(null)
         pendingFileChooser = null
@@ -339,6 +553,7 @@ class MainActivity : ComponentActivity() {
         if (::voiceInput.isInitialized) voiceInput.destroy()
         if (::textToSpeech.isInitialized) textToSpeech.shutdown()
         if (::coreBridge.isInitialized) coreBridge.shutdown()
+        if (::ars.isInitialized) ars.encerrar()
         if (::webView.isInitialized) { webView.removeJavascriptInterface("Android"); webView.destroy() }
         super.onDestroy()
     }

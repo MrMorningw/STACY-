@@ -328,7 +328,25 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
 .stacy-action:hover{background:rgba(255,117,31,.16)}
 .stacy-action.small{margin-top:0;white-space:nowrap;padding:9px 11px}
 .stacy-update-status{margin-top:6px;color:#6f675f;font-size:10px;letter-spacing:.2px;line-height:1.35}
-.stacy-action-row{display:flex;gap:8px;margin-top:14px}
+.stacy-action-row{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+.stacy-diagnostic-summary{margin:12px 0;padding:11px 12px;border:1px solid rgba(255,117,31,.22);border-radius:10px;background:rgba(255,117,31,.045);color:#c2b5aa;font-size:11px;line-height:1.5}
+.stacy-diagnostic-list{display:grid;gap:0;margin-top:8px}
+.stacy-diagnostic-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:12px 0;border-bottom:1px solid rgba(255,117,31,.12)}
+.stacy-diagnostic-row:last-child{border-bottom:0}
+.stacy-diagnostic-name{color:#efe7df;font-size:12px;letter-spacing:.2px}
+.stacy-diagnostic-detail{margin-top:4px;color:#92877f;font-size:10px;line-height:1.45;overflow-wrap:anywhere}
+.stacy-diagnostic-status{display:inline-flex;align-items:center;justify-content:center;min-width:78px;padding:6px 8px;border:1px solid rgba(255,117,31,.20);border-radius:8px;color:#a79a90;font-size:9px;letter-spacing:.7px;text-align:center}
+.stacy-diagnostic-status.ok{color:#91cda1;border-color:rgba(145,205,161,.35);background:rgba(80,150,100,.07)}
+.stacy-diagnostic-status.fail{color:#ff8069;border-color:rgba(255,128,105,.4);background:rgba(180,60,40,.07)}
+.stacy-diagnostic-status.checking{color:#ff9b45;border-color:rgba(255,155,69,.4)}
+.stacy-diagnostic-status.not_used{color:#b0a49a;border-color:rgba(176,164,154,.25)}
+.stacy-build-info{margin-top:10px;color:#aaa095;font-size:10px;line-height:1.55;overflow-wrap:anywhere}
+.stacy-ars-report{display:grid;gap:0;margin-top:10px}
+.stacy-ars-line{padding:10px 0;border-bottom:1px solid rgba(255,116,24,.13)}
+.stacy-ars-line:last-child{border-bottom:0}
+.stacy-ars-line strong{display:block;color:#eee8e2;font-size:11px;font-weight:500;margin-bottom:4px}
+.stacy-ars-line span{display:block;color:#948980;font-size:10px;line-height:1.5;overflow-wrap:anywhere}
+.stacy-ars-status{margin-top:10px}
 .stacy-input{flex:1;min-width:0;border:1px solid rgba(255,117,31,.22);border-radius:11px;background:rgba(0,0,0,.35);color:#eee;padding:10px;font-size:12px;outline:none}
 .stacy-input:focus{border-color:rgba(255,117,31,.55)}
 body.stacy-no-animations *{animation:none!important;transition:none!important}
@@ -684,6 +702,9 @@ function setState(name){
  else if(name==="erro")infoText.textContent="Falha na comunicação com o núcleo";
  else infoText.textContent="Núcleo STACY • sistema operacional";
 }
+// Explicit exports are required because the UI scene runs in an ES module while
+// the Android callback adapters below are classic scripts.
+window.stacyRenderState=setState;
 
 /* INTERFACE DEFINITIVA: o toque no orbe NÃO altera estados.
    Os estados são controlados exclusivamente pelos eventos reais do Android/CORE. */
@@ -760,26 +781,38 @@ function appendStacyChatMessage(text,role,extraClass,showConversation){
 }
 let stacyPhaseTimers=[];
 let stacyRequestActive=false;
+function setStacyComposerBusy(busy){
+ stacyRequestActive=Boolean(busy);
+ const sendButton=document.getElementById("send");
+ if(sendButton){sendButton.disabled=stacyRequestActive;sendButton.setAttribute("aria-disabled",String(stacyRequestActive));}
+ const micButton=document.getElementById("mic");
+ if(micButton){micButton.disabled=stacyRequestActive;micButton.setAttribute("aria-disabled",String(stacyRequestActive));}
+}
+window.stacySetComposerBusyState=setStacyComposerBusy;
+window.stacyComposerIsBusy=function(){return stacyRequestActive;};
 function clearStacyPhaseTimers(){
  stacyPhaseTimers.forEach(id=>clearTimeout(id));stacyPhaseTimers=[];
 }
+window.stacyClearComposerTimers=clearStacyPhaseTimers;
 function scheduleStacyResponseWatchdog(){
- // Covers the AI search timeout with a small margin. Real CORE results cancel it.
+ // The native client allows up to 60s for search reads plus connection time.
+ // Allow both HTTP attempts if an expired interaction context triggers a retry.
  stacyPhaseTimers.push(setTimeout(function(){
    if(!stacyRequestActive)return;
    window.stacyNativeResponse(
      "A STACY não recebeu uma resposta do núcleo dentro do limite de espera. Verifique a conexão com a internet e, em Menu → Ajustes, confirme a chave da Gemini API. Os comandos locais continuam disponíveis.",
      "erro"
    );
- },38000));
+ },150000));
 }
 function startStacyProcessingStages(_message){
  clearStacyPhaseTimers();
- stacyRequestActive=true;
+ setStacyComposerBusy(true);
  // Show THINKING immediately; subsequent states must come from native CORE events.
  window.stacyNativeState&&window.stacyNativeState("pensando");
  scheduleStacyResponseWatchdog();
 }
+window.stacyStartProcessingStages=startStacyProcessingStages;
 window.stacyChatSetPending=function(){
  const old=document.getElementById("stacyPendingReply");if(old)old.remove();
  // Keep the home/orb screen visible on the first request. Once chat is open,
@@ -789,6 +822,7 @@ window.stacyChatSetPending=function(){
  if(row)row.id="stacyPendingReply";
 };
 function sendComposerMessage(){
+ if(stacyRequestActive){message.focus();return;}
  let text=message.value.trim();
  if(!text && selectedAttachmentNames.length)text="Ajude-me com os anexos selecionados.";
  if(!text)return;
@@ -804,6 +838,14 @@ function sendComposerMessage(){
    window.stacyNativeResponse && window.stacyNativeResponse("A ponte nativa da STACY não está disponível.","erro");
  }
 }
+window.stacySubmitFromVoice=function(rawText){
+ const transcript=String(rawText||"").trim();
+ if(!transcript)return false;
+ if(stacyRequestActive){message.value=transcript;message.focus();return false;}
+ message.value=transcript;
+ sendComposerMessage();
+ return true;
+};
 document.getElementById("send").onclick=sendComposerMessage;
 message.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendComposerMessage();}});
 
@@ -964,8 +1006,9 @@ animationFrameId=requestAnimationFrame(animate);
     memoria:{title:'Memória',kicker:'NÚCLEO DE MEMÓRIA',html:'<div class="stacy-card"><div class="stacy-card-label">MEMÓRIA</div><div class="stacy-card-title">Contexto da STACY</div><div class="stacy-card-text">Consulte o estado atual da memória pelo núcleo.</div><button class="stacy-action" data-stacy-action="memoria">CONSULTAR MEMÓRIA</button></div>'},
     ferramentas:{title:'Ferramentas',kicker:'CENTRAL DE FERRAMENTAS',html:'<div class="stacy-card"><div class="stacy-card-label">FERRAMENTAS DO DISPOSITIVO</div><div class="stacy-card-title">Funções disponíveis</div><div class="stacy-card-text">Ações Android conectadas à ponte nativa da STACY.</div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Calendário</div><div class="stacy-setting-desc">Abrir o calendário do Android.</div></div><button class="stacy-action small" data-stacy-action="calendarioAndroid">ABRIR</button></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Configurações do Android</div><div class="stacy-setting-desc">Abrir configurações do sistema.</div></div><button class="stacy-action small" data-stacy-action="configAndroid">ABRIR</button></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Compartilhar resposta</div><div class="stacy-setting-desc">Compartilhar a última resposta da STACY.</div></div><button class="stacy-action small" data-stacy-action="compartilhar">COMPARTILHAR</button></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">CORE</div><div class="stacy-setting-desc">Consultar estado e tarefas do núcleo.</div></div><button class="stacy-action small" data-stacy-action="status">VERIFICAR</button></div></div><div class="stacy-card"><div class="stacy-card-label">FERRAMENTAS DISPONÍVEIS</div><div class="stacy-card-text">Esta lista mostra integrações implementadas no app. Ela não declara serviços externos ou plugins que não estejam realmente conectados.</div></div>'},
     permissoes:{title:'Permissões',kicker:'ACESSO E PRIVACIDADE',html:'<div class="stacy-card"><div class="stacy-card-label">PERMISSÕES DO APLICATIVO</div><div class="stacy-card-title">Controle de acesso</div><div class="stacy-card-text">Abra as configurações do Android para revisar ou conceder permissões. O sistema mostrará as permissões efetivamente disponíveis para esta instalação.</div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Microfone</div><div class="stacy-setting-desc">Necessário para entrada por voz.</div></div><button class="stacy-action small" data-stacy-action="privacidade">GERENCIAR</button></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Fotos e arquivos</div><div class="stacy-setting-desc">Acesso mediado pelo seletor seguro do Android.</div></div><button class="stacy-action small" data-stacy-action="privacidade">GERENCIAR</button></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Outras permissões</div><div class="stacy-setting-desc">Consulte o painel oficial do aplicativo no Android.</div></div><button class="stacy-action small" data-stacy-action="privacidade">ABRIR CONFIGURAÇÕES</button></div></div>'},
-    config:{title:'Configurações',kicker:'SISTEMA',html:'<div class="stacy-card"><div class="stacy-setting-row"><div><div class="stacy-setting-name">Voz da STACY</div><div class="stacy-setting-desc">Ativar ou silenciar respostas faladas.</div></div><button class="stacy-action small" data-stacy-action="voz">VOZ: <span id="voiceSetting">ATIVA</span></button></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Animações</div><div class="stacy-setting-desc">Controlar o movimento visual do núcleo.</div></div><button class="stacy-action small" data-stacy-action="animacoes">ANIMAÇÕES: <span id="animSetting">ATIVAS</span></button></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Privacidade e permissões</div><div class="stacy-setting-desc">Abrir as permissões e configurações do aplicativo.</div></div><button class="stacy-action small" data-stacy-action="privacidade">ABRIR</button></div><div class="stacy-setting-row"><div><div class="stacy-setting-row"><div><div class="stacy-setting-name">IA generativa</div><div class="stacy-setting-desc">Conectar a IA, testar a chave e gerenciar o contexto de conversa.</div></div><button class="stacy-action small" data-stacy-action="configurarIA">CONECTAR</button></div><div class="stacy-setting-name">Núcleo STACY</div><div class="stacy-setting-desc">Central de controle do CORE, arquitetura, integridade e etapas de migração.</div></div><button class="stacy-action small" data-stacy-action="nucleo">GERENCIAR</button></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Atualização da STACY</div><div class="stacy-setting-desc">Verificar uma nova versão oficial, validar o pacote e iniciar a atualização.</div><div class="stacy-update-status" id="stacyUpdateStatus">Pronta para verificar.</div></div><button class="stacy-action small" data-stacy-action="atualizacao">VERIFICAR</button></div></div>'},
-    nucleo:{title:'Núcleo STACY',kicker:'CENTRAL DO CORE',html:'<div class="stacy-card"><div class="stacy-card-label">ESTADO DA ARQUITETURA</div><div class="stacy-card-title">Núcleo Android nativo com IA generativa</div><div class="stacy-card-text">O núcleo local executa comandos permitidos, registra tarefas e anotações no banco SQLite do aparelho e responde a saudações sem internet. Para conversa generativa e pesquisa web, usa a API Gemini por HTTPS depois de configurada. O caminho de mensagens do APK não depende de Termux, Python ou servidor local.</div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Interface e ponte Android</div><div class="stacy-setting-desc">Recebe mensagens, apresenta respostas e encaminha ações autorizadas.</div></div><span class="stacy-action small">CAMADA ANDROID</span></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">CORE Kotlin / Android</div><div class="stacy-setting-desc">Roteamento nativo, ações autorizadas, tarefas e memória local persistentes.</div></div><span class="stacy-action small">ATUAL</span></div><button class="stacy-action" data-stacy-action="status">CONSULTAR ESTADO DO CORE</button></div><div class="stacy-card"><div class="stacy-card-label">INTEGRIDADE E RECUPERAÇÃO</div><div class="stacy-card-title">Mudanças com controle</div><div class="stacy-card-text">Auditoria e backup de referência estão registrados no repositório. Esta tela ainda não executa backups nem modifica o núcleo. Alterações devem ser feitas em branch separada, testadas e aprovadas antes de chegar à versão principal.</div><div class="stacy-card-text">Próximas etapas: proteger os dados operacionais, restringir a navegação da interface, reforçar a persistência e adicionar recuperação por timeout.</div></div><div class="stacy-card"><div class="stacy-card-label">MIGRAÇÃO SEGURA</div><div class="stacy-card-title">Sem substituir o CORE prematuramente</div><div class="stacy-card-text">A futura integração ao APK será gradual. O núcleo atual permanece como referência até a nova implementação passar pelos testes de regressão e validação física.</div></div>'},
+    config:{title:'Configurações',kicker:'SISTEMA',html:'<div class="stacy-card"><div class="stacy-setting-row"><div><div class="stacy-setting-name">Voz da STACY</div><div class="stacy-setting-desc">Ativar ou silenciar respostas faladas.</div></div><button class="stacy-action small" data-stacy-action="voz">VOZ: <span id="voiceSetting">ATIVA</span></button></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Animações</div><div class="stacy-setting-desc">Controlar o movimento visual do núcleo.</div></div><button class="stacy-action small" data-stacy-action="animacoes">ANIMAÇÕES: <span id="animSetting">ATIVAS</span></button></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Privacidade e permissões</div><div class="stacy-setting-desc">Abrir as permissões e configurações do aplicativo.</div></div><button class="stacy-action small" data-stacy-action="privacidade">ABRIR</button></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">IA generativa</div><div class="stacy-setting-desc">Conectar a IA, testar a chave e gerenciar o contexto de conversa.</div></div><button class="stacy-action small" data-stacy-action="configurarIA">CONECTAR</button></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Núcleo STACY</div><div class="stacy-setting-desc">Consultar o diagnóstico real do CORE, da ponte, do armazenamento e da IA.</div></div><button class="stacy-action small" data-stacy-action="nucleo">GERENCIAR</button></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">ARS — Autoconsulta e atualização</div><div class="stacy-setting-desc">Consultar a versão instalada e o canal oficial e atualizar o APK com validação de integridade.</div></div><button class="stacy-action small" data-stacy-action="ars">ABRIR ARS</button></div></div>'},
+    ars:{title:'ARS — STACY',kicker:'AUTOCONSULTA E ATUALIZAÇÃO',html:'<div class="stacy-card"><div class="stacy-card-label">ARS / ESTADO REAL</div><div class="stacy-card-title">A STACY consulta a si mesma</div><div class="stacy-card-text">A ARS compara a versão instalada com o canal oficial, verifica a identidade do pacote e a integridade dos metadados. A consulta não altera nada. Quando há nova versão, a ARS baixa e valida o APK oficial; a confirmação final da instalação continua sendo feita pelo Android.</div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Versão instalada</div><div class="stacy-setting-desc">Lida diretamente do PackageManager do Android.</div></div><button class="stacy-action small" data-stacy-action="arsVersao">CONSULTAR APK</button></div><div id="stacyArsBuildInfo" class="stacy-build-info" role="status">Versão ainda não consultada.</div><div id="stacyArsSummary" class="stacy-diagnostic-summary" role="status" aria-live="polite">Aguardando consulta do canal oficial.</div><div class="stacy-ars-report"><div class="stacy-ars-line"><strong>Instalada</strong><span id="stacyArsInstalled">Aguardando consulta.</span></div><div class="stacy-ars-line"><strong>Canal oficial</strong><span id="stacyArsPublished">Aguardando consulta.</span></div><div class="stacy-ars-line"><strong>Integridade do canal</strong><span id="stacyArsIntegrity">Ainda não validada.</span></div><div class="stacy-ars-line"><strong>Termux</strong><span>Não utilizado pelo APK nem pela ARS Android.</span></div></div><div class="stacy-action-row"><button class="stacy-action" data-stacy-action="arsConsultar">CONSULTAR CANAL</button><button class="stacy-action" data-stacy-action="arsAtualizar">VERIFICAR E ATUALIZAR</button></div><div class="stacy-update-status stacy-ars-status" id="stacyUpdateStatus" role="status" aria-live="polite">ARS pronta para consultar.</div><div id="stacyArsCheckedAt" class="stacy-build-info"></div></div><div class="stacy-card"><div class="stacy-card-label">ATUALIZAÇÃO SEGURA</div><div class="stacy-card-title">Sem atalhos ou falsas confirmações</div><div class="stacy-card-text">A ARS só considera o canal atual quando versionCode e versionName coincidem. Para atualizar, exige origem oficial, pacote correto, versão mais nova, SHA-256 e certificado de assinatura. A atualização só será registrada como instalada depois que o Android confirmar a nova versão.</div><div class="stacy-card-text">A ARS atualiza a aplicação e os módulos incorporados no APK. Ela não baixa nem executa scripts arbitrários em segundo plano e não depende do Termux.</div></div>'},
+    nucleo:{title:'Núcleo STACY',kicker:'CENTRAL DO CORE',html:'<div class="stacy-card"><div class="stacy-card-label">ARQUITETURA ATIVA</div><div class="stacy-card-title">CORE nativo Kotlin / Android</div><div class="stacy-card-text">O APK processa comandos locais em Kotlin, grava tarefas e anotações em SQLite e utiliza a API Gemini por HTTPS para conversa generativa. O fluxo do aplicativo não inicia Python, servidor local ou Termux. O painel abaixo testa cada camada separadamente e mostra o erro retornado, sem presumir que uma camada está saudável.</div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Ponte WebView / Android</div><div class="stacy-setting-desc">Teste real de ida e volta entre JavaScript e Kotlin.</div></div><button class="stacy-action small" data-stacy-action="diagnosticoPonte">TESTAR PONTE</button></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Versão instalada</div><div class="stacy-setting-desc">Ler versão e código do APK em execução.</div></div><button class="stacy-action small" data-stacy-action="buildInfo">VERSÃO</button></div><div id="stacyBuildInfo" class="stacy-build-info" role="status">Versão ainda não consultada.</div></div><div class="stacy-card"><div class="stacy-card-label">DIAGNÓSTICO POR CAMADA</div><div class="stacy-card-title">Localizar a falha</div><div class="stacy-card-text">Execute o teste completo para verificar HTML, ponte, CORE Kotlin, banco SQLite e conexão Gemini. A prova da Gemini exige internet e chave válida. “Não utilizado” significa que o componente está fora do caminho do APK.</div><div id="stacyDiagnosticSummary" class="stacy-diagnostic-summary" role="status" aria-live="polite">Diagnóstico não executado. Os indicadores não presumem nenhum estado.</div><div id="stacyDiagnosticList" class="stacy-diagnostic-list"><div class="stacy-diagnostic-row" data-diagnostic-row="html"><div><div class="stacy-diagnostic-name">HTML / JavaScript</div><div class="stacy-diagnostic-detail" data-diagnostic-detail>À espera do teste.</div></div><span class="stacy-diagnostic-status" data-diagnostic-status>AGUARDANDO</span></div><div class="stacy-diagnostic-row" data-diagnostic-row="bridge"><div><div class="stacy-diagnostic-name">Ponte WebView / Android</div><div class="stacy-diagnostic-detail" data-diagnostic-detail>À espera do teste.</div></div><span class="stacy-diagnostic-status" data-diagnostic-status>AGUARDANDO</span></div><div class="stacy-diagnostic-row" data-diagnostic-row="core"><div><div class="stacy-diagnostic-name">CORE Kotlin / Android</div><div class="stacy-diagnostic-detail" data-diagnostic-detail>À espera do teste.</div></div><span class="stacy-diagnostic-status" data-diagnostic-status>AGUARDANDO</span></div><div class="stacy-diagnostic-row" data-diagnostic-row="sqlite"><div><div class="stacy-diagnostic-name">Banco local SQLite</div><div class="stacy-diagnostic-detail" data-diagnostic-detail>À espera do teste.</div></div><span class="stacy-diagnostic-status" data-diagnostic-status>AGUARDANDO</span></div><div class="stacy-diagnostic-row" data-diagnostic-row="gemini"><div><div class="stacy-diagnostic-name">Gemini / API generativa</div><div class="stacy-diagnostic-detail" data-diagnostic-detail>À espera do teste.</div></div><span class="stacy-diagnostic-status" data-diagnostic-status>AGUARDANDO</span></div><div class="stacy-diagnostic-row" data-diagnostic-row="termux"><div><div class="stacy-diagnostic-name">Termux / daemon Python</div><div class="stacy-diagnostic-detail" data-diagnostic-detail>Fora da arquitetura do APK.</div></div><span class="stacy-diagnostic-status not_used" data-diagnostic-status>NÃO UTILIZADO</span></div></div><div class="stacy-action-row"><button class="stacy-action" data-stacy-action="diagnosticoCore">EXECUTAR DIAGNÓSTICO COMPLETO</button></div><div id="stacyDiagnosticTimestamp" class="stacy-build-info" role="status"></div></div><div class="stacy-card"><div class="stacy-card-label">INTEGRIDADE E RECUPERAÇÃO</div><div class="stacy-card-title">Mudanças com controle</div><div class="stacy-card-text">O painel consulta estado operacional; não faz backup nem altera o núcleo. Alterações de código devem permanecer em branch separada, passar pelos testes e ser aprovadas antes de chegar à versão principal.</div><div class="stacy-card-text">A interface não declara a IA como funcional só porque o CORE local respondeu. A camada Gemini recebe um teste HTTPS real e informa erros de credencial, rede, cota ou resposta inválida quando o serviço os retornar.</div></div><div class="stacy-card"><div class="stacy-card-label">DEPENDÊNCIAS</div><div class="stacy-card-title">Execução independente</div><div class="stacy-card-text">O aplicativo Android não precisa do Termux, de Python nem de um daemon local. A voz e as ações do APK usam os recursos nativos do Android; a conversa generativa usa a API Gemini diretamente por HTTPS.</div></div>'},
     sobre:{title:'Sobre',kicker:'IDENTIDADE',html:'<div class="stacy-card"><div class="stacy-card-label">STACY AI</div><div class="stacy-card-title">Assistente pessoal inteligente</div><div class="stacy-card-text">Núcleo visual, voz, memória, pesquisa, automação e integrações reunidos em uma única experiência.</div><button class="stacy-action" data-stacy-action="status">VERIFICAR NÚCLEO</button></div><div class="stacy-card"><div class="stacy-card-label">IDENTIDADE VISUAL</div><div class="stacy-card-title">Átomo · Espaço · Laranja</div><div class="stacy-card-text">Interface definitiva em evolução contínua.</div></div>'}
   };
 
@@ -975,6 +1018,15 @@ animationFrameId=requestAnimationFrame(animate);
     title.textContent=p.title;
     kicker.textContent=p.kicker;
     body.innerHTML=p.html;
+    renderCachedUpdateStatus();
+    if(key==='nucleo')renderCachedDiagnostics();
+    if(key==='ars'){
+      renderCachedArsReport();
+      showStacyBuildInfo();
+      const reportFresh=latestArsReport&&latestArsReport.status!=='busy'&&latestArsReport.status!=='error'&&Number(latestArsReport.checkedAt)>0&&(Date.now()-Number(latestArsReport.checkedAt))<60000;
+      if(!reportFresh)requestArsConsult();
+      else window.stacyNativeUpdateStatus(latestArsReport.summary||latestUpdateStatus);
+    }
     view.classList.add('open');
     view.setAttribute('aria-hidden','false');
     view.inert=false;
@@ -1009,16 +1061,26 @@ animationFrameId=requestAnimationFrame(animate);
 /* ===== STACY DEFINITIVA: controle exclusivamente por eventos reais ===== */
 (function(){
   const stateMap={pesquisa:'pesquisando',pesquisando:'pesquisando',research:'pesquisando',execucao:'executando',execução:'executando',executando:'executando',execution:'executando',task:'executando',erro:'erro',error:'erro',ouvindo:'ouvindo',listening:'ouvindo',pensando:'pensando',thinking:'pensando',respondendo:'respondendo',resposta:'respondendo',online:'online',offline:'offline'};
+  function renderNativeState(name){
+    const normalized=stateMap[name]||name||'online';
+    if(typeof window.stacyRenderState==='function'){window.stacyRenderState(normalized);return;}
+    const root=document.getElementById('app');
+    if(root){root.classList.remove('online','ouvindo','pensando','pesquisando','executando','respondendo','offline','erro');root.classList.add(normalized);}
+  }
+  function clearNativeComposer(){
+    if(typeof window.stacySetComposerBusyState==='function')window.stacySetComposerBusyState(false);
+    if(typeof window.stacyClearComposerTimers==='function')window.stacyClearComposerTimers();
+  }
   window.stacyNativeState=function(name){
     const key=String(name||'').toLowerCase();
     const pendingNow=document.getElementById('stacyPendingReply');
     if(key==='online' && pendingNow)return;
     if(['erro','error','offline'].includes(key)){
-      stacyRequestActive=false;clearStacyPhaseTimers();
+      clearNativeComposer();
       const pending=document.getElementById('stacyPendingReply');
       if(pending){pending.querySelector('.stacy-chat-bubble').textContent='Não foi possível concluir. Verifique a conexão da IA ou tente novamente.';pending.classList.remove('pending');pending.id='';}
     }
-    setState(stateMap[key]||key||'online');
+    renderNativeState(key);
     if(['pensando','ouvindo','pesquisando','executando','thinking','listening','researching','executing'].includes(key)){
       document.getElementById('app').classList.remove('has-response');
     }
@@ -1036,7 +1098,7 @@ animationFrameId=requestAnimationFrame(animate);
     const bubble=document.getElementById('responseBubble');
     if(bubble)bubble.textContent=text;
     document.getElementById('app').classList.add('has-response');
-    stacyRequestActive=false;clearStacyPhaseTimers();
+    clearNativeComposer();
     const pending=document.getElementById('stacyPendingReply');
     const log=document.getElementById('stacyChatLog');
     if(pending && log){
@@ -1051,27 +1113,247 @@ animationFrameId=requestAnimationFrame(animate);
       const answer=document.createElement('div');answer.className='stacy-chat-bubble';answer.textContent=text;
       row.appendChild(answer);log.appendChild(row);log.scrollTop=log.scrollHeight;
     }
-    setState(mapped==='erro'?'erro':'respondendo');
+    renderNativeState(mapped==='erro'?'erro':'respondendo');
   };
   function nativeSend(text){
     const value=String(text||'').trim();
     if(!value)return;
+    if(window.stacyComposerIsBusy&&window.stacyComposerIsBusy()){
+      if(typeof window.stacyNativeUpdateStatus==='function')window.stacyNativeUpdateStatus('CORE: uma solicitação já está em andamento. Aguarde antes de enviar outro comando.');
+      return;
+    }
     if(window.Android && typeof Android.stacySend==='function'){
-      window.stacyNativeState('pensando');
-      Android.stacySend(value);
+      if(typeof window.stacyStartProcessingStages==='function')window.stacyStartProcessingStages(value);
+      else window.stacyNativeState('pensando');
+      try{Android.stacySend(value);}
+      catch(error){window.stacyNativeResponse('Não foi possível enviar a solicitação ao CORE: '+(error&&error.message?error.message:'erro desconhecido'),'erro');}
     }else{
       window.stacyNativeResponse('A ponte nativa da STACY não está disponível.','erro');
     }
   }
   window.stacyNativeSend=nativeSend;
-  window.stacyNativeUpdateStatus=function(status){
+  let latestUpdateStatus='ARS pronta para consultar.';
+  let latestArsReport=null;
+  let arsConsultInProgress=false;
+  function requestArsConsult(){
+    if(arsConsultInProgress){
+      window.stacyNativeUpdateStatus('ARS: a consulta já está em andamento.');
+      return;
+    }
+    if(!window.Android||typeof Android.stacyArsConsult!=='function'){
+      window.stacyNativeUpdateStatus('ARS: ponte nativa indisponível; o canal não foi consultado.');
+      return;
+    }
+    arsConsultInProgress=true;
+    window.stacyNativeUpdateStatus('ARS: consultando a versão instalada e o canal oficial…');
+    try{Android.stacyArsConsult();}
+    catch(error){
+      arsConsultInProgress=false;
+      window.stacyNativeUpdateStatus('ARS: não foi possível iniciar a consulta nativa.');
+    }
+  }
+  function renderCachedUpdateStatus(){
     const el=document.getElementById('stacyUpdateStatus');
-    if(el)el.textContent=String(status||'');
+    if(el)el.textContent=latestUpdateStatus;
+  }
+  window.stacyNativeUpdateStatus=function(status){
+    latestUpdateStatus=String(status||'');
+    if(latestUpdateStatus.indexOf('ARS: consultando a versão instalada')>=0)arsConsultInProgress=true;
+    renderCachedUpdateStatus();
   };
+  function renderCachedArsReport(){
+    if(!latestArsReport)return;
+    const report=latestArsReport;
+    const summary=document.getElementById('stacyArsSummary');
+    const installed=document.getElementById('stacyArsInstalled');
+    const published=document.getElementById('stacyArsPublished');
+    const integrity=document.getElementById('stacyArsIntegrity');
+    const checkedAt=document.getElementById('stacyArsCheckedAt');
+    if(summary)summary.textContent=String(report.summary||'A ARS não retornou um resumo.');
+    if(installed){
+      const current=report.installed||{};
+      installed.textContent=current.versionName
+        ?String(current.versionName)+' (código '+String(current.versionCode)+')'
+        :'Versão instalada não confirmada.';
+    }
+    if(published){
+      const release=report.published||{};
+      published.textContent=release.versionName
+        ?String(release.versionName)+' (código '+String(release.versionCode)+')'
+        :'Versão publicada indisponível.';
+    }
+    if(integrity){
+      const checks=report.integrity||{};
+      integrity.textContent=checks.manifestValid&&checks.sha256MetadataConsistent&&checks.certificateMetadataValid&&checks.installedSignatureMatchesOfficial&&checks.downloadOriginApproved
+        ?'Manifesto, SHA-256, assinatura instalada/oficial e endereço do pacote passaram a validação de metadados.'
+        :'Validação incompleta. A ARS não deve declarar o canal confiável.';
+    }
+    if(checkedAt&&report.checkedAt)checkedAt.textContent='Última consulta ARS: '+new Date(Number(report.checkedAt)).toLocaleString();
+  }
+  window.stacyArsReport=function(raw){
+    try{latestArsReport=typeof raw==='string'?JSON.parse(raw):raw;}catch(_){
+      latestArsReport={status:'error',summary:'ARS: resposta de diagnóstico inválida.'};
+    }
+    arsConsultInProgress=false;
+    renderCachedArsReport();
+  };
+  let activeCoreDiagnosticId=null;
+  let activeBridgePingId=null;
+  let diagnosticSequence=0;
+  let coreDiagnosticTimer=null;
+  let latestDiagnosticReport=null;
+  const diagnosticStatusLabels={ok:'OK',fail:'FALHA',checking:'TESTANDO',not_used:'NÃO UTILIZADO'};
+  function setDiagnosticRow(id,status,detail,latencyMs){
+    const row=document.querySelector('[data-diagnostic-row="'+id+'"]');
+    if(!row)return;
+    const badge=row.querySelector('[data-diagnostic-status]');
+    const text=row.querySelector('[data-diagnostic-detail]');
+    if(badge){badge.className='stacy-diagnostic-status '+(status||'');badge.textContent=diagnosticStatusLabels[status]||'AGUARDANDO';}
+    if(text){
+      const timing=Number.isFinite(Number(latencyMs))?' • '+Math.max(0,Math.round(Number(latencyMs)))+' ms':'';
+      text.textContent=String(detail||'')+timing;
+    }
+  }
+  function applyDiagnosticReport(report){
+    if(!report||!Array.isArray(report.checks))return;
+    report.checks.forEach(item=>setDiagnosticRow(item.id,item.status,item.detail,item.latencyMs));
+    const summary=document.getElementById('stacyDiagnosticSummary');
+    const stamp=document.getElementById('stacyDiagnosticTimestamp');
+    if(summary){
+      const failed=report.checks.filter(item=>item.status==='fail');
+      const checking=report.checks.filter(item=>item.status==='checking');
+      if(report.completed){
+        summary.textContent=failed.length
+          ?'Falha localizada em: '+failed.map(item=>item.label).join(', ')+'. Consulte o detalhe de cada camada abaixo.'
+          :'Diagnóstico concluído: nenhuma falha detectada nas camadas testadas. Termux não participa deste fluxo.';
+      }else{
+        summary.textContent=checking.length
+          ?'Diagnóstico em andamento. A camada Gemini está sendo testada separadamente.'
+          :'Resultados parciais recebidos; aguardando o núcleo concluir o teste da IA.';
+      }
+    }
+    if(stamp&&report.completedAt){
+      stamp.textContent='Última consulta: '+new Date(report.completedAt).toLocaleString()+
+        (Number.isFinite(Number(report.elapsedMs))?' • duração total '+Math.round(Number(report.elapsedMs))+' ms':'');
+    }
+  }
+  function renderCachedDiagnostics(){
+    if(latestDiagnosticReport)applyDiagnosticReport(latestDiagnosticReport);
+  }
+  window.stacyDiagnosticUpdate=function(raw){
+    let report;
+    try{report=typeof raw==='string'?JSON.parse(raw):raw;}catch(_){return;}
+    if(!report||report.requestId!==activeCoreDiagnosticId)return;
+    latestDiagnosticReport=report;
+    applyDiagnosticReport(report);
+    if(report.completed&&coreDiagnosticTimer){clearTimeout(coreDiagnosticTimer);coreDiagnosticTimer=null;}
+  };
+  window.stacyBridgePingResult=function(raw){
+    let result;
+    try{result=typeof raw==='string'?JSON.parse(raw):raw;}catch(_){return;}
+    if(!result||result.requestId!==activeBridgePingId)return;
+    const elapsed=performance.now()-(window.__stacyBridgePingStartedAt||performance.now());
+    const ok=result.status==='ok';
+    setDiagnosticRow('html','ok','JavaScript está ativo.');
+    setDiagnosticRow('bridge',ok?'ok':'fail',result.detail,elapsed);
+    const summary=document.getElementById('stacyDiagnosticSummary');
+    if(summary)summary.textContent=ok
+      ?'Ponte Android validada: chamada JavaScript → Kotlin → WebView concluída.'
+      :'Falha localizada na ponte JavaScript ↔ Android.';
+    const stamp=document.getElementById('stacyDiagnosticTimestamp');
+    if(stamp)stamp.textContent='Teste da ponte: '+new Date().toLocaleString()+' • '+Math.round(elapsed)+' ms';
+  };
+  function testStacyBridge(){
+    activeBridgePingId='bridge-'+Date.now()+'-'+(++diagnosticSequence);
+    const requestId=activeBridgePingId;
+    const startedAt=performance.now();
+    setDiagnosticRow('html','ok','JavaScript está ativo.');
+    setDiagnosticRow('bridge','checking','Enviando ping nativo…');
+    const summary=document.getElementById('stacyDiagnosticSummary');
+    if(summary)summary.textContent='Testando a ida e volta da ponte Android.';
+    if(!window.Android||typeof Android.stacyPingBridge!=='function'){
+      setDiagnosticRow('bridge','fail','Método nativo stacyPingBridge não está disponível.');
+      if(summary)summary.textContent='Falha localizada: a ponte Android não foi exposta ao WebView.';
+      return;
+    }
+    try{Android.stacyPingBridge(requestId); }
+    catch(error){
+      setDiagnosticRow('bridge','fail','Falha ao invocar a ponte: '+(error&&error.message?error.message:'erro desconhecido'));
+      if(summary)summary.textContent='Falha localizada na chamada JavaScript → Kotlin.';
+      return;
+    }
+    // Native callback measures the round trip using this start timestamp.
+    // Store the timing in a side map without exposing Android objects to the page.
+    window.__stacyBridgePingStartedAt=startedAt;
+  }
+  function runStacyCoreDiagnostics(){
+    activeCoreDiagnosticId='core-'+Date.now()+'-'+(++diagnosticSequence);
+    const requestId=activeCoreDiagnosticId;
+    if(coreDiagnosticTimer){clearTimeout(coreDiagnosticTimer);coreDiagnosticTimer=null;}
+    const startedAt=Date.now();
+    latestDiagnosticReport={requestId,completed:false,checks:[
+      {id:'html',label:'HTML / JavaScript',status:'ok',detail:'JavaScript ativo e executando o diagnóstico.'},
+      {id:'bridge',label:'Ponte WebView / Android',status:'checking',detail:'Aguardando resposta da ponte nativa.'},
+      {id:'core',label:'CORE Kotlin / Android',status:'checking',detail:'Aguardando teste do roteador nativo.'},
+      {id:'sqlite',label:'Banco local SQLite',status:'checking',detail:'Aguardando consulta ao armazenamento local.'},
+      {id:'gemini',label:'Gemini / API generativa',status:'checking',detail:'Aguardando teste HTTPS real.'},
+      {id:'termux',label:'Termux / daemon Python',status:'not_used',detail:'Fora da arquitetura do APK.'}
+    ]};
+    applyDiagnosticReport(latestDiagnosticReport);
+    if(!window.Android||typeof Android.stacyRunDiagnostics!=='function'){
+      latestDiagnosticReport.checks.find(item=>item.id==='bridge').status='fail';
+      latestDiagnosticReport.checks.find(item=>item.id==='bridge').detail='Método stacyRunDiagnostics não está disponível na ponte.';
+      latestDiagnosticReport.checks.find(item=>item.id==='core').status='not_used';
+      latestDiagnosticReport.checks.find(item=>item.id==='sqlite').status='not_used';
+      latestDiagnosticReport.checks.find(item=>item.id==='gemini').status='not_used';
+      latestDiagnosticReport.completed=true;latestDiagnosticReport.completedAt=Date.now();
+      applyDiagnosticReport(latestDiagnosticReport);
+      return;
+    }
+    coreDiagnosticTimer=setTimeout(function(){
+      if(activeCoreDiagnosticId!==requestId)return;
+      const report=latestDiagnosticReport;
+      if(!report)return;
+      const gemini=report.checks.find(item=>item.id==='gemini');
+      if(gemini&&gemini.status==='checking'){
+        gemini.status='fail';gemini.detail='Tempo de diagnóstico excedido (75 s). Verifique a rede e o retorno da API.';
+      }
+      report.completed=true;report.completedAt=Date.now();report.elapsedMs=report.completedAt-startedAt;
+      applyDiagnosticReport(report);coreDiagnosticTimer=null;activeCoreDiagnosticId=null;
+    },75000);
+    try{Android.stacyRunDiagnostics(requestId);}
+    catch(error){
+      if(coreDiagnosticTimer){clearTimeout(coreDiagnosticTimer);coreDiagnosticTimer=null;}
+      const bridge=latestDiagnosticReport.checks.find(item=>item.id==='bridge');
+      bridge.status='fail';bridge.detail='Falha ao iniciar o diagnóstico: '+(error&&error.message?error.message:'erro desconhecido');
+      latestDiagnosticReport.completed=true;latestDiagnosticReport.completedAt=Date.now();
+      applyDiagnosticReport(latestDiagnosticReport);
+    }
+  }
+  function showStacyBuildInfo(){
+    const outputs=[document.getElementById('stacyBuildInfo'),document.getElementById('stacyArsBuildInfo')].filter(Boolean);
+    if(!outputs.length)return;
+    if(!window.Android||typeof Android.stacyGetBuildInfo!=='function'){
+      outputs.forEach(output=>output.textContent='Não foi possível consultar a versão: ponte Android indisponível.');
+      return;
+    }
+    try{
+      const info=JSON.parse(Android.stacyGetBuildInfo());
+      if(info.error){outputs.forEach(output=>output.textContent=String(info.error));return;}
+      if(!info.versionName||info.versionCode===undefined||!info.applicationId)throw new Error('Metadados da versão incompletos.');
+      const label='Versão '+info.versionName+' (código '+info.versionCode+') • Android API '+info.androidApi+' • '+info.applicationId;
+      outputs.forEach(output=>output.textContent=label);
+    }catch(error){
+      outputs.forEach(output=>output.textContent='Falha ao consultar a versão do APK: '+(error&&error.message?error.message:'resposta inválida'));
+    }
+  }
   document.body.addEventListener('click',function(e){
     const action=e.target.closest('[data-stacy-action]');
     if(!action)return;
     const key=action.getAttribute('data-stacy-action');
+    if(key==='diagnosticoCore'){runStacyCoreDiagnostics();return;}
+    if(key==='diagnosticoPonte'){testStacyBridge();return;}
+    if(key==='buildInfo'){showStacyBuildInfo();return;}
     if(key==='voz'){
       const enabled=action.dataset.enabled!=='false';
       const next=!enabled;
@@ -1102,14 +1384,23 @@ animationFrameId=requestAnimationFrame(animate);
       if(typeof window.stacyOpenPage==='function')window.stacyOpenPage('nucleo');
       return;
     }
-    if(key==='atualizacao'){
-      const status=document.getElementById('stacyUpdateStatus');
-      if(status)status.textContent='Verificando…';
-      if(window.Android && typeof Android.stacyCheckUpdate==='function'){
-        Android.stacyCheckUpdate();
-      }else if(status){
-        status.textContent='Ponte nativa indisponível.';
-      }
+    if(key==='ars'){
+      if(typeof window.stacyOpenPage==='function')window.stacyOpenPage('ars');
+      return;
+    }
+    if(key==='arsVersao'){
+      showStacyBuildInfo();
+      return;
+    }
+    if(key==='arsConsultar'){
+      requestArsConsult();
+      return;
+    }
+    if(key==='arsAtualizar'||key==='atualizacao'){
+      window.stacyNativeUpdateStatus('ARS: verificando o canal e preparando a atualização com segurança…');
+      if(window.Android && typeof Android.stacyArsUpdate==='function')Android.stacyArsUpdate();
+      else if(window.Android && typeof Android.stacyCheckUpdate==='function')Android.stacyCheckUpdate();
+      else window.stacyNativeUpdateStatus('ARS: ponte nativa indisponível; atualização não iniciada.');
       return;
     }
     if(key==='configAndroid'){

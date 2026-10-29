@@ -1,13 +1,13 @@
-"""Stable JSON entry point for the Android-to-Python CORE bridge.
+"""JSON entry point for the standalone Python CORE.
 
-Android receives exactly one JSON object on stdout. Diagnostics and tracebacks
-are sent to stderr. Session state is persisted because Termux launches a fresh
-Python process for each Android message.
+The command writes exactly one response object to stdout and sends diagnostics
+to stderr. Conversation state is persisted across separate process invocations.
+Android actions, when recognized, are returned as typed JSON and are not
+executed through shell commands in this process.
 """
 import contextlib
 import json
 import os
-import subprocess
 import sys
 import traceback
 
@@ -17,36 +17,8 @@ def _emit(payload):
     sys.stdout.flush()
 
 
-def _report_android_phase(execution_id, state):
-    if execution_id is None or state not in {"pesquisando", "executando", "pensando"}:
-        return
-    try:
-        subprocess.run(
-            [
-                "/system/bin/am", "broadcast",
-                "-n", "com.mrmorning.stacy/.StacyCorePhaseReceiver",
-                "-a", "com.mrmorning.stacy.CORE_PHASE",
-                "--ei", "execution_id", str(execution_id),
-                "--es", "state", state,
-            ],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            timeout=1.5,
-            check=False,
-        )
-    except (OSError, subprocess.SubprocessError):
-        # Phase telemetry is best-effort; the actual JSON result remains authoritative.
-        pass
-
-
 def main(argv=None):
     args = list(sys.argv[1:] if argv is None else argv)
-    execution_id = None
-    if args and args[0].startswith("--execution-id="):
-        try:
-            execution_id = int(args.pop(0).split("=", 1)[1])
-        except ValueError:
-            execution_id = None
     message = " ".join(str(arg) for arg in args).strip()
     if not message:
         _emit({"tipo": "erro", "resposta": "A mensagem recebida está vazia."})
@@ -73,7 +45,6 @@ def main(argv=None):
                     api_key=load_api_key(),
                     memoria=memoria,
                     entidades=entidades,
-                    phase_callback=lambda state: _report_android_phase(execution_id, state),
                 )
                 warning = restore_session(orchestrator)
                 try:

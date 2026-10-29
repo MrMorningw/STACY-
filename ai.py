@@ -80,8 +80,8 @@ def gerar_resposta(
 ):
     if not api_key:
         raise RuntimeError(
-            "Chave da Gemini não configurada. No Termux, configure "
-            "~/.stacy/secrets.json com GEMINI_API_KEY; não envie a chave no chat."
+            "Chave da Gemini não configurada. Defina GEMINI_API_KEY no ambiente "
+            "do processo; não envie a chave no chat."
         )
 
     url = (
@@ -164,8 +164,8 @@ def gerar_resposta_pesquisa(
     """Pesquisa fatos externos com Gemini + Google Search, sem memória persistente."""
     if not api_key:
         raise RuntimeError(
-            "Chave da Gemini não configurada. No Termux, configure "
-            "~/.stacy/secrets.json com GEMINI_API_KEY; não envie a chave no chat."
+            "Chave da Gemini não configurada. Defina GEMINI_API_KEY no ambiente "
+            "do processo; não envie a chave no chat."
         )
 
     url = (

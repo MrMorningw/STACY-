@@ -11,6 +11,7 @@ on:
       - mp08-automacao-android-20260922
       - stacy-final-android-20260924
       - mp-ef10-android-assistant-ready
+      - fix/core-diagnostics-no-termux-20261027
   pull_request:
     branches:
       - mp08-automacao-android-20260922
@@ -19,8 +20,8 @@ on:
 
 jobs:
   android:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
     defaults:
       run:
         working-directory: android
@@ -43,6 +44,7 @@ jobs:
       - name: Validate STACY web animation states
         working-directory: .
         run: grep -F 'online:0,ouvindo:1,pensando:2,pesquisando:1,executando:1,respondendo:2' android/app/src/main/assets/stacy_prototipo36.html
+
       - name: Validate native CORE contract
         working-directory: .
         run: |
@@ -114,6 +116,36 @@ jobs:
 
       - name: Build, unit tests, and instrumentation package
         run: gradle assembleDebug testDebugUnitTest assembleDebugAndroidTest
+
+      - name: Run WebView bridge and AI transport instrumentation tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          emulator-boot-timeout: 600
+          script: |
+            set +e
+            timeout 10m gradle -p "$GITHUB_WORKSPACE/android" connectedDebugAndroidTest
+            test_exit=$?
+            if [ "$test_exit" -ne 0 ]; then
+              mkdir -p "$GITHUB_WORKSPACE/android/app/build/diagnostics"
+              adb logcat -d -v threadtime > "$GITHUB_WORKSPACE/android/app/build/diagnostics/emulator-logcat.txt" 2>&1 || true
+            fi
+            exit "$test_exit"
+
+      - name: Upload Android instrumentation diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: STACY-android-test-results
+          path: |
+            android/app/build/reports/androidTests/connected/
+            android/app/build/outputs/androidTest-results/connected/
+            android/app/build/diagnostics/
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Upload STACY APK
         if: success()

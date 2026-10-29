@@ -1,44 +1,61 @@
-# RBI — Integridade de identidade, componentes e atualizações da STACY
-Data: 2026-10-13
-Versão alvo: 0.2.3 (versionCode 14)
-Status: implementação proposta; validação automática pendente; validação física pendente.
+# RBI — Integridade de identidade, núcleo e atualizações da STACY
+
+Data de revisão: 2026-10-28  
+Versão preparada nesta branch: 0.3.8 (versionCode 29)  
+Estado: implementação em PR; validação em emulador e validação física ainda pendentes.
 
 ## Objetivo
-Impedir que a STACY declare “já está atualizada” quando o canal publicado estiver inconsistente, atrasado ou apontar para um pacote que não corresponde à versão anunciada. A identificação dos componentes deve descrever arquitetura real, não simular saúde operacional.
 
-## Identidade interna dos componentes
-- Interface Android/WebView: recebe comandos, apresenta estados e mensagens.
-- Ponte Android/CORE: envia pedidos ao serviço de execução do Termux e aguarda callback.
-- CORE Python via Termux: dependência externa atual para raciocínio e execução; não está incorporado integralmente ao APK.
-- Canal de atualização: manifesto update.json, APK publicado, versionCode/versionName, packageName, SHA-256 e certificado de assinatura.
-- MPEF Atualizações: fluxo separado de atualização pessoal via RIC e atualização do aplicativo/APK. Uma ação não deve ser apresentada como concluída sem confirmação verificável.
+Fazer a interface representar o estado real do aplicativo, separar falhas do núcleo de falhas da IA e permitir que a própria STACY consulte sua versão e conduza atualizações seguras, sem dependência operacional do Termux.
+
+## Identidade de componentes
+
+- Interface: HTML/WebView, incluindo o painel de diagnóstico do núcleo e a página ARS.
+- Ponte: JavaScript chama métodos nomeados da interface Kotlin via WebView.
+- CORE do APK: Kotlin/Android; comandos locais e persistência operacional usam SQLite.
+- IA generativa: cliente Gemini por HTTPS; depende de internet, chave válida e quota.
+- ARS: coordena autoconsulta, comparação com o canal oficial e atualização do APK. O manifesto é consultado em HTTPS; download, packageName, versionCode/versionName, SHA-256 e certificado são verificados.
+- Termux/Python: não participa do fluxo de mensagens do APK. Os módulos Python restantes são um runtime independente e opcional, sem broadcasts de estado para o Android.
+- Atualização pessoal/RIC e atualização do APK são responsabilidades separadas. A ARS não executa scripts arbitrários nem altera código ativo fora do ciclo validado de distribuição do APK.
 
 ## Regras de verdade do atualizador
-1. O manifesto deve conter versionCode positivo, versionName, packageName esperado, SHA-256 do APK e hash do certificado.
-2. O version_code do ativo e o versionCode do manifesto devem coincidir.
-3. O digest do ativo e o SHA-256 de topo do manifesto devem coincidir.
-4. packageName deve ser com.mrmorning.stacy; o APK baixado precisa corresponder ao pacote, versão, digest e certificado publicados.
-5. Só informar que a instalação corresponde à versão publicada quando versionCode e versionName instalados coincidirem com o canal consultado.
-6. Se o canal estiver atrás da instalação, os metadados divergirem ou a verificação falhar, reportar inconsistência específica. Nunca transformar erro, timeout, ausência de rede ou metadados inválidos em “já está atualizada”.
-7. “Pacote validado e instalador aberto” não significa “atualização instalada”. A instalação final depende da confirmação do Android e deve ser verificada ao reabrir o app.
 
-## Estados que a interface deve diferenciar
-- Verificando canal…
-- Nova versão encontrada: instalada → publicada.
-- Baixando e validando integridade…
-- Pacote validado; aguardando confirmação do instalador Android.
-- Verificação concluída: versão instalada corresponde à publicada; nenhuma versão mais nova anunciada.
-- Falha de rede/servidor.
-- Canal inconsistente/desatualizado.
-- Integridade, pacote ou assinatura inválidos.
-- Termux/CORE indisponível ou sem retorno (diagnóstico separado do estado do APK).
+1. O manifesto precisa conter versionCode positivo, versionName, packageName esperado, versão mínima do Android, SHA-256 e certificado de assinatura.
+2. O versionCode declarado no ativo precisa corresponder ao manifesto; o nome do ativo e o versionName dentro do APK precisam corresponder à versão publicada.
+3. O digest de topo e o digest do ativo precisam coincidir, e o arquivo baixado é verificado novamente.
+4. A URL do APK precisa apontar para o caminho versionado do repositório oficial de atualização.
+5. O APK baixado precisa ter packageName, versão, SHA-256 e certificado de assinatura esperados.
+6. “Atualizada” só pode ser informado quando versionCode e versionName instalados coincidirem com o canal consultado.
+7. Se o canal estiver atrás da versão instalada, for inconsistente ou falhar por rede, a ARS informa esse estado — nunca “já está atualizada”.
+8. “Instalador aberto” não significa “instalação concluída”. A ARS guarda o alvo e só confirma após o Android informar que o código e nome esperados estão instalados.
+9. A confirmação final da instalação é do Android; o aplicativo não tenta contornar as restrições da plataforma.
+
+## Diagnóstico por camadas
+
+O painel de Núcleo STACY deve reportar separadamente:
+
+- HTML/JavaScript.
+- Ponte WebView ↔ Kotlin.
+- CORE Kotlin/Android.
+- SQLite.
+- Gemini/API generativa.
+- Termux: NÃO UTILIZADO no fluxo do APK.
+- Versão instalada e horário/latência dos testes.
+
+Um resultado positivo do CORE local não deve mascarar uma falha Gemini. Uma falha Gemini não prova que o CORE local falhou.
 
 ## Validação obrigatória
-- CI/testes/compilação Android aprovados.
-- Manifesto público conferido depois da publicação, não apenas depois da compilação.
-- Instalação e atualização real testadas em Android.
-- CORE validado com comando real no dispositivo: enviar → estados visuais → resposta do CORE na conversa.
-- Se não houver teste físico, o RBI deve dizer explicitamente “não validado em dispositivo”.
 
-## Limites
-A compilação aprovada não comprova que o Termux, Python, dependências, credenciais ou CORE estejam instalados/configurados no telefone. O estado “ONLINE” da interface não deve ser usado como prova dessas dependências.
+- Testes unitários da política ARS (versões, canal atrasado, versão inconsistente e origem aprovada).
+- Build Android, testes unitários e compilação do pacote instrumentado.
+- Testes instrumentados em emulador: ponte WebView, diagnóstico por camada e controles ARS.
+- Consultar o manifesto público após a publicação real; um build de PR não atualiza o canal oficial.
+- Testar instalação de uma versão anterior para a nova, preservação de dados, cancelamento e confirmação após retorno do instalador.
+- Fazer teste físico com o APK no dispositivo-alvo.
+- Se a validação física ainda não ocorreu, registrar explicitamente “não validado em dispositivo”.
+
+## Resultado desta revisão
+
+Foi encontrado que o último teste instrumentado foi **cancelado pelo limite de 20 minutos do job**, após o emulador demorar aproximadamente 15 minutos a inicializar. Não foi uma falha de asserção concluída. O workflow foi ajustado para um runner mais estável, timeout de job maior, limite separado para testes instrumentados e recolha de resultados para diagnóstico.
+
+A branch adiciona a página ARS, uma política determinística de comparação de versões, consulta do canal sem instalar, atualização verificada e confirmação da instalação após o retorno do Android. A integração final aguarda os testes instrumentados concluírem; a publicação do APK requer integração na main e secrets válidos do release.

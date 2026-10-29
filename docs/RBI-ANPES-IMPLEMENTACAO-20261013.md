@@ -1,5 +1,9 @@
 # RBI — ANPES: Auto Núcleo Pessoal Eficiente STACY
 
+> **Nota de estado (2026-10-28):** este documento é um registro histórico da etapa de 2026-10-13. A arquitetura ativa do APK foi posteriormente migrada para Kotlin/Android nativo e não depende operacionalmente de Termux/Python. Para o estado atual da autoconsulta e atualização, consulte `docs/ARS-AUTOATUALIZACAO-SEGURA.md` e `docs/RBI-INTEGRIDADE-IDENTIDADE-ATUALIZACOES-20261013.md`.
+
+
+
 **Data:** 13/10/2026  
 **Branch de trabalho:** `stacy-anpes-core-20261013`  
 **Integração atual:** política de autonomia conectada ao `StacyOrchestrator` por meio do contrato compatível `autonomy.py`; consulta determinística de estado do ANPES adicionada.

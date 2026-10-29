@@ -1,4 +1,8 @@
 # RBI — Bootstrap do STACY Core Native
+
+> **Nota de estado (2026-10-28):** registro histórico do trabalho de 2026-10-18. Os pontos de integração com Termux/Python descritos neste documento não representam o fluxo ativo do APK atual, que usa CORE Kotlin/Android nativo. Consulte `docs/RBI-INTEGRIDADE-IDENTIDADE-ATUALIZACOES-20261013.md` para o estado atualizado.
+
+
 Data: 18 de outubro de 2026
 
 ## Objetivo

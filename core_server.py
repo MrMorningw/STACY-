@@ -11,7 +11,6 @@ import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from core_phase_context import CorePhaseContext
 
 ROOT = Path(__file__).resolve().parent
 HOST = "127.0.0.1"
@@ -39,7 +38,6 @@ class CoreRuntime:
         self.error = None
         self.orchestrator = None
         self.warning = None
-        self._phase_context = CorePhaseContext()
         self._load()
 
     def _load(self) -> None:
@@ -53,7 +51,7 @@ class CoreRuntime:
             with contextlib.redirect_stdout(sys.stderr):
                 memoria = memory.carregar_memoria()
                 entidades = entity_store.carregar_entidades()
-                self.orchestrator = StacyOrchestrator(api_key=load_api_key(), memoria=memoria, entidades=entidades, phase_callback=self._phase)
+                self.orchestrator = StacyOrchestrator(api_key=load_api_key(), memoria=memoria, entidades=entidades)
                 self.warning = restore_session(self.orchestrator)
             self.ready = True
             self.error = None
@@ -62,39 +60,15 @@ class CoreRuntime:
             self.error = f"{type(exc).__name__}: {exc}"
             traceback.print_exc(file=sys.stderr)
 
-    def _phase(self, state: str) -> None:
-        if state not in {"pensando", "pesquisando", "executando"}:
-            return
-        try:
-            import subprocess
-            execution_id = self._phase_context.current_execution_id()
-            if execution_id is None:
-                return
-            subprocess.run(
-                ["/system/bin/am", "broadcast", "-n", "com.mrmorning.stacy/.StacyCorePhaseReceiver", "-a", "com.mrmorning.stacy.CORE_PHASE", "--ei", "execution_id", str(execution_id), "--es", "state", state],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                timeout=1.0,
-                check=False,
-            )
-        except (OSError, subprocess.SubprocessError):
-            pass
-
-    def chat(self, message: str, execution_id=None) -> dict:
+    def chat(self, message: str) -> dict:
         normalized = message.strip()
         if not normalized:
             return {"tipo": "erro", "resposta": "A mensagem recebida está vazia."}
         if not self.ready:
             return {"tipo": "erro", "resposta": "O CORE não está saudável: " + (self.error or "falha de inicialização")}
 
-        # HTTP requests run on separate threads. Keep phase events correlated to
-        # this request rather than storing its ID on the shared runtime object.
-        self._phase_context.set_current_execution_id(execution_id)
-
         with self.lock:
             try:
-                # Emit THINKING only when this request owns the serialized CORE.
-                self._phase("pensando")
                 import android_tools
                 import stacy_ecc
                 sec = stacy_ecc.inspect_untrusted_text(normalized)
@@ -133,7 +107,7 @@ class CoreRuntime:
                     self.orchestrator.conversa.registrar_erro("falha no processamento")
                 except Exception:
                     pass
-                # Give Android a useful diagnosis, but never return a stored API key.
+                # Give the caller a useful diagnosis, but never return a stored API key.
                 diagnostic = " ".join(str(exc).split())
                 api_key = getattr(self.orchestrator, "api_key", None)
                 if isinstance(api_key, str) and api_key:
@@ -146,9 +120,6 @@ class CoreRuntime:
                         "Diagnóstico: " + diagnostic
                     ),
                 }
-            finally:
-                self._phase_context.clear_current_execution_id()
-
         if not isinstance(result, dict):
             result = {"tipo": "resposta", "resposta": str(result)}
 
@@ -222,10 +193,9 @@ class Handler(BaseHTTPRequestHandler):
                 return
             body = json.loads(self.rfile.read(length).decode("utf-8"))
             message = body.get("message")
-            execution_id = body.get("executionId")
             if not isinstance(message, str):
                 raise ValueError("message deve ser texto")
-            self._json(200, RUNTIME.chat(message, execution_id))
+            self._json(200, RUNTIME.chat(message))
         except Exception as exc:
             self._json(400, {"tipo": "erro", "resposta": f"Requisição inválida: {exc}"})
 

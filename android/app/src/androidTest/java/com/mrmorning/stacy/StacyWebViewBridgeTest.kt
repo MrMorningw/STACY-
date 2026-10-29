@@ -127,9 +127,228 @@ class StacyWebViewBridgeTest {
                             "var log=document.getElementById('stacyChatLog'); " +
                             "var replies=log ? log.querySelectorAll('.stacy-chat-row.assistant .stacy-chat-bubble') : []; " +
                             "return replies.length === 1 && " +
-                            "replies[0].innerText.includes('IA generativa ainda não foi conectada') && " +
+                            "replies[0].innerText.includes('IA generativa ainda não está conectada') && " +
                             "!log.innerText.includes('Não foi possível concluir. Verifique a conexão da IA ou tente novamente.'); " +
                         "})()",
+                    ) == "true"
+                },
+            )
+        }
+    }
+
+    @Test
+    fun rapidSecondSubmitKeepsDraftAndDoesNotReplacePendingReply() {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            lateinit var webView: WebView
+            scenario.onActivity { activity ->
+                StacySecretStore(activity).clearGeminiApiKey()
+                val content = activity.findViewById<ViewGroup>(android.R.id.content)
+                webView = content.getChildAt(0) as? WebView
+                    ?: throw AssertionError("MainActivity is not displaying its production WebView")
+            }
+
+            assertTrue(
+                "Composer or native response callbacks did not become ready",
+                awaitCondition(webView, timeoutMs = 12_000) {
+                    evaluate(
+                        webView,
+                        "typeof window.stacySetAnimationsEnabled === 'function' && " +
+                            "typeof window.stacyNativeResponse === 'function' && " +
+                            "typeof window.stacyComposerIsBusy === 'function' && " +
+                            "typeof window.Android === 'object' && typeof window.Android.stacySend === 'function'",
+                    ) == "true"
+                },
+            )
+            evaluate(webView, "window.stacySetAnimationsEnabled(false)")
+
+            assertTrue(
+                "A second submit must be blocked without replacing the active pending response",
+                evaluate(
+                    webView,
+                    "(function(){ " +
+                        "var input=document.getElementById('message'); " +
+                        "var send=document.getElementById('send'); " +
+                        "var log=document.getElementById('stacyChatLog'); " +
+                        "if(!input||!send||!log)return false; " +
+                        "input.value='Primeira solicitação sem chave'; send.click(); " +
+                        "input.value='RASCUNHO_PRESERVADO'; " +
+                        "input.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true})); " +
+                        "return log.querySelectorAll('.stacy-chat-row.user').length===1 && " +
+                            "input.value==='RASCUNHO_PRESERVADO' && send.disabled===true && " +
+                            "window.stacyComposerIsBusy()===true; " +
+                    "})()",
+                ) == "true",
+            )
+
+            assertTrue(
+                "The first reply should complete normally and leave the second draft available",
+                awaitCondition(webView, timeoutMs = 8_000) {
+                    evaluate(
+                        webView,
+                        "(function(){ " +
+                            "var input=document.getElementById('message'); " +
+                            "var send=document.getElementById('send'); " +
+                            "var log=document.getElementById('stacyChatLog'); " +
+                            "var replies=log?log.querySelectorAll('.stacy-chat-row.assistant .stacy-chat-bubble'):[]; " +
+                            "return !!input && !!send && !!log && " +
+                                "log.querySelectorAll('.stacy-chat-row.user').length===1 && replies.length===1 && " +
+                                "replies[0].innerText.includes('IA generativa ainda não está conectada') && " +
+                                "input.value==='RASCUNHO_PRESERVADO' && send.disabled===false && " +
+                                "window.stacyComposerIsBusy()===false; " +
+                        "})()",
+                    ) == "true"
+                },
+            )
+        }
+    }
+
+    @Test
+    fun voiceTranscriptUsesSharedComposerAndReturnsVisibleReply() {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            lateinit var webView: WebView
+            scenario.onActivity { activity ->
+                StacySecretStore(activity).clearGeminiApiKey()
+                val content = activity.findViewById<ViewGroup>(android.R.id.content)
+                webView = content.getChildAt(0) as? WebView
+                    ?: throw AssertionError("MainActivity is not displaying its production WebView")
+            }
+
+            assertTrue(
+                "Voice submission callback or native bridge did not become ready",
+                awaitCondition(webView, timeoutMs = 12_000) {
+                    evaluate(
+                        webView,
+                        "typeof window.stacySubmitFromVoice === 'function' && " +
+                            "typeof window.stacyNativeResponse === 'function' && " +
+                            "typeof window.Android === 'object' && typeof window.Android.stacySend === 'function'",
+                    ) == "true"
+                },
+            )
+            evaluate(webView, "window.stacySetAnimationsEnabled(false)")
+            evaluate(webView, "window.stacySubmitFromVoice('transcrição de voz de teste')")
+
+            assertTrue(
+                "Voice transcription should appear as a user message and receive one visible CORE error",
+                awaitCondition(webView, timeoutMs = 8_000) {
+                    evaluate(
+                        webView,
+                        "(function(){ " +
+                            "var log=document.getElementById('stacyChatLog'); " +
+                            "var users=log?log.querySelectorAll('.stacy-chat-row.user'):[]; " +
+                            "var replies=log?log.querySelectorAll('.stacy-chat-row.assistant .stacy-chat-bubble'):[]; " +
+                            "return !!log && users.length===1 && users[0].innerText.includes('transcrição de voz de teste') && " +
+                                "replies.length===1 && replies[0].innerText.includes('IA generativa ainda não está conectada') && " +
+                                "window.stacyComposerIsBusy()===false; " +
+                        "})()",
+                    ) == "true"
+                },
+            )
+        }
+    }
+
+    @Test
+    fun coreDiagnosticsShowIndependentLocalAndGeminiResults() {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            lateinit var webView: WebView
+            scenario.onActivity { activity ->
+                StacySecretStore(activity).clearGeminiApiKey()
+                val content = activity.findViewById<ViewGroup>(android.R.id.content)
+                webView = content.getChildAt(0) as? WebView
+                    ?: throw AssertionError("MainActivity is not displaying its production WebView")
+            }
+
+            assertTrue(
+                "STACY page or diagnostic bridge did not become ready",
+                awaitCondition(webView, timeoutMs = 12_000) {
+                    evaluate(
+                        webView,
+                        "typeof window.stacySetAnimationsEnabled === 'function' && " +
+                            "typeof window.stacyOpenPage === 'function' && " +
+                            "typeof window.stacyDiagnosticUpdate === 'function' && " +
+                            "typeof window.Android === 'object' && " +
+                            "typeof window.Android.stacyRunDiagnostics === 'function'",
+                    ) == "true"
+                },
+            )
+            evaluate(webView, "window.stacySetAnimationsEnabled(false)")
+            evaluate(webView, "window.stacyOpenPage('nucleo')")
+
+            assertTrue(
+                "The diagnostic action is missing from the CORE page",
+                awaitCondition(webView, timeoutMs = 5_000) {
+                    evaluate(
+                        webView,
+                        "!!document.querySelector('[data-stacy-action=diagnosticoCore]')",
+                    ) == "true"
+                },
+            )
+
+            evaluate(
+                webView,
+                "document.querySelector('[data-stacy-action=diagnosticoCore]').click()",
+            )
+
+            assertTrue(
+                "The panel did not report local CORE success separately from a missing Gemini key",
+                awaitCondition(webView, timeoutMs = 10_000) {
+                    evaluate(
+                        webView,
+                        "(function(){ " +
+                            "var summary=document.getElementById('stacyDiagnosticSummary'); " +
+                            "var core=document.querySelector('[data-diagnostic-row=core] [data-diagnostic-status]'); " +
+                            "var storage=document.querySelector('[data-diagnostic-row=sqlite] [data-diagnostic-status]'); " +
+                            "var gemini=document.querySelector('[data-diagnostic-row=gemini] [data-diagnostic-status]'); " +
+                            "var termux=document.querySelector('[data-diagnostic-row=termux] [data-diagnostic-status]'); " +
+                            "return !!summary && summary.innerText.includes('Falha localizada em: Gemini / API generativa.') && " +
+                            "!!core && core.innerText === 'OK' && " +
+                            "!!storage && storage.innerText === 'OK' && " +
+                            "!!gemini && gemini.innerText === 'FALHA' && " +
+                            "!!termux && termux.innerText === 'NÃO UTILIZADO'; " +
+                        "})()",
+                    ) == "true"
+                },
+            )
+        }
+    }
+
+    @Test
+    fun arsPageExposesSelfConsultAndSafeUpdateControls() {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            lateinit var webView: WebView
+            scenario.onActivity { activity ->
+                val content = activity.findViewById<ViewGroup>(android.R.id.content)
+                webView = content.getChildAt(0) as? WebView
+                    ?: throw AssertionError("MainActivity is not displaying its production WebView")
+            }
+
+            assertTrue(
+                "ARS JavaScript or native methods did not become ready",
+                awaitCondition(webView, timeoutMs = 12_000) {
+                    evaluate(
+                        webView,
+                        "typeof window.stacyOpenPage === 'function' && " +
+                            "typeof window.stacyArsReport === 'function' && " +
+                            "typeof window.Android === 'object' && " +
+                            "typeof window.Android.stacyArsConsult === 'function' && " +
+                            "typeof window.Android.stacyArsUpdate === 'function' && " +
+                            "typeof window.Android.stacyGetBuildInfo === 'function'",
+                    ) == "true"
+                },
+            )
+
+            evaluate(webView, "window.stacySetAnimationsEnabled(false)")
+            evaluate(webView, "window.stacyOpenPage('ars')")
+
+            assertTrue(
+                "ARS page did not render the self-consult and update controls",
+                awaitCondition(webView, timeoutMs = 5_000) {
+                    evaluate(
+                        webView,
+                        "!!document.getElementById('stacyArsSummary') && " +
+                            "!!document.querySelector('[data-stacy-action=arsConsultar]') && " +
+                            "!!document.querySelector('[data-stacy-action=arsAtualizar]') && " +
+                            "!!document.getElementById('stacyArsInstalled') && " +
+                            "!!document.getElementById('stacyArsPublished')",
                     ) == "true"
                 },
             )

@@ -1,5 +1,9 @@
 # RBI — Conexão da Interface, Acessibilidade e Recuperação do CORE
 
+> **Nota de estado (2026-10-28):** o fluxo Interface → Termux/Python descrito abaixo é histórico e retrata a implementação da data deste relatório. O APK atual usa HTML/WebView → ponte Kotlin → CORE Kotlin/Android → Gemini por HTTPS, sem Termux no caminho de mensagens. A ARS e a validação atual estão documentadas em `docs/ARS-AUTOATUALIZACAO-SEGURA.md`.
+
+
+
 **Data:** 13/10/2026  
 **Projeto:** STACY  
 **Branch:** `stacy-ui-actions-accessibility-20261013`  

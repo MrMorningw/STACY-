@@ -1,8 +1,8 @@
-"""Private, atomic persistence for the Android-launched STACY CORE session.
+"""Private, atomic persistence for process-based Python CORE sessions.
 
-Each Android message starts a short-lived Termux/Python process. This store
-preserves only the serializable conversational state needed across those
-processes; tasks, entities, and long-term memory keep their existing stores.
+Conversation state may need to survive separate process invocations. This
+store preserves only serializable conversational state; tasks, entities, and
+long-term memory keep their existing stores.
 """
 from contextlib import contextmanager
 import fcntl
