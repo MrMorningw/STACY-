@@ -51,17 +51,21 @@ internal class StacySecretStore(context: Context) {
         val envelope = ByteArray(iv.size + ciphertext.size)
         System.arraycopy(iv, 0, envelope, 0, iv.size)
         System.arraycopy(ciphertext, 0, envelope, iv.size, ciphertext.size)
-        preferences.edit()
-            .putString(ENCRYPTED_KEY, Base64.encodeToString(envelope, Base64.NO_WRAP))
-            .remove(PREVIOUS_INTERACTION_ID)
-            .apply()
+        check(
+            preferences.edit()
+                .putString(ENCRYPTED_KEY, Base64.encodeToString(envelope, Base64.NO_WRAP))
+                .remove(PREVIOUS_INTERACTION_ID)
+                .commit(),
+        ) { "Não foi possível confirmar a gravação da chave no armazenamento local." }
     }
 
     fun clearGeminiApiKey() = synchronized(LOCK) {
-        preferences.edit()
-            .remove(ENCRYPTED_KEY)
-            .remove(PREVIOUS_INTERACTION_ID)
-            .apply()
+        check(
+            preferences.edit()
+                .remove(ENCRYPTED_KEY)
+                .remove(PREVIOUS_INTERACTION_ID)
+                .commit(),
+        ) { "Não foi possível confirmar a remoção da chave e do contexto local." }
     }
 
     fun getPreviousInteractionId(): String? = synchronized(LOCK) {
