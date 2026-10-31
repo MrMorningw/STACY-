@@ -210,27 +210,9 @@ class MainActivity : ComponentActivity() {
             .setTitle("Conectar IA da STACY")
             .setMessage(message)
             .setView(entry)
-            .setPositiveButton("Salvar e testar") { _, _ ->
-                val key = entry.text?.toString()?.trim().orEmpty()
-                if (key.isNotBlank()) {
-                    try {
-                        store.saveGeminiApiKey(key)
-                    } catch (error: Exception) {
-                        webResponse("Não foi possível salvar a chave: " + (error.message ?: "erro desconhecido"), "erro")
-                        webState("erro")
-                        return@setPositiveButton
-                    }
-                } else if (!store.hasGeminiApiKey()) {
-                    webResponse("Cole uma chave Gemini API antes de testar a conexão.", "erro")
-                    webState("erro")
-                    return@setPositiveButton
-                }
-                webState("pensando")
-                webResponse("Chave configurada. Verificando a conexão segura com a IA...", "resposta")
-                coreBridge.testConnection { result ->
-                    CoreResultStore.publish(this@MainActivity, result)
-                }
-            }
+            // The positive-button listener is installed after show() so Android
+            // does not dismiss the dialog before storage has been verified.
+            .setPositiveButton("Salvar e testar", null)
             .setNeutralButton("Apagar chave e contexto") { _, _ ->
                 store.clearGeminiApiKey()
                 webResponse("A chave da IA e o vínculo de contexto foram removidos deste aparelho. Os comandos locais continuam disponíveis.", "resposta")
@@ -238,8 +220,45 @@ class MainActivity : ComponentActivity() {
             }
             .setNegativeButton("Cancelar", null)
             .create()
+
         dialog.show()
         dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            val key = entry.text?.toString()?.trim().orEmpty()
+            if (key.isNotBlank()) {
+                try {
+                    store.saveGeminiApiKey(key)
+                } catch (error: Exception) {
+                    entry.error = "Falha ao salvar: ${error.message ?: "erro desconhecido"}"
+                    entry.requestFocus()
+                    return@setOnClickListener
+                }
+            } else if (!store.hasGeminiApiKey()) {
+                entry.error = "Cole uma chave Gemini API antes de testar."
+                entry.requestFocus()
+                return@setOnClickListener
+            }
+
+            // Confirm that the encrypted value can be read back before closing.
+            val savedKey = try {
+                store.getGeminiApiKey()
+            } catch (error: Exception) {
+                null
+            }
+            if (savedKey.isNullOrBlank() || (key.isNotBlank() && savedKey != key)) {
+                entry.error = "A chave não foi confirmada no armazenamento seguro. Tente novamente."
+                entry.requestFocus()
+                return@setOnClickListener
+            }
+
+            entry.error = null
+            dialog.dismiss()
+            webState("pensando")
+            webResponse("Chave salva e confirmada no armazenamento seguro. Verificando a conexão com a IA...", "resposta")
+            coreBridge.testConnection { result ->
+                CoreResultStore.publish(this@MainActivity, result)
+            }
+        }
     }
 
     inner class StacyJsBridge {
