@@ -11,6 +11,7 @@ on:
       - mp08-automacao-android-20260922
       - stacy-final-android-20260924
       - mp-ef10-android-assistant-ready
+      - core-detachment-adapter
   pull_request:
     branches:
       - mp08-automacao-android-20260922
@@ -43,18 +44,15 @@ jobs:
       - name: Validate STACY web animation states
         working-directory: .
         run: grep -F 'online:0,ouvindo:1,pensando:2,pesquisando:1,executando:1,respondendo:2' android/app/src/main/assets/stacy_prototipo36.html
-      - name: Validate native CORE contract
+      - name: Validate detached CORE provider contract
         working-directory: .
         run: |
-          grep -F 'data-stacy-action="configurarIA"' android/app/src/main/assets/stacy_prototipo36.html
-          grep -F 'StacyAiClient' android/app/src/main/java/com/mrmorning/stacy/StacyCoreBridge.kt
-          grep -F 'CREATE TABLE tasks' android/app/src/main/java/com/mrmorning/stacy/StacyLocalStore.kt
-          grep -F 'v1/interactions' android/app/src/main/java/com/mrmorning/stacy/StacyAiClient.kt
-          grep -F 'previous_interaction_id' android/app/src/main/java/com/mrmorning/stacy/StacyAiClient.kt
-          grep -F '"type", "google_search"' android/app/src/main/java/com/mrmorning/stacy/StacyAiClient.kt
+          grep -F 'interface StacyCoreProvider' android/app/src/main/java/com/mrmorning/stacy/StacyCoreProvider.kt
+          grep -F 'StacyCoreProviderFactory.create' android/app/src/main/java/com/mrmorning/stacy/StacyCoreBridge.kt
+          grep -F 'CORE_PROVIDER_NOT_CONFIGURED' android/app/src/main/java/com/mrmorning/stacy/StacyCoreProvider.kt
           grep -F 'window.stacyNativeResponse' android/app/src/main/java/com/mrmorning/stacy/MainActivity.kt
           grep -F 'window.stacyNativeState' android/app/src/main/assets/stacy_prototipo36.html
-          if grep -F '"temperature"' android/app/src/main/java/com/mrmorning/stacy/StacyAiClient.kt; then exit 1; fi
+          if grep -R -E 'StacyAiClient|StacyNativeCore|StacyLocalStore|StacySecretStore|stacyConfigureAi|configureAiProvider' android/app/src/main; then exit 1; fi
           if grep -F 'RUN_COMMAND' android/app/src/main/java/com/mrmorning/stacy/StacyCoreBridge.kt; then exit 1; fi
           if grep -F 'com.termux' android/app/src/main/AndroidManifest.xml; then exit 1; fi
           python -c "from pathlib import Path; p=Path('android/app/src/main/assets/stacy_prototipo36.html'); assert len(p.read_text(encoding='utf-8')) > 170000"
