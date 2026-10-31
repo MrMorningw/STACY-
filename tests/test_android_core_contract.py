@@ -17,6 +17,7 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
         cls.gradle = (ROOT / "android/app/build.gradle.kts").read_text(encoding="utf-8")
         cls.updater = (ROOT / "android/app/src/main/java/com/mrmorning/stacy/StacyUpdater.kt").read_text(encoding="utf-8")
         cls.secrets = (ROOT / "android/app/src/main/java/com/mrmorning/stacy/StacySecretStore.kt").read_text(encoding="utf-8")
+        cls.publisher = (ROOT / "scripts/publish_stacy_update.sh").read_text(encoding="utf-8")
 
     def test_message_has_a_complete_ui_to_core_and_back_path(self):
         self.assertIn('Android.stacySend(text)', self.html)
@@ -116,6 +117,11 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
         self.assertIn(".remove(PREVIOUS_INTERACTION_ID)\n                .commit()", self.secrets)
         self.assertIn("Não foi possível confirmar a gravação da chave", self.secrets)
         self.assertIn("Não foi possível confirmar a remoção da chave", self.secrets)
+
+    def test_ars_publisher_refuses_signer_rotation(self):
+        self.assertIn("EXPECTED_CERT=", self.publisher)
+        self.assertIn('if [ "$CERT" != "$EXPECTED_CERT" ]; then', self.publisher)
+        self.assertIn("Refusing to publish an update that Android may reject.", self.publisher)
 
 
 if __name__ == "__main__":
