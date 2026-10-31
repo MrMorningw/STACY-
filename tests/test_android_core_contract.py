@@ -15,6 +15,7 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
         cls.daemon = (ROOT / "android/termux_widget/stacy-core-daemon.sh").read_text(encoding="utf-8")
         cls.server = (ROOT / "core_server.py").read_text(encoding="utf-8")
         cls.gradle = (ROOT / "android/app/build.gradle.kts").read_text(encoding="utf-8")
+        cls.updater = (ROOT / "android/app/src/main/java/com/mrmorning/stacy/StacyUpdater.kt").read_text(encoding="utf-8")
 
     def test_message_has_a_complete_ui_to_core_and_back_path(self):
         self.assertIn('Android.stacySend(text)', self.html)
@@ -98,8 +99,17 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
         self.assertIn("CorePhaseContext", (ROOT / "core_phase_context.py").read_text(encoding="utf-8"))
 
     def test_released_build_advances_version_so_installed_app_can_update(self):
-        self.assertIn("versionCode = 28", self.gradle)
-        self.assertIn('versionName = "0.3.7"', self.gradle)
+        self.assertIn("versionCode = 29", self.gradle)
+        self.assertIn('versionName = "0.3.8"', self.gradle)
+
+    def test_update_channel_is_pinned_and_checks_package_identity(self):
+        self.assertIn("EXPECTED_SIGNING_CERT_SHA256", self.updater)
+        self.assertIn("TRUSTED_APK_URL_PREFIX", self.updater)
+        self.assertIn("certificate != EXPECTED_SIGNING_CERT_SHA256", self.updater)
+        self.assertIn("archiveInfo.versionName != expectedVersionName", self.updater)
+        self.assertIn("archiveInfo.packageName != context.packageName", self.updater)
+        self.assertIn("sha256(file) != expectedDigest", self.updater)
+        self.assertIn("downloadedVersionCode <= currentVersionCode", self.updater)
 
 
 if __name__ == "__main__":
