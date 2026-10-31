@@ -16,6 +16,7 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
         cls.server = (ROOT / "core_server.py").read_text(encoding="utf-8")
         cls.gradle = (ROOT / "android/app/build.gradle.kts").read_text(encoding="utf-8")
         cls.updater = (ROOT / "android/app/src/main/java/com/mrmorning/stacy/StacyUpdater.kt").read_text(encoding="utf-8")
+        cls.secrets = (ROOT / "android/app/src/main/java/com/mrmorning/stacy/StacySecretStore.kt").read_text(encoding="utf-8")
 
     def test_message_has_a_complete_ui_to_core_and_back_path(self):
         self.assertIn('Android.stacySend(text)', self.html)
@@ -110,6 +111,11 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
         self.assertIn("archiveInfo.packageName != context.packageName", self.updater)
         self.assertIn("sha256(file) != expectedDigest", self.updater)
         self.assertIn("downloadedVersionCode <= currentVersionCode", self.updater)
+
+    def test_gemini_key_and_context_changes_are_committed_to_disk(self):
+        self.assertIn(".remove(PREVIOUS_INTERACTION_ID)\n                .commit()", self.secrets)
+        self.assertIn("Não foi possível confirmar a gravação da chave", self.secrets)
+        self.assertIn("Não foi possível confirmar a remoção da chave", self.secrets)
 
 
 if __name__ == "__main__":
