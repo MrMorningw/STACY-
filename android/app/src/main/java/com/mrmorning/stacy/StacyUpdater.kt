@@ -91,11 +91,14 @@ class StacyUpdater(
     }
 
     private fun fetchLatestRelease(): JSONObject {
-        val connection = (URL(API_URL).openConnection() as HttpURLConnection).apply {
+        val manifestUrl = "$API_URL?nocache=${System.currentTimeMillis()}"
+        val connection = (URL(manifestUrl).openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
             connectTimeout = 12_000
             readTimeout = 20_000
             setRequestProperty("Accept", "application/vnd.github+json")
+            setRequestProperty("Cache-Control", "no-cache, no-store, max-age=0")
+            setRequestProperty("Pragma", "no-cache")
             setRequestProperty("X-GitHub-Api-Version", "2022-11-28")
             setRequestProperty("User-Agent", USER_AGENT)
         }
@@ -132,8 +135,11 @@ class StacyUpdater(
             throw IllegalStateException("O pacote da atualização não possui endereço de download.")
         }
         val assetName = asset.optString("name", "")
+        val parsedUrl = Uri.parse(url)
         if (!assetName.matches(Regex("STACY-[0-9]+\\.[0-9]+\\.[0-9]+\\.apk")) ||
-            !url.startsWith(TRUSTED_APK_URL_PREFIX) || !url.endsWith("/$assetName")
+            parsedUrl.scheme != "https" ||
+            parsedUrl.host != "raw.githubusercontent.com" ||
+            parsedUrl.path != "/MrMorningw/STACY---UPTADES-DEFINITIVO/main/releases/$assetName"
         ) {
             throw SecurityException("O canal apontou para um pacote fora do repositório oficial de atualizações.")
         }
@@ -146,6 +152,8 @@ class StacyUpdater(
             readTimeout = 60_000
             instanceFollowRedirects = true
             setRequestProperty("Accept", "application/octet-stream")
+            setRequestProperty("Cache-Control", "no-cache, no-store, max-age=0")
+            setRequestProperty("Pragma", "no-cache")
             setRequestProperty("User-Agent", USER_AGENT)
         }
         try {
