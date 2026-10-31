@@ -5,68 +5,62 @@ import android.os.Handler
 import android.os.Looper
 import org.json.JSONArray
 import org.json.JSONObject
-import java.text.Normalizer
-import java.util.Locale
 
 /**
- * Android-native request router.
- * Deterministic commands are answered locally. General conversation uses HTTPS
- * directly from this app; this request path starts no Python daemon or secondary server.
+ * Application-facing facade. It knows only the provider contract, never a
+ * specific intelligence engine, API vendor, Python runtime, or local daemon.
  */
-class StacyCoreBridge(private val context: Context) {
-    private val localStore = StacyLocalStore(context.applicationContext)
-    private val nativeCore = StacyNativeCore(localStore)
-    private val aiClient = StacyAiClient(context.applicationContext)
-
+class StacyCoreBridge(
+    private val context: Context,
+    private val provider: StacyCoreProvider = StacyCoreProviderFactory.create(context.applicationContext),
+) {
     fun process(message: String, onQueued: () -> Unit = {}) {
         val normalized = message.trim()
         if (normalized.isEmpty()) return
 
         onQueued()
-        val localResult = nativeCore.process(normalized)
-        if (localResult != null) {
-            CoreResultStore.publish(context, localResult)
-            return
+        CorePhaseStore.publish(context, "pensando")
+        try {
+            provider.process(normalized) { result ->
+                CoreResultStore.publish(context, result)
+                CorePhaseStore.publish(
+                    context,
+                    if (result.tipo.equals("erro", ignoreCase = true) || result.tipo.equals("error", ignoreCase = true)) "erro" else "respondendo",
+                )
+            }
+        } catch (error: Exception) {
+            publishProviderFailure(error)
         }
+    }
 
-        val useWebSearch = shouldUseWebSearch(normalized)
-        CorePhaseStore.publish(context, if (useWebSearch) "pesquisando" else "pensando")
-        aiClient.chat(normalized, useWebSearch) { result ->
-            // Deliver the authoritative payload before final phase telemetry.
-            // The WebView's ERROR-state handler replaces a pending bubble with a
-            // generic message; publishing the phase first can create a duplicate
-            // bubble and hide the detailed API diagnostic.
-            CoreResultStore.publish(context, result)
-            CorePhaseStore.publish(
-                context,
-                if (result.tipo.equals("erro", ignoreCase = true) || result.tipo.equals("error", ignoreCase = true)) "erro" else "respondendo",
+    fun testConnection(callback: (CoreResult) -> Unit) {
+        try {
+            provider.testConnection(callback)
+        } catch (error: Exception) {
+            callback(
+                CoreResult(
+                    tipo = "erro",
+                    response = "Falha ao testar o núcleo conectado: ${error.message ?: "erro inesperado"}",
+                    exitCode = 1,
+                    stderr = error.message.orEmpty(),
+                ),
             )
         }
     }
 
-    private fun shouldUseWebSearch(message: String): Boolean {
-        val normalized = Normalizer.normalize(message, Normalizer.Form.NFD)
-            .replace(Regex("\\p{Mn}+"), "")
-            .lowercase(Locale.ROOT)
-        val webIntents = listOf(
-            "pesquise", "pesquisar", "pesquisa na web", "pesquisa na internet",
-            "busque na web", "procure na internet", "na internet", "na web",
-            "noticias", "hoje", "atualmente", "agora", "mais recente", "ultimas",
-            "ultimo", "ultima", "preco", "cotacao", "onde assistir", "fontes",
-            "referencias", "situacao atual", "quem e o atual", "pesquise sobre",
+    private fun publishProviderFailure(error: Exception) {
+        val result = CoreResult(
+            tipo = "erro",
+            response = "O núcleo conectado falhou ao processar a solicitação: ${error.message ?: "erro inesperado"}",
+            exitCode = 1,
+            stderr = error.message.orEmpty(),
         )
-        return webIntents.any(normalized::contains)
-    }
-
-    fun testConnection(callback: (CoreResult) -> Unit) {
-        aiClient.chat("Responda somente com: Conexão da STACY validada.") { result ->
-            callback(result)
-        }
+        CoreResultStore.publish(context, result)
+        CorePhaseStore.publish(context, "erro")
     }
 
     fun shutdown() {
-        aiClient.shutdown()
-        localStore.close()
+        provider.shutdown()
     }
 }
 
