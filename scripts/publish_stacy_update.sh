@@ -48,6 +48,7 @@ VN="${META[1]:-}"
 PKG="${META[2]:-}"
 SHA="$(sha256sum "$APK" | awk '{print $1}')"
 CERT="$("$APKSIGNER" verify --print-certs "$APK" | sed -n 's/.*certificate SHA-256 digest: //p' | head -1 | tr -d ':')"
+EXPECTED_CERT="6adc9b10b2e4c20f15985d315694063efed0cbe885d6cacf424248708980034b"
 
 if [ "$PKG" != "com.mrmorning.stacy" ]; then
   echo "Unexpected APK package name: '${PKG:-empty}' (expected com.mrmorning.stacy)"
@@ -56,6 +57,14 @@ fi
 if [ -z "$VC" ] || [ -z "$VN" ] || [ -z "$SHA" ] || [ -z "$CERT" ]; then
   echo "Could not extract release metadata from the APK."
   echo "versionCode='${VC:-}', versionName='${VN:-}', sha256_present=$([[ -n "$SHA" ]] && echo yes || echo no), certificate_present=$([[ -n "$CERT" ]] && echo yes || echo no)"
+  exit 1
+fi
+
+if [ "$CERT" != "$EXPECTED_CERT" ]; then
+  echo "Release signer does not match the certificate pinned in the installed STACY app."
+  echo "Expected: $EXPECTED_CERT"
+  echo "Actual:   $CERT"
+  echo "Refusing to publish an update that Android may reject."
   exit 1
 fi
 

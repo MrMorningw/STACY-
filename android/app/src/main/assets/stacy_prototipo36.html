@@ -764,14 +764,15 @@ function clearStacyPhaseTimers(){
  stacyPhaseTimers.forEach(id=>clearTimeout(id));stacyPhaseTimers=[];
 }
 function scheduleStacyResponseWatchdog(){
- // Covers the AI search timeout with a small margin. Real CORE results cancel it.
+ // The native Gemini client allows 45s for chat and 60s for web search.
+ // Keep a 10s delivery margin so the UI never reports a false timeout first.
  stacyPhaseTimers.push(setTimeout(function(){
    if(!stacyRequestActive)return;
    window.stacyNativeResponse(
      "A STACY não recebeu uma resposta do núcleo dentro do limite de espera. Verifique a conexão com a internet e, em Menu → Ajustes, confirme a chave da Gemini API. Os comandos locais continuam disponíveis.",
      "erro"
    );
- },38000));
+ },70000));
 }
 function startStacyProcessingStages(_message){
  clearStacyPhaseTimers();

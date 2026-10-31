@@ -15,6 +15,9 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
         cls.daemon = (ROOT / "android/termux_widget/stacy-core-daemon.sh").read_text(encoding="utf-8")
         cls.server = (ROOT / "core_server.py").read_text(encoding="utf-8")
         cls.gradle = (ROOT / "android/app/build.gradle.kts").read_text(encoding="utf-8")
+        cls.updater = (ROOT / "android/app/src/main/java/com/mrmorning/stacy/StacyUpdater.kt").read_text(encoding="utf-8")
+        cls.secrets = (ROOT / "android/app/src/main/java/com/mrmorning/stacy/StacySecretStore.kt").read_text(encoding="utf-8")
+        cls.publisher = (ROOT / "scripts/publish_stacy_update.sh").read_text(encoding="utf-8")
 
     def test_message_has_a_complete_ui_to_core_and_back_path(self):
         self.assertIn('Android.stacySend(text)', self.html)
@@ -35,7 +38,7 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
         self.assertNotIn('localhost', self.bridge.lower())
         self.assertNotIn('com.termux.permission.RUN_COMMAND', manifest)
         self.assertNotIn('android:name="com.termux"', manifest)
-        self.assertIn('https://generativelanguage.googleapis.com/v1beta/interactions', ai)
+        self.assertIn('https://generativelanguage.googleapis.com/v1/interactions', ai)
         self.assertIn('previous_interaction_id', ai)
         self.assertIn('StacyLocalStore', self.bridge)
         self.assertGreater(len(self.html), 170_000, "Approved STACY UI must be preserved")
@@ -98,8 +101,27 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
         self.assertIn("CorePhaseContext", (ROOT / "core_phase_context.py").read_text(encoding="utf-8"))
 
     def test_released_build_advances_version_so_installed_app_can_update(self):
-        self.assertIn("versionCode = 28", self.gradle)
-        self.assertIn('versionName = "0.3.7"', self.gradle)
+        self.assertIn("versionCode = 29", self.gradle)
+        self.assertIn('versionName = "0.3.8"', self.gradle)
+
+    def test_update_channel_is_pinned_and_checks_package_identity(self):
+        self.assertIn("EXPECTED_SIGNING_CERT_SHA256", self.updater)
+        self.assertIn("TRUSTED_APK_URL_PREFIX", self.updater)
+        self.assertIn("certificate != EXPECTED_SIGNING_CERT_SHA256", self.updater)
+        self.assertIn("archiveInfo.versionName != expectedVersionName", self.updater)
+        self.assertIn("archiveInfo.packageName != context.packageName", self.updater)
+        self.assertIn("sha256(file) != expectedDigest", self.updater)
+        self.assertIn("downloadedVersionCode <= currentVersionCode", self.updater)
+
+    def test_gemini_key_and_context_changes_are_committed_to_disk(self):
+        self.assertIn(".remove(PREVIOUS_INTERACTION_ID)\n                .commit()", self.secrets)
+        self.assertIn("Não foi possível confirmar a gravação da chave", self.secrets)
+        self.assertIn("Não foi possível confirmar a remoção da chave", self.secrets)
+
+    def test_ars_publisher_refuses_signer_rotation(self):
+        self.assertIn("EXPECTED_CERT=", self.publisher)
+        self.assertIn('if [ "$CERT" != "$EXPECTED_CERT" ]; then', self.publisher)
+        self.assertIn("Refusing to publish an update that Android may reject.", self.publisher)
 
 
 if __name__ == "__main__":

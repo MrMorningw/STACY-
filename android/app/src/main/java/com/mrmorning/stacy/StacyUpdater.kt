@@ -25,6 +25,10 @@ class StacyUpdater(
             "https://raw.githubusercontent.com/MrMorningw/STACY---UPTADES-DEFINITIVO/main/update.json"
         private const val USER_AGENT = "STACY-Updater/1.0"
         private const val APK_PREFIX = "STACY"
+        // Pin the certificate already used by the published 0.3.7 installation.
+        // The manifest is public and must not be allowed to redefine the trusted signer.
+        private const val EXPECTED_SIGNING_CERT_SHA256 = "6adc9b10b2e4c20f15985d315694063efed0cbe885d6cacf424248708980034b"
+        private const val TRUSTED_APK_URL_PREFIX = "https://raw.githubusercontent.com/MrMorningw/STACY---UPTADES-DEFINITIVO/main/releases/"
     }
 
     private val executor = Executors.newSingleThreadExecutor()
@@ -53,8 +57,12 @@ class StacyUpdater(
                 if (!publishedDigest.matches(Regex("[a-f0-9]{64}")) || publishedDigest != assetDigest) {
                     throw IllegalStateException("Canal inválido: SHA-256 do manifesto e do APK não coincidem.")
                 }
-                if (!certificate.matches(Regex("[a-f0-9]{64}"))) {
-                    throw IllegalStateException("Canal inválido: certificado oficial não foi publicado corretamente.")
+                if (!certificate.matches(Regex("[a-f0-9]{64}")) || certificate != EXPECTED_SIGNING_CERT_SHA256) {
+                    throw SecurityException("Canal inválido: o certificado publicado não corresponde ao assinante oficial da STACY.")
+                }
+                val minAndroid = release.optInt("minAndroid", -1)
+                if (minAndroid < 1 || Build.VERSION.SDK_INT < minAndroid) {
+                    throw IllegalStateException("Esta atualização exige Android API $minAndroid ou superior.")
                 }
                 asset.put("signingCertificateSha256", certificate)
                 val currentCode = currentVersionCode()
@@ -73,7 +81,7 @@ class StacyUpdater(
 
                 onState("Nova versão confirmada: $currentName → $publishedName. Baixando e validando pacote…")
                 val file = downloadApk(asset)
-                validateApk(file, asset, assetVersionCode, currentCode)
+                validateApk(file, asset, assetVersionCode, publishedName, currentCode)
                 onState("Integridade e assinatura confirmadas para $publishedName. Abrindo instalador do Android…")
                 installApk(file)
             } catch (e: Exception) {
@@ -123,6 +131,12 @@ class StacyUpdater(
         val url = asset.optString("browser_download_url").ifBlank {
             throw IllegalStateException("O pacote da atualização não possui endereço de download.")
         }
+        val assetName = asset.optString("name", "")
+        if (!assetName.matches(Regex("STACY-[0-9]+\\.[0-9]+\\.[0-9]+\\.apk")) ||
+            !url.startsWith(TRUSTED_APK_URL_PREFIX) || !url.endsWith("/$assetName")
+        ) {
+            throw SecurityException("O canal apontou para um pacote fora do repositório oficial de atualizações.")
+        }
         val target = File(context.cacheDir, "stacy-update.apk")
         if (target.exists()) target.delete()
 
@@ -160,7 +174,7 @@ class StacyUpdater(
         return target
     }
 
-    private fun validateApk(file: File, asset: JSONObject, assetVersionCode: Long, currentVersionCode: Long) {
+    private fun validateApk(file: File, asset: JSONObject, assetVersionCode: Long, expectedVersionName: String, currentVersionCode: Long) {
         val expectedDigest = asset.optString("digest", "")
             .removePrefix("sha256:")
             .lowercase()
@@ -181,6 +195,9 @@ class StacyUpdater(
             ?: throw IllegalStateException("O arquivo baixado não é um APK válido.")
         if (archiveInfo.packageName != context.packageName) {
             throw SecurityException("O pacote baixado não pertence à STACY.")
+        }
+        if (archiveInfo.versionName != expectedVersionName) {
+            throw SecurityException("O versionName do APK não corresponde ao manifesto de atualização.")
         }
 
         val expectedCertificate = asset.optString("signingCertificateSha256", "")
