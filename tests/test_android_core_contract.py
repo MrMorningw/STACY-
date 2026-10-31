@@ -35,7 +35,7 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
         self.assertNotIn('localhost', self.bridge.lower())
         self.assertNotIn('com.termux.permission.RUN_COMMAND', manifest)
         self.assertNotIn('android:name="com.termux"', manifest)
-        self.assertIn('https://generativelanguage.googleapis.com/v1beta/interactions', ai)
+        self.assertIn('https://generativelanguage.googleapis.com/v1/interactions', ai)
         self.assertIn('previous_interaction_id', ai)
         self.assertIn('StacyLocalStore', self.bridge)
         self.assertGreater(len(self.html), 170_000, "Approved STACY UI must be preserved")
