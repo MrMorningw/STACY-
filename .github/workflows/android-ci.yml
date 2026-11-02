@@ -129,19 +129,7 @@ jobs:
           arch: x86_64
           disable-linux-hw-accel: false
           disable-animations: true
-          script: |
-            cd android
-            set +e
-            gradle connectedDebugAndroidTest --stacktrace
-            test_status=$?
-            echo "===== ANDROID INSTRUMENTATION XML REPORTS ====="
-            if [ -d app/build/outputs/androidTest-results/connected ]; then
-              find app/build/outputs/androidTest-results/connected -type f -name '*.xml' -print -exec cat {} \;
-            else
-              echo "No XML test report directory was created."
-            fi
-            echo "===== END ANDROID INSTRUMENTATION REPORTS ====="
-            exit "$test_status"
+          script: bash scripts/run_android_instrumentation.sh
 
       - name: Upload Android instrumentation test reports
         if: always()
