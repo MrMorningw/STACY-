@@ -51,7 +51,8 @@ class StacyWebViewBridgeTest {
                 },
             )
 
-            evaluate(
+            armJavascriptDiagnostics(webView)
+            val submitSnapshot = evaluate(
                 webView,
                 "(function(){ " +
                     "var input=document.getElementById('message'); " +
@@ -59,19 +60,22 @@ class StacyWebViewBridgeTest {
                     "if(!input || !send) return 'missing-composer'; " +
                     "input.value='diagnóstico do CORE nativo'; " +
                     "send.click(); " +
-                    "return 'sent'; " +
+                    "return JSON.stringify({value:input.value,pending:!!document.getElementById('stacyPendingReply')," +
+                    "chat:document.getElementById('stacyChatLog') ? document.getElementById('stacyChatLog').innerText : ''}); " +
                 "})()",
             )
-
+            val returned = awaitCondition(webView, timeoutMs = 8_000) {
+                evaluate(
+                    webView,
+                    "(function(){ var log=document.getElementById('stacyChatLog'); " +
+                        "return !!log && log.innerText.includes('CORE NATIVO: ONLINE'); })()",
+                ) == "true"
+            }
+            val diagnostics = if (returned) "" else webViewSnapshot(webView)
             assertTrue(
-                "The diagnostic request did not return to the production chat UI",
-                awaitCondition(webView, timeoutMs = 8_000) {
-                    evaluate(
-                        webView,
-                        "(function(){ var log=document.getElementById('stacyChatLog'); " +
-                            "return !!log && log.innerText.includes('CORE NATIVO: ONLINE'); })()",
-                    ) == "true"
-                },
+                "The diagnostic request did not return to the production chat UI. " +
+                    "Submit=$submitSnapshot; DOM=$diagnostics",
+                returned,
             )
         }
     }
@@ -106,7 +110,8 @@ class StacyWebViewBridgeTest {
                 },
             )
 
-            evaluate(
+            armJavascriptDiagnostics(webView)
+            val submitSnapshot = evaluate(
                 webView,
                 "(function(){ " +
                     "var input=document.getElementById('message'); " +
@@ -114,27 +119,61 @@ class StacyWebViewBridgeTest {
                     "if(!input || !send) return 'missing-composer'; " +
                     "input.value='Explique a teoria geral dos contratos'; " +
                     "send.click(); " +
-                    "return 'sent'; " +
+                    "return JSON.stringify({value:input.value,pending:!!document.getElementById('stacyPendingReply')," +
+                    "chat:document.getElementById('stacyChatLog') ? document.getElementById('stacyChatLog').innerText : ''}); " +
                 "})()",
             )
-
+            val returned = awaitCondition(webView, timeoutMs = 8_000) {
+                evaluate(
+                    webView,
+                    "(function(){ " +
+                        "var log=document.getElementById('stacyChatLog'); " +
+                        "var replies=log ? log.querySelectorAll('.stacy-chat-row.assistant .stacy-chat-bubble') : []; " +
+                        "return replies.length === 1 && " +
+                        "replies[0].innerText.includes('IA generativa ainda não está conectada') && " +
+                        "!log.innerText.includes('Não foi possível concluir. Verifique a conexão da IA ou tente novamente.'); " +
+                    "})()",
+                ) == "true"
+            }
+            val diagnostics = if (returned) "" else webViewSnapshot(webView)
             assertTrue(
-                "A missing API key must produce one real diagnostic bubble, not a generic placeholder plus a duplicate",
-                awaitCondition(webView, timeoutMs = 8_000) {
-                    evaluate(
-                        webView,
-                        "(function(){ " +
-                            "var log=document.getElementById('stacyChatLog'); " +
-                            "var replies=log ? log.querySelectorAll('.stacy-chat-row.assistant .stacy-chat-bubble') : []; " +
-                            "return replies.length === 1 && " +
-                            "replies[0].innerText.includes('IA generativa ainda não foi conectada') && " +
-                            "!log.innerText.includes('Não foi possível concluir. Verifique a conexão da IA ou tente novamente.'); " +
-                        "})()",
-                    ) == "true"
-                },
+                "A missing API key must produce one real diagnostic bubble. " +
+                    "Submit=$submitSnapshot; DOM=$diagnostics",
+                returned,
             )
         }
     }
+
+    private fun armJavascriptDiagnostics(webView: WebView) {
+        evaluate(
+            webView,
+            "(function(){ " +
+                "window.__stacyTestErrors=[];window.__stacyTestClickObserved=0; " +
+                "window.addEventListener('error',function(e){window.__stacyTestErrors.push(String(e.message||e.error||'unknown JS error'));}); " +
+                "window.addEventListener('unhandledrejection',function(e){window.__stacyTestErrors.push(String(e.reason||'unhandled rejection'));}); " +
+                "var send=document.getElementById('send'); " +
+                "if(send)send.addEventListener('click',function(){window.__stacyTestClickObserved++;},true); " +
+                "return 'armed'; " +
+            "})()",
+        )
+    }
+
+    private fun webViewSnapshot(webView: WebView): String =
+        evaluate(
+            webView,
+            "(function(){ " +
+                "var log=document.getElementById('stacyChatLog'); " +
+                "var input=document.getElementById('message'); " +
+                "var status=document.getElementById('status'); " +
+                "var bubble=document.getElementById('responseBubble'); " +
+                "return JSON.stringify({bridge:window.Android ? typeof window.Android.stacySend : 'missing'," +
+                "nativeResponse:typeof window.stacyNativeResponse,clicks:window.__stacyTestClickObserved||0," +
+                "input:input ? input.value : null,pending:!!document.getElementById('stacyPendingReply')," +
+                "chat:log ? log.innerText : '',status:status ? status.innerText : null," +
+                "response:bubble ? bubble.innerText : null,appClass:document.getElementById('app') ? document.getElementById('app').className : null," +
+                "errors:window.__stacyTestErrors||[]});" +
+            "})()",
+        ) ?: "<WebView did not return a diagnostic snapshot>"
 
     private fun awaitCondition(
         webView: WebView,

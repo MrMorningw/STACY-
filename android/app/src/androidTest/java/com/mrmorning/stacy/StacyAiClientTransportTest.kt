@@ -59,10 +59,13 @@ class StacyAiClientTransportTest {
             assertEquals("A stale interaction should cause exactly one clean retry", 2, server.requests.size)
             val firstBody = server.requests[0]
             val secondBody = server.requests[1]
+            assertTrue("Request must use the Interactions endpoint", firstBody.startsWith("POST /v1/interactions "))
+            assertTrue("API key must be sent in the documented header", firstBody.contains("x-goog-api-key: test-only-key"))
+            assertTrue("Request must declare JSON content", firstBody.contains("Content-Type: application/json"))
             assertTrue(firstBody.contains("\"previous_interaction_id\":\"expired-interaction\""))
             assertFalse(secondBody.contains("previous_interaction_id"))
-            assertTrue(firstBody.contains("\"max_output_tokens\":4096"))
-            assertTrue(secondBody.contains("\"max_output_tokens\":4096"))
+            assertTrue(firstBody.contains("\"max_output_tokens\":32768"))
+            assertTrue(secondBody.contains("\"max_output_tokens\":32768"))
             assertEquals("fresh-interaction", secrets.getPreviousInteractionId())
             assertEquals(null, server.failure.get())
         } finally {
@@ -78,7 +81,7 @@ class StacyAiClientTransportTest {
         private val responses: List<FakeResponse>,
     ) : AutoCloseable {
         private val socket = ServerSocket(0, responses.size, InetAddress.getByName("127.0.0.1"))
-        val url: String = "http://127.0.0.1:${socket.localPort}/v1beta/interactions"
+        val url: String = "http://127.0.0.1:${socket.localPort}/v1/interactions"
         val requests = CopyOnWriteArrayList<String>()
         val failure = AtomicReference<Throwable?>()
         private var thread: Thread? = null

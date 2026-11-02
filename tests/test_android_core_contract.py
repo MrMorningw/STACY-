@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 import unittest
 
 
@@ -101,9 +102,16 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
         self.assertIn("CorePhaseContext", (ROOT / "core_phase_context.py").read_text(encoding="utf-8"))
 
     def test_released_build_advances_version_so_installed_app_can_update(self):
-        self.assertIn("versionCode = 29", self.gradle)
-        self.assertIn('versionName = "0.3.8"', self.gradle)
-
+        version_code = re.search(r"versionCode\s*=\s*(\d+)", self.gradle)
+        version_name = re.search(r'versionName\s*=\s*"([^"]+)"', self.gradle)
+        self.assertIsNotNone(version_code, "Android versionCode must be declared")
+        self.assertIsNotNone(version_name, "Android versionName must be declared")
+        self.assertGreater(int(version_code.group(1)), 29, "Installed 0.3.8 builds must accept this update")
+        self.assertGreater(
+            tuple(int(part) for part in version_name.group(1).split(".")),
+            (0, 3, 8),
+            "The released versionName must advance beyond 0.3.8",
+        )
     def test_update_channel_is_pinned_and_checks_package_identity(self):
         self.assertIn("EXPECTED_SIGNING_CERT_SHA256", self.updater)
         self.assertIn("TRUSTED_APK_URL_PREFIX", self.updater)
