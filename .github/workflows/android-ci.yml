@@ -129,7 +129,30 @@ jobs:
           arch: x86_64
           disable-linux-hw-accel: false
           disable-animations: true
-          script: cd android && gradle connectedDebugAndroidTest
+          script: |
+            cd android
+            set +e
+            gradle connectedDebugAndroidTest --stacktrace
+            test_status=$?
+            echo "===== ANDROID INSTRUMENTATION XML REPORTS ====="
+            if [ -d app/build/outputs/androidTest-results/connected ]; then
+              find app/build/outputs/androidTest-results/connected -type f -name '*.xml' -print -exec cat {} \;
+            else
+              echo "No XML test report directory was created."
+            fi
+            echo "===== END ANDROID INSTRUMENTATION REPORTS ====="
+            exit "$test_status"
+
+      - name: Upload Android instrumentation test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: STACY-android-instrumentation-results
+          path: |
+            android/app/build/reports/androidTests/connected/debug/
+            android/app/build/outputs/androidTest-results/connected/debug/
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Upload STACY APK
         if: success()
