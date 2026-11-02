@@ -59,10 +59,16 @@ class StacyAiClientTransportTest {
             assertEquals("A stale interaction should cause exactly one clean retry", 2, server.requests.size)
             val firstBody = server.requests[0]
             val secondBody = server.requests[1]
-            assertTrue(firstBody.contains("\"previous_interaction_id\":\"expired-interaction\""))
-            assertFalse(secondBody.contains("previous_interaction_id"))
-            assertTrue(firstBody.contains("\"max_output_tokens\":4096"))
-            assertTrue(secondBody.contains("\"max_output_tokens\":4096"))
+            val firstRequest = JSONObject(firstBody.substringAfter("\n\n"))
+            val secondRequest = JSONObject(secondBody.substringAfter("\n\n"))
+            assertEquals("gemini-3.8-flash", firstRequest.getString("model"))
+            assertEquals("gemini-3.8-flash", secondRequest.getString("model"))
+            assertEquals(32768, firstRequest.getJSONObject("generation_config").getInt("max_output_tokens"))
+            assertEquals(32768, secondRequest.getJSONObject("generation_config").getInt("max_output_tokens"))
+            assertEquals("low", firstRequest.getJSONObject("generation_config").getString("thinking_level"))
+            assertEquals("low", secondRequest.getJSONObject("generation_config").getString("thinking_level"))
+            assertTrue(firstRequest.getBoolean("store"))
+            assertTrue(secondRequest.getBoolean("store"))
             assertEquals("fresh-interaction", secrets.getPreviousInteractionId())
             assertEquals(null, server.failure.get())
         } finally {
@@ -78,7 +84,7 @@ class StacyAiClientTransportTest {
         private val responses: List<FakeResponse>,
     ) : AutoCloseable {
         private val socket = ServerSocket(0, responses.size, InetAddress.getByName("127.0.0.1"))
-        val url: String = "http://127.0.0.1:${socket.localPort}/v1beta/interactions"
+        val url: String = "http://127.0.0.1:${socket.localPort}/v1/interactions"
         val requests = CopyOnWriteArrayList<String>()
         val failure = AtomicReference<Throwable?>()
         private var thread: Thread? = null
