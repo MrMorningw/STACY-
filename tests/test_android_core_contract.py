@@ -102,8 +102,8 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
         self.assertIn("CorePhaseContext", (ROOT / "core_phase_context.py").read_text(encoding="utf-8"))
 
     def test_released_build_advances_version_so_installed_app_can_update(self):
-        version_code = re.search(r"versionCode\\s*=\\s*(\\d+)", self.gradle)
-        version_name = re.search(r'versionName\\s*=\\s*"([^"]+)"', self.gradle)
+        version_code = re.search(r"versionCode\s*=\s*(\d+)", self.gradle)
+        version_name = re.search(r'versionName\s*=\s*"([^"]+)"', self.gradle)
         self.assertIsNotNone(version_code, "Android versionCode must be declared")
         self.assertIsNotNone(version_name, "Android versionName must be declared")
         self.assertGreater(int(version_code.group(1)), 29, "Installed 0.3.8 builds must accept this update")
