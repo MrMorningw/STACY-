@@ -129,7 +129,7 @@ jobs:
           arch: x86_64
           disable-linux-hw-accel: false
           disable-animations: true
-          script: gradle connectedDebugAndroidTest
+          script: cd android && gradle connectedDebugAndroidTest
 
       - name: Upload STACY APK
         if: success()
