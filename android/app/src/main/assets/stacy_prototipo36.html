@@ -764,6 +764,10 @@ let stacyRequestActive=false;
 function clearStacyPhaseTimers(){
  stacyPhaseTimers.forEach(id=>clearTimeout(id));stacyPhaseTimers=[];
 }
+window.stacyStopProcessing=function(){
+ stacyRequestActive=false;
+ clearStacyPhaseTimers();
+};
 function scheduleStacyResponseWatchdog(){
  // The native Gemini client allows 45s for chat and 60s for web search.
  // Keep a 10s delivery margin so the UI never reports a false timeout first.
@@ -1016,7 +1020,7 @@ animationFrameId=requestAnimationFrame(animate);
     const pendingNow=document.getElementById('stacyPendingReply');
     if(key==='online' && pendingNow)return;
     if(['erro','error','offline'].includes(key)){
-      stacyRequestActive=false;clearStacyPhaseTimers();
+      window.stacyStopProcessing();
       const pending=document.getElementById('stacyPendingReply');
       if(pending){pending.querySelector('.stacy-chat-bubble').textContent='Não foi possível concluir. Verifique a conexão da IA ou tente novamente.';pending.classList.remove('pending');pending.id='';}
     }
@@ -1038,7 +1042,7 @@ animationFrameId=requestAnimationFrame(animate);
     const bubble=document.getElementById('responseBubble');
     if(bubble)bubble.textContent=text;
     document.getElementById('app').classList.add('has-response');
-    stacyRequestActive=false;clearStacyPhaseTimers();
+    window.stacyStopProcessing();
     const pending=document.getElementById('stacyPendingReply');
     const log=document.getElementById('stacyChatLog');
     if(pending && log){
