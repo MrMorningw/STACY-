@@ -102,8 +102,8 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
         self.assertIn("CorePhaseContext", (ROOT / "core_phase_context.py").read_text(encoding="utf-8"))
 
     def test_released_build_advances_version_so_installed_app_can_update(self):
-        version_code = re.search(r"\\bversionCode\\s*=\\s*(\\d+)", self.gradle)
-        version_name = re.search(r'\\bversionName\\s*=\\s*"([^"]+)"', self.gradle)
+        version_code = re.search(r"\bversionCode\s*=\s*(\d+)", self.gradle)
+        version_name = re.search(r'\bversionName\s*=\s*"([^"]+)"', self.gradle)
         self.assertIsNotNone(version_code, "Android versionCode must be declared")
         self.assertIsNotNone(version_name, "Android versionName must be declared")
         self.assertGreater(
@@ -113,7 +113,7 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
         )
 
         semantic_version = re.fullmatch(
-            r"(\\d+)\\.(\\d+)\\.(\\d+)(?:[-+].*)?",
+            r"(\d+)\.(\d+)\.(\d+)(?:[-+].*)?",
             version_name.group(1),
         )
         self.assertIsNotNone(
