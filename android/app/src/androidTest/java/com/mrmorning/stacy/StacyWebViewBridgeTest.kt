@@ -127,7 +127,7 @@ class StacyWebViewBridgeTest {
                             "var log=document.getElementById('stacyChatLog'); " +
                             "var replies=log ? log.querySelectorAll('.stacy-chat-row.assistant .stacy-chat-bubble') : []; " +
                             "return replies.length === 1 && " +
-                            "replies[0].innerText.includes('IA generativa ainda não foi conectada') && " +
+                            "replies[0].innerText.includes('IA generativa ainda não está conectada') && " +
                             "!log.innerText.includes('Não foi possível concluir. Verifique a conexão da IA ou tente novamente.'); " +
                         "})()",
                     ) == "true"
