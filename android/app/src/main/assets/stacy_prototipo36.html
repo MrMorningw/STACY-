@@ -684,6 +684,7 @@ function setState(name){
  else if(name==="erro")infoText.textContent="Falha na comunicação com o núcleo";
  else infoText.textContent="Núcleo STACY • sistema operacional";
 }
+window.stacySetState = setState;
 
 /* INTERFACE DEFINITIVA: o toque no orbe NÃO altera estados.
    Os estados são controlados exclusivamente pelos eventos reais do Android/CORE. */
@@ -1019,7 +1020,7 @@ animationFrameId=requestAnimationFrame(animate);
       const pending=document.getElementById('stacyPendingReply');
       if(pending){pending.querySelector('.stacy-chat-bubble').textContent='Não foi possível concluir. Verifique a conexão da IA ou tente novamente.';pending.classList.remove('pending');pending.id='';}
     }
-    setState(stateMap[key]||key||'online');
+    window.stacySetState(stateMap[key]||key||'online');
     if(['pensando','ouvindo','pesquisando','executando','thinking','listening','researching','executing'].includes(key)){
       document.getElementById('app').classList.remove('has-response');
     }
@@ -1052,7 +1053,7 @@ animationFrameId=requestAnimationFrame(animate);
       const answer=document.createElement('div');answer.className='stacy-chat-bubble';answer.textContent=text;
       row.appendChild(answer);log.appendChild(row);log.scrollTop=log.scrollHeight;
     }
-    setState(mapped==='erro'?'erro':'respondendo');
+    window.stacySetState(mapped==='erro'?'erro':'respondendo');
   };
   function nativeSend(text){
     const value=String(text||'').trim();
