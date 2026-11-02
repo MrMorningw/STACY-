@@ -78,7 +78,7 @@ class StacyAiClientTransportTest {
         private val responses: List<FakeResponse>,
     ) : AutoCloseable {
         private val socket = ServerSocket(0, responses.size, InetAddress.getByName("127.0.0.1"))
-        val url: String = "http://127.0.0.1:${socket.localPort}/v1beta/interactions"
+        val url: String = "http://127.0.0.1:${socket.localPort}/v1/interactions"
         val requests = CopyOnWriteArrayList<String>()
         val failure = AtomicReference<Throwable?>()
         private var thread: Thread? = null
