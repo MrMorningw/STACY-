@@ -82,6 +82,7 @@ class MainActivity : ComponentActivity() {
         }
 
         CorePhaseStore.subscribe { state -> runOnUiThread { webState(state) } }
+        CoreStatusStore.subscribe { status -> runOnUiThread { webCoreStatus(status) } }
 
         CoreResultStore.subscribe { result ->
             runOnUiThread {
@@ -319,6 +320,11 @@ class MainActivity : ComponentActivity() {
         webView.evaluateJavascript("(function(s){try{if(typeof window.stacyNativeUpdateStatus==='function'){window.stacyNativeUpdateStatus(s);return;}}catch(e){} })(" + JSONObject.quote(status) + ")", null)
     }
 
+    private fun webCoreStatus(status: String) {
+        if (!::webView.isInitialized) return
+        webView.evaluateJavascript("(function(s){try{if(typeof window.stacyNativeCoreStatus==='function'){window.stacyNativeCoreStatus(s);return;}}catch(e){} })(" + JSONObject.quote(status) + ")", null)
+    }
+
     private fun webResponse(response: String, tipo: String) {
         if (!::webView.isInitialized) return
         val responseJson = JSONObject.quote(response)
@@ -355,6 +361,7 @@ class MainActivity : ComponentActivity() {
         responseHandler.removeCallbacksAndMessages(null)
         CoreResultStore.clear()
         CorePhaseStore.clear()
+        CoreStatusStore.clear()
         if (::voiceInput.isInitialized) voiceInput.destroy()
         if (::textToSpeech.isInitialized) textToSpeech.shutdown()
         if (::coreBridge.isInitialized) coreBridge.shutdown()
