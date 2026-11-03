@@ -1036,10 +1036,8 @@ animationFrameId=requestAnimationFrame(animate);
     if(stacyResponseDeferred && ['respondendo','resposta'].includes(key))return;
     if(key==='online' && pendingNow)return;
     stacyCurrentPhase=stateMap[key]||key||'online';
-    if(['pesquisando','pesquisa','research','researching'].includes(key)){
-      // A real CORE research event supersedes the ordinary execution phase.
-      stacyPhaseTimers=stacyPhaseTimers.filter(id=>{clearTimeout(id);return false;});
-    }
+    // A real CORE research event supersedes the ordinary execution phase;
+    // the scheduled transition checks stacyCurrentPhase before changing state.
     if(['erro','error','offline'].includes(key)){
       window.stacyStopProcessing();
       const pending=document.getElementById('stacyPendingReply');
@@ -1133,10 +1131,12 @@ animationFrameId=requestAnimationFrame(animate);
     }
     if(key==='privacidade'){
       if(window.Android && typeof Android.stacyOpenAppSettings==='function')Android.stacyOpenAppSettings();
+      else window.stacyNativeResponse('Não foi possível abrir as permissões: a ponte Android não está disponível.','erro');
       return;
     }
     if(key==='nucleo'){
       if(typeof window.stacyOpenPage==='function')window.stacyOpenPage('nucleo');
+      else window.stacyNativeResponse('A tela do Núcleo STACY não está disponível nesta versão.','erro');
       return;
     }
     if(key==='atualizacao'){
