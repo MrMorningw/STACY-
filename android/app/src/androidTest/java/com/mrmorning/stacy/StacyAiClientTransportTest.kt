@@ -75,7 +75,149 @@ class StacyAiClientTransportTest {
         }
     }
 
-    private data class FakeResponse(val status: Int, val body: String)
+    @Test
+    fun serviceUnavailableRetriesWithRetryAfterAndReturnsOriginalResponse() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val secrets = StacySecretStore(context)
+        secrets.clearGeminiApiKey()
+        secrets.saveGeminiApiKey("test-only-key")
+
+        val server = FakeInteractionsServer(
+            listOf(
+                FakeResponse(
+                    status = 503,
+                    body = """{"error":{"message":"The model is currently experiencing high demand."}}""",
+                    headers = mapOf("Retry-After" to "0"),
+                ),
+                FakeResponse(
+                    status = 200,
+                    body = """{"id":"recovered-interaction","status":"completed","output_text":"A STACY recuperou a conexão."}""",
+                ),
+            ),
+        )
+        val client = StacyAiClient(context, server.url)
+        val latch = CountDownLatch(1)
+        val result = AtomicReference<CoreResult?>()
+        val retryAttempts = CopyOnWriteArrayList<Int>()
+        val retryStatuses = CopyOnWriteArrayList<Int>()
+
+        try {
+            server.start()
+            client.chat(
+                message = "Mantenha esta solicitação sem alterações.",
+                useWebSearch = false,
+                onRetry = { attempt, _, status ->
+                    retryAttempts.add(attempt)
+                    retryStatuses.add(status)
+                },
+            ) {
+                result.set(it)
+                latch.countDown()
+            }
+
+            assertTrue("The client did not recover after HTTP 503", latch.await(10, TimeUnit.SECONDS))
+            assertEquals("resposta", result.get()?.tipo)
+            assertEquals("A STACY recuperou a conexão.", result.get()?.response)
+            assertEquals(2, server.requests.size)
+            assertEquals(listOf(1), retryAttempts.toList())
+            assertEquals(listOf(503), retryStatuses.toList())
+            assertTrue(server.requests.all { it.contains("Mantenha esta solicitação sem alterações.") })
+            assertEquals("recovered-interaction", secrets.getPreviousInteractionId())
+            assertEquals(null, server.failure.get())
+        } finally {
+            client.shutdown()
+            secrets.clearGeminiApiKey()
+            server.close()
+        }
+    }
+
+    @Test
+    fun serviceUnavailableStopsAfterFourTotalAttempts() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val secrets = StacySecretStore(context)
+        secrets.clearGeminiApiKey()
+        secrets.saveGeminiApiKey("test-only-key")
+
+        val server = FakeInteractionsServer(
+            List(4) {
+                FakeResponse(
+                    status = 503,
+                    body = """{"error":{"message":"The service is temporarily overloaded."}}""",
+                    headers = mapOf("Retry-After" to "0"),
+                )
+            },
+        )
+        val client = StacyAiClient(context, server.url)
+        val latch = CountDownLatch(1)
+        val result = AtomicReference<CoreResult?>()
+        val retryAttempts = CopyOnWriteArrayList<Int>()
+
+        try {
+            server.start()
+            client.chat(
+                message = "Teste de limite de tentativas.",
+                onRetry = { attempt, _, _ -> retryAttempts.add(attempt) },
+            ) {
+                result.set(it)
+                latch.countDown()
+            }
+
+            assertTrue("The client did not stop after the retry limit", latch.await(10, TimeUnit.SECONDS))
+            assertEquals("erro", result.get()?.tipo)
+            assertTrue(result.get()?.response.orEmpty().contains("4 tentativas automáticas"))
+            assertEquals(4, server.requests.size)
+            assertEquals(listOf(1, 2, 3), retryAttempts.toList())
+            assertEquals(null, server.failure.get())
+        } finally {
+            client.shutdown()
+            secrets.clearGeminiApiKey()
+            server.close()
+        }
+    }
+
+    @Test
+    fun quotaExhausted429DoesNotRetry() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val secrets = StacySecretStore(context)
+        secrets.clearGeminiApiKey()
+        secrets.saveGeminiApiKey("test-only-key")
+
+        val server = FakeInteractionsServer(
+            listOf(
+                FakeResponse(
+                    status = 429,
+                    body = """{"error":{"message":"Quota exceeded for this API key."}}""",
+                ),
+            ),
+        )
+        val client = StacyAiClient(context, server.url)
+        val latch = CountDownLatch(1)
+        val result = AtomicReference<CoreResult?>()
+
+        try {
+            server.start()
+            client.chat("Teste de cota esgotada.") {
+                result.set(it)
+                latch.countDown()
+            }
+
+            assertTrue("The client did not return the quota error", latch.await(5, TimeUnit.SECONDS))
+            assertEquals("erro", result.get()?.tipo)
+            assertTrue(result.get()?.response.orEmpty().contains("HTTP 429"))
+            assertEquals("Quota errors must not trigger repeated requests", 1, server.requests.size)
+            assertEquals(null, server.failure.get())
+        } finally {
+            client.shutdown()
+            secrets.clearGeminiApiKey()
+            server.close()
+        }
+    }
+
+    private data class FakeResponse(
+        val status: Int,
+        val body: String,
+        val headers: Map<String, String> = emptyMap(),
+    )
 
     private class FakeInteractionsServer(
         private val responses: List<FakeResponse>,
@@ -117,10 +259,19 @@ class StacyAiClientTransportTest {
                             requests.add(headers.joinToString("\n") + "\n\n" + requestBody)
 
                             val responseBytes = response.body.toByteArray(StandardCharsets.UTF_8)
-                            val reason = if (response.status in 200..299) "OK" else "Bad Request"
+                            val reason = when (response.status) {
+                                200 -> "OK"
+                                429 -> "Too Many Requests"
+                                503 -> "Service Unavailable"
+                                else -> "Error"
+                            }
+                            val extraHeaders = response.headers.entries.joinToString(separator = "") {
+                                "${it.key}: ${it.value}\r\n"
+                            }
                             val responseHeaders = (
                                 "HTTP/1.1 ${response.status} ${reason}\r\n" +
                                     "Content-Type: application/json; charset=UTF-8\r\n" +
+                                    extraHeaders +
                                     "Content-Length: ${responseBytes.size}\r\n" +
                                     "Connection: close\r\n\r\n"
                                 ).toByteArray(StandardCharsets.US_ASCII)
