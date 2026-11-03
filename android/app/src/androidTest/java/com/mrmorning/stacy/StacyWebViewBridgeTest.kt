@@ -39,6 +39,16 @@ class StacyWebViewBridgeTest {
                 },
             )
             evaluate(webView, "window.stacySetAnimationsEnabled(false)")
+            evaluate(webView, "window.stacyNativeCoreStatus('Gemini indisponível. Tentativa automática 1/3.')")
+            assertTrue(
+                "Retry status must be visible in the existing STACY information line",
+                evaluate(
+                    webView,
+                    "document.getElementById('infoText').innerText.includes('Tentativa automática 1/3')",
+                ) == "true",
+            )
+            evaluate(webView, "window.stacyNativeCoreStatus('')")
+
 
             assertTrue(
                 "STACY WebView did not finish exposing its native bridge",
@@ -46,6 +56,7 @@ class StacyWebViewBridgeTest {
                     evaluate(
                         webView,
                         "typeof window.stacyNativeResponse === 'function' && " +
+                            "typeof window.stacyNativeCoreStatus === 'function' && " +
                             "typeof window.Android === 'object' && typeof window.Android.stacySend === 'function'",
                     ) == "true"
                 },

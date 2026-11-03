@@ -690,6 +690,10 @@ function setState(name){
  else infoText.textContent="Núcleo STACY • sistema operacional";
 }
 window.stacySetState = setState;
+window.stacyNativeCoreStatus = function(message){
+ const value=String(message||"").trim();
+ infoText.textContent=value||"Núcleo STACY • sistema operacional";
+};
 
 /* INTERFACE DEFINITIVA: o toque no orbe NÃO altera estados.
    Os estados são controlados exclusivamente pelos eventos reais do Android/CORE. */

@@ -31,7 +31,8 @@ class StacyCoreBridge(private val context: Context) {
 
         val useWebSearch = shouldUseWebSearch(normalized)
         CorePhaseStore.publish(context, if (useWebSearch) "pesquisando" else "pensando")
-        aiClient.chat(normalized, useWebSearch) { result ->
+        aiClient.chat(normalized, useWebSearch, onRetry = ::publishRetryStatus) { result ->
+            CoreStatusStore.publish(context, "")
             // Deliver the authoritative payload before final phase telemetry.
             // The WebView's ERROR-state handler replaces a pending bubble with a
             // generic message; publishing the phase first can create a duplicate
@@ -59,9 +60,20 @@ class StacyCoreBridge(private val context: Context) {
     }
 
     fun testConnection(callback: (CoreResult) -> Unit) {
-        aiClient.chat("Responda somente com: Conexão da STACY validada.") { result ->
+        aiClient.chat(
+            "Responda somente com: Conexão da STACY validada.",
+            onRetry = ::publishRetryStatus,
+        ) { result ->
+            CoreStatusStore.publish(context, "")
             callback(result)
         }
+    }
+
+    private fun publishRetryStatus(attempt: Int, delayMs: Long, statusCode: Int) {
+        CoreStatusStore.publish(
+            context,
+            "Gemini temporariamente indisponível (HTTP $statusCode). Nova tentativa $attempt/3 em ${delayMs} ms.",
+        )
     }
 
     fun shutdown() {
@@ -117,5 +129,22 @@ object CorePhaseStore {
 
     fun publish(context: Context, state: String) {
         mainHandler.post { listener?.invoke(state) }
+    }
+}
+
+object CoreStatusStore {
+    @Volatile private var listener: ((String) -> Unit)? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    fun subscribe(listener: (String) -> Unit) {
+        this.listener = listener
+    }
+
+    fun clear() {
+        listener = null
+    }
+
+    fun publish(context: Context, status: String) {
+        mainHandler.post { listener?.invoke(status) }
     }
 }
