@@ -25,7 +25,8 @@ class TestStacyAnimationLifecycle(unittest.TestCase):
 
         self.assertIn('window.stacyNativeState&&window.stacyNativeState("pensando")', lifecycle)
         self.assertNotIn("likelyQuestion", lifecycle)
-        self.assertNotIn("setTimeout", lifecycle)
+        self.assertIn("setTimeout", lifecycle)
+        self.assertIn('window.stacyNativeState&&window.stacyNativeState("executando")', lifecycle)
         self.assertNotIn('"pesquisando"', lifecycle)
         self.assertNotIn('"executando"', lifecycle)
 
@@ -50,6 +51,33 @@ class TestStacyAnimationLifecycle(unittest.TestCase):
         response_handler = self.html[start:end]
 
         self.assertIn("['erro','error'].includes(resultType)?'erro':'respondendo'", response_handler)
+
+    def test_settings_markup_has_independent_ai_and_core_rows(self):
+        start = self.html.index("config:{title:'Configurações'")
+        end = self.html.index("nucleo:{title:'Núcleo STACY'", start)
+        settings = self.html[start:end]
+        self.assertIn('data-stacy-action="configurarIA"', settings)
+        self.assertIn('data-stacy-action="nucleo"', settings)
+        self.assertNotIn('<div class="stacy-setting-row"><div><div class="stacy-setting-row">', settings)
+
+    def test_settings_controls_are_centered_and_consistently_sized(self):
+        self.assertIn("flex-direction:column;align-items:center;justify-content:center", self.html)
+        self.assertIn("width:min(100%,220px);min-width:0;min-height:42px", self.html)
+
+    def test_fast_success_waits_for_minimum_processing_animation(self):
+        start = self.html.index("window.stacyNativeResponse=function")
+        end = self.html.index("function nativeSend", start)
+        handler = self.html[start:end]
+        self.assertIn("minimumProcessingMs=1350", handler)
+        self.assertIn("stacyResponseDeferred=true", handler)
+        self.assertIn("stacyPhaseTimers.push(setTimeout(finishResponse,delay))", handler)
+
+    def test_real_research_state_prevents_execution_transition(self):
+        start = self.html.index("function startStacyProcessingStages")
+        end = self.html.index("window.stacyChatSetPending", start)
+        lifecycle = self.html[start:end]
+        self.assertIn('stacyCurrentPhase!=="pensando"', lifecycle)
+        self.assertIn("stacyCurrentPhase=\"pensando\"", lifecycle)
 
 
 if __name__ == "__main__":
