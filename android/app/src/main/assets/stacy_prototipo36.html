@@ -762,24 +762,27 @@ function appendStacyChatMessage(text,role,extraClass,showConversation){
  row.appendChild(bubble);log.appendChild(row);log.scrollTop=log.scrollHeight;
  return row;
 }
-let stacyPhaseTimers=[];
-let stacyRequestActive=false;
-let stacyProcessingStartedAt=0;
-let stacyCurrentPhase="online";
-let stacyResponseDeferred=false;
+const stacyPhaseTimers=[];
+window.stacyRequestActive=false;
+window.stacyProcessingStartedAt=0;
+window.stacyCurrentPhase="online";
+window.stacyResponseDeferred=false;
 function clearStacyPhaseTimers(){
- stacyPhaseTimers.forEach(id=>clearTimeout(id));stacyPhaseTimers=[];
+ stacyPhaseTimers.forEach(id=>clearTimeout(id));stacyPhaseTimers.length=0;
 }
+window.stacySchedulePhaseTimer=function(callback,delay){
+ stacyPhaseTimers.push(setTimeout(callback,delay));
+};
 window.stacyStopProcessing=function(){
- stacyRequestActive=false;
- stacyResponseDeferred=false;
+ window.stacyRequestActive=false;
+ window.stacyResponseDeferred=false;
  clearStacyPhaseTimers();
 };
 function scheduleStacyResponseWatchdog(){
  // The native Gemini client allows 45s for chat and 60s for web search.
  // Keep a 10s delivery margin so the UI never reports a false timeout first.
  stacyPhaseTimers.push(setTimeout(function(){
-   if(!stacyRequestActive)return;
+   if(!window.stacyRequestActive)return;
    window.stacyNativeResponse(
      "A STACY não recebeu uma resposta do núcleo dentro do limite de espera. Verifique a conexão com a internet e, em Menu → Ajustes, confirme a chave da Gemini API. Os comandos locais continuam disponíveis.",
      "erro"
@@ -788,15 +791,15 @@ function scheduleStacyResponseWatchdog(){
 }
 function startStacyProcessingStages(_message){
  clearStacyPhaseTimers();
- stacyRequestActive=true;
- stacyResponseDeferred=false;
- stacyProcessingStartedAt=performance.now();
- stacyCurrentPhase="pensando";
+ window.stacyRequestActive=true;
+ window.stacyResponseDeferred=false;
+ window.stacyProcessingStartedAt=performance.now();
+ window.stacyCurrentPhase="pensando";
  // The native CORE remains authoritative for research. Ordinary requests move
  // from THINKING to EXECUTING while the real operation is still in progress.
  window.stacyNativeState&&window.stacyNativeState("pensando");
  stacyPhaseTimers.push(setTimeout(function(){
-   if(!stacyRequestActive||stacyCurrentPhase!=="pensando")return;
+   if(!window.stacyRequestActive||window.stacyCurrentPhase!=="pensando")return;
    window.stacyNativeState&&window.stacyNativeState("executando");
  },420));
  scheduleStacyResponseWatchdog();
@@ -1033,9 +1036,9 @@ animationFrameId=requestAnimationFrame(animate);
   window.stacyNativeState=function(name){
     const key=String(name||'').toLowerCase();
     const pendingNow=document.getElementById('stacyPendingReply');
-    if(stacyResponseDeferred && ['respondendo','resposta'].includes(key))return;
+    if(window.stacyResponseDeferred && ['respondendo','resposta'].includes(key))return;
     if(key==='online' && pendingNow)return;
-    stacyCurrentPhase=stateMap[key]||key||'online';
+    window.stacyCurrentPhase=stateMap[key]||key||'online';
     // A real CORE research event supersedes the ordinary execution phase;
     // the scheduled transition checks stacyCurrentPhase before changing state.
     if(['erro','error','offline'].includes(key)){
@@ -1078,12 +1081,13 @@ animationFrameId=requestAnimationFrame(animate);
     };
     // Keep the processing animation visible long enough to be perceived even
     // when a local CORE command returns almost instantly. Errors remain immediate.
-    const elapsed=performance.now()-stacyProcessingStartedAt;
+    const elapsed=performance.now()-window.stacyProcessingStartedAt;
     const minimumProcessingMs=1350;
-    if(!isError && stacyRequestActive && elapsed<minimumProcessingMs){
-      stacyResponseDeferred=true;
+    if(!isError && window.stacyRequestActive && elapsed<minimumProcessingMs){
+      window.stacyResponseDeferred=true;
+      window.stacyCurrentPhase='respondendo';
       const delay=minimumProcessingMs-elapsed;
-      stacyPhaseTimers.push(setTimeout(finishResponse,delay));
+      window.stacySchedulePhaseTimer(finishResponse,delay);
       return;
     }
     finishResponse();
