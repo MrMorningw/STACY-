@@ -89,6 +89,14 @@ class TestStacyAnimationLifecycle(unittest.TestCase):
         self.assertNotIn("stacyPhaseTimers.push", bridge)
         self.assertNotIn("performance.now()-stacyProcessingStartedAt", bridge)
 
+    def test_completed_response_returns_to_online_after_response_animation(self):
+        start = self.html.index("window.stacyNativeResponse=function")
+        end = self.html.index("function nativeSend", start)
+        handler = self.html[start:end]
+        self.assertIn("window.stacyCurrentPhase=mapped", handler)
+        self.assertIn("window.stacyNativeState('online')", handler)
+        self.assertIn("window.stacyCurrentPhase==='respondendo'", handler)
+
 
 if __name__ == "__main__":
     unittest.main()
