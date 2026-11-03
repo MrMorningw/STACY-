@@ -318,17 +318,20 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
   font-size:14px;margin-bottom:7px;
 }
 .stacy-setting-row{
-  display:flex;align-items:center;justify-content:space-between;gap:16px;
-  padding:15px 0;border-bottom:1px solid rgba(255,117,31,.08);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  width:100%;padding:17px 0;border-bottom:1px solid rgba(255,117,31,.08);text-align:center;
 }
-.stacy-setting-name{font-family:'STACY SpaceStacked',sans-serif;color:#ddd3cc;font-size:13px}
-.stacy-setting-desc{font-size:10px;color:#756b64;margin-top:4px}
+.stacy-setting-copy{width:100%;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center}
+.stacy-setting-name{font-family:'STACY SpaceStacked',sans-serif;color:#ddd3cc;font-size:13px;line-height:1.35}
+.stacy-setting-desc{max-width:34ch;font-size:10px;color:#8b8078;margin-top:0;line-height:1.45}
 .stacy-pill{color:#ff7925;font-size:9px;letter-spacing:1px}
-.stacy-action{margin-top:14px;border:1px solid rgba(255,117,31,.30);border-radius:11px;background:rgba(255,117,31,.08);color:#ff7925;padding:10px 13px;font-size:10px;letter-spacing:1px;cursor:pointer}
+.stacy-action{display:inline-flex;align-items:center;justify-content:center;min-width:176px;min-height:42px;margin:14px auto 0;border:1px solid rgba(255,117,31,.30);border-radius:11px;background:rgba(255,117,31,.08);color:#ff7925;padding:10px 16px;font-size:10px;letter-spacing:1px;cursor:pointer;text-align:center}
 .stacy-action:hover{background:rgba(255,117,31,.16)}
-.stacy-action.small{margin-top:0;white-space:nowrap;padding:9px 11px}
-.stacy-update-status{margin-top:6px;color:#6f675f;font-size:10px;letter-spacing:.2px;line-height:1.35}
-.stacy-action-row{display:flex;gap:8px;margin-top:14px}
+.stacy-action.small{width:min(100%,220px);min-width:0;min-height:42px;margin:0;white-space:nowrap;padding:10px 14px}
+.stacy-update-status{margin-top:6px;color:#8b8078;font-size:10px;letter-spacing:.2px;line-height:1.4;text-align:center}
+.stacy-action-row{display:flex;flex-direction:column;align-items:center;gap:10px;width:100%;margin-top:14px}
+.stacy-action-row .stacy-input{width:100%;min-height:42px}
+.stacy-action-row .stacy-action{margin:0}
 .stacy-input{flex:1;min-width:0;border:1px solid rgba(255,117,31,.22);border-radius:11px;background:rgba(0,0,0,.35);color:#eee;padding:10px;font-size:12px;outline:none}
 .stacy-input:focus{border-color:rgba(255,117,31,.55)}
 body.stacy-no-animations *{animation:none!important;transition:none!important}
@@ -761,11 +764,15 @@ function appendStacyChatMessage(text,role,extraClass,showConversation){
 }
 let stacyPhaseTimers=[];
 let stacyRequestActive=false;
+let stacyProcessingStartedAt=0;
+let stacyCurrentPhase="online";
+let stacyResponseDeferred=false;
 function clearStacyPhaseTimers(){
  stacyPhaseTimers.forEach(id=>clearTimeout(id));stacyPhaseTimers=[];
 }
 window.stacyStopProcessing=function(){
  stacyRequestActive=false;
+ stacyResponseDeferred=false;
  clearStacyPhaseTimers();
 };
 function scheduleStacyResponseWatchdog(){
@@ -782,8 +789,16 @@ function scheduleStacyResponseWatchdog(){
 function startStacyProcessingStages(_message){
  clearStacyPhaseTimers();
  stacyRequestActive=true;
- // Show THINKING immediately; subsequent states must come from native CORE events.
+ stacyResponseDeferred=false;
+ stacyProcessingStartedAt=performance.now();
+ stacyCurrentPhase="pensando";
+ // The native CORE remains authoritative for research. Ordinary requests move
+ // from THINKING to EXECUTING while the real operation is still in progress.
  window.stacyNativeState&&window.stacyNativeState("pensando");
+ stacyPhaseTimers.push(setTimeout(function(){
+   if(!stacyRequestActive||stacyCurrentPhase!=="pensando")return;
+   window.stacyNativeState&&window.stacyNativeState("executando");
+ },420));
  scheduleStacyResponseWatchdog();
 }
 window.stacyChatSetPending=function(){
@@ -970,7 +985,7 @@ animationFrameId=requestAnimationFrame(animate);
     memoria:{title:'Memória',kicker:'NÚCLEO DE MEMÓRIA',html:'<div class="stacy-card"><div class="stacy-card-label">MEMÓRIA</div><div class="stacy-card-title">Contexto da STACY</div><div class="stacy-card-text">Consulte o estado atual da memória pelo núcleo.</div><button class="stacy-action" data-stacy-action="memoria">CONSULTAR MEMÓRIA</button></div>'},
     ferramentas:{title:'Ferramentas',kicker:'CENTRAL DE FERRAMENTAS',html:'<div class="stacy-card"><div class="stacy-card-label">FERRAMENTAS DO DISPOSITIVO</div><div class="stacy-card-title">Funções disponíveis</div><div class="stacy-card-text">Ações Android conectadas à ponte nativa da STACY.</div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Calendário</div><div class="stacy-setting-desc">Abrir o calendário do Android.</div></div><button class="stacy-action small" data-stacy-action="calendarioAndroid">ABRIR</button></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Configurações do Android</div><div class="stacy-setting-desc">Abrir configurações do sistema.</div></div><button class="stacy-action small" data-stacy-action="configAndroid">ABRIR</button></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Compartilhar resposta</div><div class="stacy-setting-desc">Compartilhar a última resposta da STACY.</div></div><button class="stacy-action small" data-stacy-action="compartilhar">COMPARTILHAR</button></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">CORE</div><div class="stacy-setting-desc">Consultar estado e tarefas do núcleo.</div></div><button class="stacy-action small" data-stacy-action="status">VERIFICAR</button></div></div><div class="stacy-card"><div class="stacy-card-label">FERRAMENTAS DISPONÍVEIS</div><div class="stacy-card-text">Esta lista mostra integrações implementadas no app. Ela não declara serviços externos ou plugins que não estejam realmente conectados.</div></div>'},
     permissoes:{title:'Permissões',kicker:'ACESSO E PRIVACIDADE',html:'<div class="stacy-card"><div class="stacy-card-label">PERMISSÕES DO APLICATIVO</div><div class="stacy-card-title">Controle de acesso</div><div class="stacy-card-text">Abra as configurações do Android para revisar ou conceder permissões. O sistema mostrará as permissões efetivamente disponíveis para esta instalação.</div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Microfone</div><div class="stacy-setting-desc">Necessário para entrada por voz.</div></div><button class="stacy-action small" data-stacy-action="privacidade">GERENCIAR</button></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Fotos e arquivos</div><div class="stacy-setting-desc">Acesso mediado pelo seletor seguro do Android.</div></div><button class="stacy-action small" data-stacy-action="privacidade">GERENCIAR</button></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Outras permissões</div><div class="stacy-setting-desc">Consulte o painel oficial do aplicativo no Android.</div></div><button class="stacy-action small" data-stacy-action="privacidade">ABRIR CONFIGURAÇÕES</button></div></div>'},
-    config:{title:'Configurações',kicker:'SISTEMA',html:'<div class="stacy-card"><div class="stacy-setting-row"><div><div class="stacy-setting-name">Voz da STACY</div><div class="stacy-setting-desc">Ativar ou silenciar respostas faladas.</div></div><button class="stacy-action small" data-stacy-action="voz">VOZ: <span id="voiceSetting">ATIVA</span></button></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Animações</div><div class="stacy-setting-desc">Controlar o movimento visual do núcleo.</div></div><button class="stacy-action small" data-stacy-action="animacoes">ANIMAÇÕES: <span id="animSetting">ATIVAS</span></button></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Privacidade e permissões</div><div class="stacy-setting-desc">Abrir as permissões e configurações do aplicativo.</div></div><button class="stacy-action small" data-stacy-action="privacidade">ABRIR</button></div><div class="stacy-setting-row"><div><div class="stacy-setting-row"><div><div class="stacy-setting-name">IA generativa</div><div class="stacy-setting-desc">Conectar a IA, testar a chave e gerenciar o contexto de conversa.</div></div><button class="stacy-action small" data-stacy-action="configurarIA">CONECTAR</button></div><div class="stacy-setting-name">Núcleo STACY</div><div class="stacy-setting-desc">Central de controle do CORE, arquitetura, integridade e etapas de migração.</div></div><button class="stacy-action small" data-stacy-action="nucleo">GERENCIAR</button></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Atualização da STACY</div><div class="stacy-setting-desc">Verificar uma nova versão oficial, validar o pacote e iniciar a atualização.</div><div class="stacy-update-status" id="stacyUpdateStatus">Pronta para verificar.</div></div><button class="stacy-action small" data-stacy-action="atualizacao">VERIFICAR</button></div></div>'},
+    config:{title:'Configurações',kicker:'SISTEMA',html:'<div class="stacy-card"><div class="stacy-setting-row"><div><div class="stacy-setting-name">Voz da STACY</div><div class="stacy-setting-desc">Ativar ou silenciar respostas faladas.</div></div><button class="stacy-action small" data-stacy-action="voz">VOZ: <span id="voiceSetting">ATIVA</span></button></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Animações</div><div class="stacy-setting-desc">Controlar o movimento visual do núcleo.</div></div><button class="stacy-action small" data-stacy-action="animacoes">ANIMAÇÕES: <span id="animSetting">ATIVAS</span></button></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Privacidade e permissões</div><div class="stacy-setting-desc">Abrir as permissões e configurações do aplicativo.</div></div><button class="stacy-action small" data-stacy-action="privacidade">ABRIR</button></div><div class="stacy-setting-row"><div class="stacy-setting-copy"><div class="stacy-setting-name">IA generativa</div><div class="stacy-setting-desc">Conectar a IA, testar a chave e gerenciar o contexto de conversa.</div></div><button class="stacy-action small" data-stacy-action="configurarIA">CONECTAR</button></div><div class="stacy-setting-row"><div class="stacy-setting-copy"><div class="stacy-setting-name">Núcleo STACY</div><div class="stacy-setting-desc">Central de controle do CORE, arquitetura, integridade e etapas de migração.</div></div><button class="stacy-action small" data-stacy-action="nucleo">GERENCIAR</button></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Atualização da STACY</div><div class="stacy-setting-desc">Verificar uma nova versão oficial, validar o pacote e iniciar a atualização.</div><div class="stacy-update-status" id="stacyUpdateStatus">Pronta para verificar.</div></div><button class="stacy-action small" data-stacy-action="atualizacao">VERIFICAR</button></div></div>'},
     nucleo:{title:'Núcleo STACY',kicker:'CENTRAL DO CORE',html:'<div class="stacy-card"><div class="stacy-card-label">ESTADO DA ARQUITETURA</div><div class="stacy-card-title">Núcleo Android nativo com IA generativa</div><div class="stacy-card-text">O núcleo local executa comandos permitidos, registra tarefas e anotações no banco SQLite do aparelho e responde a saudações sem internet. Para conversa generativa e pesquisa web, usa a API Gemini por HTTPS depois de configurada. O caminho de mensagens do APK não depende de Termux, Python ou servidor local.</div><div class="stacy-setting-row"><div><div class="stacy-setting-name">Interface e ponte Android</div><div class="stacy-setting-desc">Recebe mensagens, apresenta respostas e encaminha ações autorizadas.</div></div><span class="stacy-action small">CAMADA ANDROID</span></div><div class="stacy-setting-row"><div><div class="stacy-setting-name">CORE Kotlin / Android</div><div class="stacy-setting-desc">Roteamento nativo, ações autorizadas, tarefas e memória local persistentes.</div></div><span class="stacy-action small">ATUAL</span></div><button class="stacy-action" data-stacy-action="status">CONSULTAR ESTADO DO CORE</button></div><div class="stacy-card"><div class="stacy-card-label">INTEGRIDADE E RECUPERAÇÃO</div><div class="stacy-card-title">Mudanças com controle</div><div class="stacy-card-text">Auditoria e backup de referência estão registrados no repositório. Esta tela ainda não executa backups nem modifica o núcleo. Alterações devem ser feitas em branch separada, testadas e aprovadas antes de chegar à versão principal.</div><div class="stacy-card-text">Próximas etapas: proteger os dados operacionais, restringir a navegação da interface, reforçar a persistência e adicionar recuperação por timeout.</div></div><div class="stacy-card"><div class="stacy-card-label">MIGRAÇÃO SEGURA</div><div class="stacy-card-title">Sem substituir o CORE prematuramente</div><div class="stacy-card-text">A futura integração ao APK será gradual. O núcleo atual permanece como referência até a nova implementação passar pelos testes de regressão e validação física.</div></div>'},
     sobre:{title:'Sobre',kicker:'IDENTIDADE',html:'<div class="stacy-card"><div class="stacy-card-label">STACY AI</div><div class="stacy-card-title">Assistente pessoal inteligente</div><div class="stacy-card-text">Núcleo visual, voz, memória, pesquisa, automação e integrações reunidos em uma única experiência.</div><button class="stacy-action" data-stacy-action="status">VERIFICAR NÚCLEO</button></div><div class="stacy-card"><div class="stacy-card-label">IDENTIDADE VISUAL</div><div class="stacy-card-title">Átomo · Espaço · Laranja</div><div class="stacy-card-text">Interface definitiva em evolução contínua.</div></div>'}
   };
@@ -1018,7 +1033,13 @@ animationFrameId=requestAnimationFrame(animate);
   window.stacyNativeState=function(name){
     const key=String(name||'').toLowerCase();
     const pendingNow=document.getElementById('stacyPendingReply');
+    if(stacyResponseDeferred && ['respondendo','resposta'].includes(key))return;
     if(key==='online' && pendingNow)return;
+    stacyCurrentPhase=stateMap[key]||key||'online';
+    if(['pesquisando','pesquisa','research','researching'].includes(key)){
+      // A real CORE research event supersedes the ordinary execution phase.
+      stacyPhaseTimers=stacyPhaseTimers.filter(id=>{clearTimeout(id);return false;});
+    }
     if(['erro','error','offline'].includes(key)){
       window.stacyStopProcessing();
       const pending=document.getElementById('stacyPendingReply');
@@ -1032,32 +1053,42 @@ animationFrameId=requestAnimationFrame(animate);
     if(messageInput)messageInput.placeholder=key==='ouvindo'||key==='listening'?'Ouvindo…':'Digite ou fale...';
   };
   window.stacyNativeResponse=function(response,tipo){
-    // Even an empty/malformed payload must close the pending bubble instead of
-    // leaving the user staring at an endless animation.
     const text=String(response||'').trim() || 'O núcleo da STACY retornou uma resposta vazia. Tente novamente e confira a conexão da IA.';
     const resultType=String(tipo||'').toLowerCase();
-    // A returned payload means processing has finished. Its type describes
-    // the result, not an ongoing phase; only errors stay in ERROR.
-    const mapped=['erro','error'].includes(resultType)?'erro':'respondendo';
-    const bubble=document.getElementById('responseBubble');
-    if(bubble)bubble.textContent=text;
-    document.getElementById('app').classList.add('has-response');
-    window.stacyStopProcessing();
-    const pending=document.getElementById('stacyPendingReply');
-    const log=document.getElementById('stacyChatLog');
-    if(pending && log){
-      document.getElementById('app').classList.add('chat-active');
-      const answer=pending.querySelector('.stacy-chat-bubble');
-      if(answer)answer.textContent=text;
-      pending.classList.remove('pending');pending.id='';pending.classList.add('assistant');
-      log.scrollTop=log.scrollHeight;
-    }else if(log){
-      document.getElementById('app').classList.add('chat-active');
-      const row=document.createElement('div');row.className='stacy-chat-row assistant';
-      const answer=document.createElement('div');answer.className='stacy-chat-bubble';answer.textContent=text;
-      row.appendChild(answer);log.appendChild(row);log.scrollTop=log.scrollHeight;
+    const isError=['erro','error'].includes(resultType);
+    const finishResponse=function(){
+      const mapped=isError?'erro':'respondendo';
+      const bubble=document.getElementById('responseBubble');
+      if(bubble)bubble.textContent=text;
+      document.getElementById('app').classList.add('has-response');
+      window.stacyStopProcessing();
+      const pending=document.getElementById('stacyPendingReply');
+      const log=document.getElementById('stacyChatLog');
+      if(pending && log){
+        document.getElementById('app').classList.add('chat-active');
+        const answer=pending.querySelector('.stacy-chat-bubble');
+        if(answer)answer.textContent=text;
+        pending.classList.remove('pending');pending.id='';pending.classList.add('assistant');
+        log.scrollTop=log.scrollHeight;
+      }else if(log){
+        document.getElementById('app').classList.add('chat-active');
+        const row=document.createElement('div');row.className='stacy-chat-row assistant';
+        const answer=document.createElement('div');answer.className='stacy-chat-bubble';answer.textContent=text;
+        row.appendChild(answer);log.appendChild(row);log.scrollTop=log.scrollHeight;
+      }
+      window.stacySetState(mapped==='erro'?'erro':'respondendo');
+    };
+    // Keep the processing animation visible long enough to be perceived even
+    // when a local CORE command returns almost instantly. Errors remain immediate.
+    const elapsed=performance.now()-stacyProcessingStartedAt;
+    const minimumProcessingMs=1350;
+    if(!isError && stacyRequestActive && elapsed<minimumProcessingMs){
+      stacyResponseDeferred=true;
+      const delay=minimumProcessingMs-elapsed;
+      stacyPhaseTimers.push(setTimeout(finishResponse,delay));
+      return;
     }
-    window.stacySetState(mapped==='erro'?'erro':'respondendo');
+    finishResponse();
   };
   function nativeSend(text){
     const value=String(text||'').trim();
