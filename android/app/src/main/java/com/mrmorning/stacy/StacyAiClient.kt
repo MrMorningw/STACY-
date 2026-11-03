@@ -10,8 +10,11 @@ import java.net.SocketTimeoutException
 import java.net.URL
 import java.net.UnknownHostException
 import java.nio.charset.StandardCharsets
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.concurrent.Executors
+import java.util.concurrent.ThreadLocalRandom
 
 /** Native Gemini Interactions transport. */
 internal class StacyAiClient(
@@ -22,13 +25,18 @@ internal class StacyAiClient(
     private val executor = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
 
-    fun chat(message: String, useWebSearch: Boolean = false, callback: (CoreResult) -> Unit) {
+    fun chat(
+        message: String,
+        useWebSearch: Boolean = false,
+        onRetry: ((Int, Long, Int) -> Unit)? = null,
+        callback: (CoreResult) -> Unit,
+    ) {
         executor.execute {
             val result = try {
                 val key = secrets.getGeminiApiKey()
                 if (key.isNullOrBlank()) {
                     errorResult("A IA generativa ainda não está conectada. Abra Menu → Ajustes → Conectar IA e salve uma chave Gemini API válida.")
-                } else requestGemini(key, message, useWebSearch)
+                } else requestGemini(key, message, useWebSearch, onRetry)
             } catch (error: Exception) {
                 errorResult("Falha ao preparar a solicitação da IA: ${error.message ?: "erro inesperado"}")
             }
@@ -38,20 +46,34 @@ internal class StacyAiClient(
 
     fun shutdown() = executor.shutdownNow()
 
-    private fun requestGemini(apiKey: String, message: String, useWebSearch: Boolean): CoreResult =
-        requestGemini(apiKey, message, useWebSearch, secrets.getPreviousInteractionId(), false)
+    private fun requestGemini(
+        apiKey: String,
+        message: String,
+        useWebSearch: Boolean,
+        onRetry: ((Int, Long, Int) -> Unit)?,
+    ): CoreResult = requestGemini(
+        apiKey,
+        message,
+        useWebSearch,
+        secrets.getPreviousInteractionId(),
+        requestAttempt = 1,
+        retriedWithoutPreviousInteraction = false,
+        onRetry = onRetry,
+    )
 
     private fun requestGemini(
         apiKey: String,
         message: String,
         useWebSearch: Boolean,
         previousInteractionId: String?,
+        requestAttempt: Int,
         retriedWithoutPreviousInteraction: Boolean,
+        onRetry: ((Int, Long, Int) -> Unit)?,
     ): CoreResult {
         var connection: HttpURLConnection? = null
         try {
             val generation = JSONObject()
-                .put("thinking_level", "low")
+                .put("thinking_level", "medium")
                 .put("max_output_tokens", 32768)
             val payload = JSONObject()
                 .put("model", MODEL)
@@ -87,16 +109,45 @@ internal class StacyAiClient(
                 if (!retriedWithoutPreviousInteraction && previousInteractionId != null && isStaleInteraction(statusCode, detail)) {
                     secrets.clearPreviousInteractionId()
                     connection.disconnect()
-                    return requestGemini(apiKey, message, useWebSearch, null, true)
+                    return requestGemini(
+                        apiKey, message, useWebSearch, null, requestAttempt,
+                        retriedWithoutPreviousInteraction = true, onRetry = onRetry,
+                    )
                 }
+
+                if (requestAttempt < MAX_HTTP_ATTEMPTS && isRetryableHttpStatus(statusCode, detail)) {
+                    val delayMs = calculateRetryDelayMs(connection, requestAttempt)
+                    connection.disconnect()
+                    runCatching { onRetry?.invoke(requestAttempt, delayMs, statusCode) }
+                    try {
+                        if (delayMs > 0L) Thread.sleep(delayMs)
+                    } catch (_: InterruptedException) {
+                        Thread.currentThread().interrupt()
+                        return errorResult("A tentativa automática de conexão com a IA foi interrompida. Tente novamente.")
+                    }
+                    return requestGemini(
+                        apiKey, message, useWebSearch, previousInteractionId, requestAttempt + 1,
+                        retriedWithoutPreviousInteraction, onRetry,
+                    )
+                }
+
                 val explanation = when (statusCode) {
                     400 -> "A API Gemini recusou a solicitação (HTTP 400)."
                     401, 403 -> "A chave Gemini foi recusada ou não tem permissão para este modelo."
                     404 -> "A API Gemini não encontrou o recurso solicitado (HTTP 404)."
-                    429 -> "A cota ou o limite de solicitações da API Gemini foi atingido."
+                    408 -> "A API Gemini demorou para responder (HTTP 408)."
+                    429 -> "A API Gemini atingiu um limite de uso ou cota (HTTP 429)."
+                    503 -> "A API Gemini está temporariamente sobrecarregada (HTTP 503)."
+                    in 500..599 -> "A API Gemini apresentou uma instabilidade temporária (HTTP $statusCode)."
                     else -> "A API Gemini retornou HTTP $statusCode."
                 }
-                return errorResult(if (detail.isBlank()) explanation else "$explanation Detalhe: ${detail.take(MAX_ERROR_DETAIL)}")
+                val retryNote = if (requestAttempt > 1 && statusCode in 500..599) {
+                    " A STACY realizou $requestAttempt tentativas automáticas."
+                } else ""
+                return errorResult(
+                    if (detail.isBlank()) "$explanation$retryNote"
+                    else "$explanation$retryNote Detalhe: ${detail.take(MAX_ERROR_DETAIL)}",
+                )
             }
 
             val answer = extractText(responseJson)
@@ -127,6 +178,38 @@ internal class StacyAiClient(
         } finally {
             connection?.disconnect()
         }
+    }
+
+    private fun isRetryableHttpStatus(statusCode: Int, detail: String): Boolean {
+        if (statusCode == 408 || statusCode in 500..599) return true
+        if (statusCode != 429) return false
+
+        val normalized = detail.lowercase(Locale.ROOT)
+        val quotaFailure = listOf("quota", "billing", "prepay", "daily limit", "per day")
+            .any(normalized::contains)
+        val transientRateLimit = listOf(
+            "rate limit", "rate_limit", "too many requests",
+            "requests per minute", "requests per second", "rate exceeded",
+        ).any(normalized::contains)
+        return transientRateLimit && !quotaFailure
+    }
+
+    private fun calculateRetryDelayMs(connection: HttpURLConnection, failedAttempt: Int): Long {
+        val retryAfter = connection.getHeaderField("Retry-After")?.trim()
+        val retryAfterSeconds = retryAfter?.toLongOrNull()?.takeIf { it >= 0L }
+        val retryAfterDateMs = if (retryAfterSeconds == null && !retryAfter.isNullOrBlank()) {
+            runCatching {
+                ZonedDateTime.parse(retryAfter, DateTimeFormatter.RFC_1123_DATE_TIME)
+                    .toInstant().toEpochMilli() - System.currentTimeMillis()
+            }.getOrNull()?.coerceAtLeast(0L)
+        } else null
+        val serverDelayMs = retryAfterSeconds?.let { it.coerceAtMost(MAX_RETRY_DELAY_MS / 1000L) * 1000L }
+            ?: retryAfterDateMs?.coerceAtMost(MAX_RETRY_DELAY_MS)
+        val exponent = (failedAttempt - 1).coerceIn(0, 10)
+        val exponentialDelayMs = (INITIAL_RETRY_DELAY_MS * (1L shl exponent)).coerceAtMost(MAX_RETRY_DELAY_MS)
+        val baseDelayMs = (serverDelayMs ?: exponentialDelayMs).coerceIn(0L, MAX_RETRY_DELAY_MS)
+        val jitterMs = ThreadLocalRandom.current().nextLong(0L, RETRY_JITTER_MAX_MS + 1L)
+        return baseDelayMs + jitterMs
     }
 
     private fun isStaleInteraction(statusCode: Int, detail: String): Boolean {
@@ -185,6 +268,10 @@ internal class StacyAiClient(
         const val READ_TIMEOUT_MS = 45_000
         const val SEARCH_READ_TIMEOUT_MS = 60_000
         const val MAX_ERROR_DETAIL = 320
+        const val MAX_HTTP_ATTEMPTS = 4
+        const val INITIAL_RETRY_DELAY_MS = 1_000L
+        const val MAX_RETRY_DELAY_MS = 8_000L
+        const val RETRY_JITTER_MAX_MS = 250L
         const val SYSTEM_INSTRUCTION = "Você é STACY, uma assistente pessoal em português brasileiro. Sua postura é elegante, respeitosa, inteligente, precisa e prestativa. Responda com clareza e sem fingir que executou ações que não foram executadas. Quando faltar informação, declare a limitação de forma direta. Quando uma informação atual ou verificável for necessária, utilize a busca na web e diferencie fatos de inferências."
     }
 }
