@@ -1077,7 +1077,15 @@ animationFrameId=requestAnimationFrame(animate);
         const answer=document.createElement('div');answer.className='stacy-chat-bubble';answer.textContent=text;
         row.appendChild(answer);log.appendChild(row);log.scrollTop=log.scrollHeight;
       }
+      window.stacyCurrentPhase=mapped;
       window.stacySetState(mapped==='erro'?'erro':'respondendo');
+      if(!isError){
+        window.stacySchedulePhaseTimer(function(){
+          if(window.stacyCurrentPhase==='respondendo' && !document.getElementById('stacyPendingReply')){
+            window.stacyNativeState('online');
+          }
+        },1200);
+      }
     };
     // Keep the processing animation visible long enough to be perceived even
     // when a local CORE command returns almost instantly. Errors remain immediate.
