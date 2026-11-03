@@ -318,22 +318,24 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
   font-size:14px;margin-bottom:7px;
 }
 .stacy-setting-row{
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
-  width:100%;padding:17px 0;border-bottom:1px solid rgba(255,117,31,.08);text-align:center;
+  display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:14px;
+  width:100%;padding:17px 0;border-bottom:1px solid rgba(255,117,31,.08);text-align:left;
 }
-.stacy-setting-copy{width:100%;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center}
-.stacy-setting-name{font-family:'STACY SpaceStacked',sans-serif;color:#ddd3cc;font-size:13px;line-height:1.35}
-.stacy-setting-desc{max-width:34ch;font-size:10px;color:#8b8078;margin-top:0;line-height:1.45}
+.stacy-setting-copy{flex:1 1 auto;min-width:0;width:auto;display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left}
+.stacy-setting-row>div{flex:1 1 auto;min-width:0;text-align:left}
+.stacy-setting-name{font-family:'STACY SpaceStacked',sans-serif;color:#ddd3cc;font-size:13px;line-height:1.35;text-align:left}
+.stacy-setting-desc{max-width:34ch;font-size:10px;color:#8b8078;margin-top:0;line-height:1.45;text-align:left}
 .stacy-pill{color:#ff7925;font-size:9px;letter-spacing:1px}
 .stacy-action{display:inline-flex;align-items:center;justify-content:center;min-width:176px;min-height:42px;margin:14px auto 0;border:1px solid rgba(255,117,31,.30);border-radius:11px;background:rgba(255,117,31,.08);color:#ff7925;padding:10px 16px;font-size:10px;letter-spacing:1px;cursor:pointer;text-align:center}
 .stacy-action:hover{background:rgba(255,117,31,.16)}
-.stacy-action.small{width:min(100%,220px);min-width:0;min-height:42px;margin:0;white-space:nowrap;padding:10px 14px}
-.stacy-update-status{margin-top:6px;color:#8b8078;font-size:10px;letter-spacing:.2px;line-height:1.4;text-align:center}
+.stacy-action.small{flex:0 0 auto;width:auto;min-width:136px;max-width:176px;min-height:42px;margin:0;white-space:nowrap;padding:10px 12px}
+.stacy-update-status{margin-top:6px;color:#8b8078;font-size:10px;letter-spacing:.2px;line-height:1.4;text-align:left}
 .stacy-action-row{display:flex;flex-direction:column;align-items:center;gap:10px;width:100%;margin-top:14px}
 .stacy-action-row .stacy-input{width:100%;min-height:42px}
 .stacy-action-row .stacy-action{margin:0}
 .stacy-input{flex:1;min-width:0;border:1px solid rgba(255,117,31,.22);border-radius:11px;background:rgba(0,0,0,.35);color:#eee;padding:10px;font-size:12px;outline:none}
 .stacy-input:focus{border-color:rgba(255,117,31,.55)}
+@media(max-width:380px){.stacy-setting-row{gap:8px}.stacy-action.small{min-width:120px;max-width:142px;padding:9px 8px;font-size:9px}.stacy-setting-desc{font-size:9px}}
 body.stacy-no-animations *{animation:none!important;transition:none!important}
 
 .quick-actions .stacy-attach-note{padding:8px 12px 10px;color:#a99a8e;font-size:12px;line-height:1.4}
