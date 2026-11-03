@@ -25,9 +25,9 @@ class TestStacyAnimationLifecycle(unittest.TestCase):
 
         self.assertIn('window.stacyNativeState&&window.stacyNativeState("pensando")', lifecycle)
         self.assertNotIn("likelyQuestion", lifecycle)
-        self.assertNotIn("setTimeout", lifecycle)
+        self.assertIn("setTimeout", lifecycle)
+        self.assertIn('window.stacyNativeState&&window.stacyNativeState("executando")', lifecycle)
         self.assertNotIn('"pesquisando"', lifecycle)
-        self.assertNotIn('"executando"', lifecycle)
 
     def test_progress_reaching_one_hundred_does_not_finish_the_core_request(self):
         start = self.html.index("function animate(now)")
@@ -49,7 +49,53 @@ class TestStacyAnimationLifecycle(unittest.TestCase):
         end = self.html.index("function nativeSend", start)
         response_handler = self.html[start:end]
 
-        self.assertIn("['erro','error'].includes(resultType)?'erro':'respondendo'", response_handler)
+        self.assertIn("const mapped=isError?'erro':'respondendo'", response_handler)
+
+    def test_settings_markup_has_independent_ai_and_core_rows(self):
+        start = self.html.index("config:{title:'Configurações'")
+        end = self.html.index("nucleo:{title:'Núcleo STACY'", start)
+        settings = self.html[start:end]
+        self.assertIn('data-stacy-action="configurarIA"', settings)
+        self.assertIn('data-stacy-action="nucleo"', settings)
+        self.assertNotIn('<div class="stacy-setting-row"><div><div class="stacy-setting-row">', settings)
+
+    def test_settings_controls_are_centered_and_consistently_sized(self):
+        self.assertIn("flex-direction:column;align-items:center;justify-content:center", self.html)
+        self.assertIn("width:min(100%,220px);min-width:0;min-height:42px", self.html)
+
+    def test_fast_success_waits_for_minimum_processing_animation(self):
+        start = self.html.index("window.stacyNativeResponse=function")
+        end = self.html.index("function nativeSend", start)
+        handler = self.html[start:end]
+        self.assertIn("minimumProcessingMs=1350", handler)
+        self.assertIn("stacyResponseDeferred=true", handler)
+        self.assertIn("window.stacySchedulePhaseTimer(finishResponse,delay)", handler)
+
+    def test_real_research_state_prevents_execution_transition(self):
+        start = self.html.index("function startStacyProcessingStages")
+        end = self.html.index("window.stacyChatSetPending", start)
+        lifecycle = self.html[start:end]
+        self.assertIn('stacyCurrentPhase!=="pensando"', lifecycle)
+        self.assertIn("stacyCurrentPhase=\"pensando\"", lifecycle)
+
+    def test_processing_state_is_shared_safely_between_module_and_classic_scripts(self):
+        start = self.html.index("/* ===== STACY DEFINITIVA: controle exclusivamente por eventos reais ===== */")
+        bridge = self.html[start:]
+        self.assertIn("window.stacyResponseDeferred=false", self.html)
+        self.assertIn("window.stacyCurrentPhase=\"online\"", self.html)
+        self.assertIn("window.stacyRequestActive=false", self.html)
+        self.assertIn("window.stacySchedulePhaseTimer=function", self.html)
+        self.assertNotIn("if(stacyResponseDeferred", bridge)
+        self.assertNotIn("stacyPhaseTimers.push", bridge)
+        self.assertNotIn("performance.now()-stacyProcessingStartedAt", bridge)
+
+    def test_completed_response_returns_to_online_after_response_animation(self):
+        start = self.html.index("window.stacyNativeResponse=function")
+        end = self.html.index("function nativeSend", start)
+        handler = self.html[start:end]
+        self.assertIn("window.stacyCurrentPhase=mapped", handler)
+        self.assertIn("window.stacyNativeState('online')", handler)
+        self.assertIn("window.stacyCurrentPhase==='respondendo'", handler)
 
 
 if __name__ == "__main__":
