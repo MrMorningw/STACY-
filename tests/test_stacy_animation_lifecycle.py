@@ -28,7 +28,6 @@ class TestStacyAnimationLifecycle(unittest.TestCase):
         self.assertIn("setTimeout", lifecycle)
         self.assertIn('window.stacyNativeState&&window.stacyNativeState("executando")', lifecycle)
         self.assertNotIn('"pesquisando"', lifecycle)
-        self.assertNotIn('"executando"', lifecycle)
 
     def test_progress_reaching_one_hundred_does_not_finish_the_core_request(self):
         start = self.html.index("function animate(now)")
@@ -50,7 +49,7 @@ class TestStacyAnimationLifecycle(unittest.TestCase):
         end = self.html.index("function nativeSend", start)
         response_handler = self.html[start:end]
 
-        self.assertIn("['erro','error'].includes(resultType)?'erro':'respondendo'", response_handler)
+        self.assertIn("const mapped=isError?'erro':'respondendo'", response_handler)
 
     def test_settings_markup_has_independent_ai_and_core_rows(self):
         start = self.html.index("config:{title:'Configurações'")
