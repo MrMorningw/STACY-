@@ -143,7 +143,6 @@ class StacyAiClientTransportTest {
                 FakeResponse(
                     status = 503,
                     body = """{"error":{"message":"The service is temporarily overloaded."}}""",
-                    headers = mapOf("Retry-After" to "0"),
                 )
             },
         )
@@ -153,6 +152,7 @@ class StacyAiClientTransportTest {
         val retryAttempts = CopyOnWriteArrayList<Int>()
 
         try {
+            val startedAt = System.nanoTime()
             server.start()
             client.chat(
                 message = "Teste de limite de tentativas.",
@@ -162,7 +162,9 @@ class StacyAiClientTransportTest {
                 latch.countDown()
             }
 
-            assertTrue("The client did not stop after the retry limit", latch.await(10, TimeUnit.SECONDS))
+            assertTrue("The client did not stop after the retry limit", latch.await(15, TimeUnit.SECONDS))
+            val elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAt)
+            assertTrue("Retries must use progressive backoff rather than an immediate retry", elapsedMs >= 6_500L)
             assertEquals("erro", result.get()?.tipo)
             assertTrue(result.get()?.response.orEmpty().contains("4 tentativas automáticas"))
             assertEquals(4, server.requests.size)
