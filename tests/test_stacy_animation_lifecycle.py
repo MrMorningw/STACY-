@@ -69,7 +69,7 @@ class TestStacyAnimationLifecycle(unittest.TestCase):
         handler = self.html[start:end]
         self.assertIn("minimumProcessingMs=1350", handler)
         self.assertIn("stacyResponseDeferred=true", handler)
-        self.assertIn("stacyPhaseTimers.push(setTimeout(finishResponse,delay))", handler)
+        self.assertIn("window.stacySchedulePhaseTimer(finishResponse,delay)", handler)
 
     def test_real_research_state_prevents_execution_transition(self):
         start = self.html.index("function startStacyProcessingStages")
@@ -77,6 +77,17 @@ class TestStacyAnimationLifecycle(unittest.TestCase):
         lifecycle = self.html[start:end]
         self.assertIn('stacyCurrentPhase!=="pensando"', lifecycle)
         self.assertIn("stacyCurrentPhase=\"pensando\"", lifecycle)
+
+    def test_processing_state_is_shared_safely_between_module_and_classic_scripts(self):
+        start = self.html.index("/* ===== STACY DEFINITIVA: controle exclusivamente por eventos reais ===== */")
+        bridge = self.html[start:]
+        self.assertIn("window.stacyResponseDeferred=false", self.html)
+        self.assertIn("window.stacyCurrentPhase=\"online\"", self.html)
+        self.assertIn("window.stacyRequestActive=false", self.html)
+        self.assertIn("window.stacySchedulePhaseTimer=function", self.html)
+        self.assertNotIn("if(stacyResponseDeferred", bridge)
+        self.assertNotIn("stacyPhaseTimers.push", bridge)
+        self.assertNotIn("performance.now()-stacyProcessingStartedAt", bridge)
 
 
 if __name__ == "__main__":
