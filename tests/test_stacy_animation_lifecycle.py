@@ -59,9 +59,11 @@ class TestStacyAnimationLifecycle(unittest.TestCase):
         self.assertIn('data-stacy-action="nucleo"', settings)
         self.assertNotIn('<div class="stacy-setting-row"><div><div class="stacy-setting-row">', settings)
 
-    def test_settings_controls_are_centered_and_consistently_sized(self):
-        self.assertIn("flex-direction:column;align-items:center;justify-content:center", self.html)
-        self.assertIn("width:min(100%,220px);min-width:0;min-height:42px", self.html)
+    def test_settings_controls_restore_left_copy_and_right_aligned_buttons(self):
+        self.assertIn("display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:14px", self.html)
+        self.assertIn("align-items:flex-start;gap:4px;text-align:left", self.html)
+        self.assertIn("min-width:136px;max-width:176px;min-height:42px", self.html)
+        self.assertIn("@media(max-width:380px)", self.html)
 
     def test_fast_success_waits_for_minimum_processing_animation(self):
         start = self.html.index("window.stacyNativeResponse=function")
