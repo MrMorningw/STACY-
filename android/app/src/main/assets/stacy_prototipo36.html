@@ -1092,7 +1092,10 @@ animationFrameId=requestAnimationFrame(animate);
     const value=String(text||'').trim();
     if(!value)return;
     if(window.Android && typeof Android.stacySend==='function'){
-      window.stacyNativeState('pensando');
+      const chatIsOpen=document.getElementById('app').classList.contains('chat-active');
+      appendStacyChatMessage(value,'user','',chatIsOpen);
+      window.stacyChatSetPending();
+      startStacyProcessingStages(value);
       Android.stacySend(value);
     }else{
       window.stacyNativeResponse('A ponte nativa da STACY não está disponível.','erro');
