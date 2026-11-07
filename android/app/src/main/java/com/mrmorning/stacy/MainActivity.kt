@@ -424,7 +424,7 @@ class MainActivity : ComponentActivity() {
                 val deleted = historyStore.deleteConversation(id)
                 if (deleted && activeConversationId == id) {
                     activeConversationId = historyStore.createConversation().id
-                    publishActiveConversation()
+                    publishActiveConversationId()
                 }
                 publishConversationList()
             }
@@ -435,7 +435,7 @@ class MainActivity : ComponentActivity() {
                 historyStore.listConversations().forEach { coreBridge.cancelConversation(it.id) }
                 historyStore.clearConversationHistory()
                 activeConversationId = historyStore.createConversation().id
-                publishActiveConversation()
+                publishActiveConversationId()
                 publishConversationList()
             }
         }
