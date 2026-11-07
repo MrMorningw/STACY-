@@ -283,7 +283,7 @@ internal class StacyAiClient(
                 if (statusCode !in 200..299) {
                     val detail = responseJson.optJSONObject("error")?.optString("message").orEmpty()
                     if (!retriedWithoutPreviousInteraction && activePreviousInteractionId != null &&
-                        isStaleInteraction(statusCode, detail)
+                        attempt < MAX_HTTP_ATTEMPTS && isStaleInteraction(statusCode, detail)
                     ) {
                         if (conversationId == LEGACY_CONVERSATION_ID) secrets.clearPreviousInteractionId()
                         else localStore.savePreviousInteractionId(conversationId, null)
@@ -292,6 +292,7 @@ internal class StacyAiClient(
                         connection.disconnect()
                         pending.connection.compareAndSet(connection, null)
                         if (remainingMs(pending) < MIN_ATTEMPT_BUDGET_MS) break
+                        attempt++
                         continue
                     }
 
@@ -324,8 +325,10 @@ internal class StacyAiClient(
                         else -> "A API Gemini retornou um estado não concluído ($status)."
                     })
                 }
+                if (remainingMs(pending) <= 0L) return errorResult("O prazo total da solicitação terminou antes da conclusão do processamento.")
                 val answer = extractText(responseJson)
                 if (answer.isBlank()) return errorResult("A API Gemini concluiu sem devolver texto utilizável.")
+                if (remainingMs(pending) <= 0L) return errorResult("O prazo total da solicitação terminou antes da gravação do contexto.")
 
                 val interactionId = responseJson.optString("id").takeIf { it.isNotBlank() && it != "null" }
                 if (saveInteraction && !interactionId.isNullOrBlank()) {
