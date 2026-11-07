@@ -1093,11 +1093,25 @@ animationFrameId=requestAnimationFrame(animate);
       );
     }
   };
-  window.stacyRenderConversations=function(items){
+  window.stacyConversationItems=[];
+  window.stacyRenderConversations=function(items,hasMore){
+    window.stacyConversationItems=Array.isArray(items)?items.slice():[];
+    renderConversationItems(!!hasMore);
+  };
+  window.stacyAppendConversations=function(items,hasMore){
+    const incoming=Array.isArray(items)?items:[];
+    const known=new Set(window.stacyConversationItems.map(function(item){return String(item.id||'');}));
+    incoming.forEach(function(item){
+      const id=String(item&&item.id||'');
+      if(id&&!known.has(id)){known.add(id);window.stacyConversationItems.push(item);}
+    });
+    renderConversationItems(!!hasMore);
+  };
+  function renderConversationItems(hasMore){
     const container=document.getElementById('stacyConversationList');
     if(!container)return;
     container.innerHTML='';
-    const list=Array.isArray(items)?items:[];
+    const list=window.stacyConversationItems;
     if(!list.length){
       const empty=document.createElement('div');
       empty.className='stacy-card-text';
@@ -1135,6 +1149,17 @@ animationFrameId=requestAnimationFrame(animate);
         card.appendChild(copy);card.appendChild(actions);container.appendChild(card);
       });
     }
+    if(hasMore){
+      const more=document.createElement('button');
+      more.className='stacy-action';
+      more.textContent='CARREGAR MAIS CONVERSAS';
+      more.addEventListener('click',function(){
+        more.disabled=true;
+        more.textContent='CARREGANDO…';
+        if(window.Android && typeof Android.stacyLoadMoreConversations==='function')Android.stacyLoadMoreConversations();
+      });
+      container.appendChild(more);
+    }
     const create=document.getElementById('stacyNewConversation');
     if(create)create.onclick=function(){
       if(window.Android && typeof Android.stacyNewConversation==='function')Android.stacyNewConversation();
@@ -1144,7 +1169,7 @@ animationFrameId=requestAnimationFrame(animate);
       if(!window.confirm('Isso excluirá todas as conversas e mensagens armazenadas neste aparelho. Tarefas, memórias e chave API serão preservadas. Deseja continuar?'))return;
       if(window.Android && typeof Android.stacyClearConversationHistory==='function')Android.stacyClearConversationHistory();
     };
-  };
+  }
   window.stacyLoadConversation=function(payload){
     if(!payload||!payload.id)return;
     window.stacyActiveConversationId=String(payload.id);
