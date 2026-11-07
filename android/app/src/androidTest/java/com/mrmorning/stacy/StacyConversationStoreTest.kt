@@ -53,6 +53,51 @@ class StacyConversationStoreTest {
     }
 
     @Test
+    fun contextsCanBeInvalidatedAndConversationListLoadsInPages() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val name = "stacy_paging_test_\${UUID.randomUUID()}.db"
+        try {
+            val store = StacyLocalStore(context, name)
+            val sessions = (1..105).map { store.createConversation() }
+            sessions.forEachIndexed { index, item ->
+                store.addConversationMessage(item.id, "user", "Mensagem \${index + 1}")
+                store.savePreviousInteractionId(item.id, "context-\${index + 1}")
+            }
+            val firstPage = store.listConversations(limit = 100, offset = 0)
+            val secondPage = store.listConversations(limit = 100, offset = 100)
+            assertEquals(100, firstPage.size)
+            assertEquals(5, secondPage.size)
+            assertEquals(105, (firstPage + secondPage).map { it.id }.toSet().size)
+            assertTrue(firstPage.none { candidate -> secondPage.any { it.id == candidate.id } })
+
+            assertEquals(105, store.clearAllPreviousInteractionIds())
+            assertTrue((firstPage + secondPage).all { store.getPreviousInteractionId(it.id) == null })
+            store.close()
+        } finally {
+            context.deleteDatabase(name)
+        }
+    }
+
+    @Test
+    fun interruptedPendingMessagesAreMarkedWhenAppRestarts() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val name = "stacy_pending_test_\${UUID.randomUUID()}.db"
+        try {
+            val store = StacyLocalStore(context, name)
+            val session = store.createConversation()
+            store.addConversationMessage(session.id, "user", "Solicitação pendente", "pending-request", "pending")
+            store.close()
+
+            val reopened = StacyLocalStore(context, name)
+            reopened.markPendingMessagesInterrupted()
+            assertEquals("interrupted", reopened.listConversationMessages(session.id).single().state)
+            reopened.close()
+        } finally {
+            context.deleteDatabase(name)
+        }
+    }
+
+    @Test
     fun versionOneDatabaseMigratesWithoutLosingTasksOrMemories() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val name = "stacy_migration_test_${UUID.randomUUID()}.db"
