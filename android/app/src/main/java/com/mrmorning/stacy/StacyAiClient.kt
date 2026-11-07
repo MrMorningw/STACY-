@@ -3,6 +3,7 @@ package com.mrmorning.stacy
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -46,12 +47,17 @@ internal class StacyAiClient(
     private class PendingRequest(
         val conversationId: String,
         val deadlineNanos: Long,
+        val profile: String,
         val callback: (CoreResult) -> Unit,
     ) {
+        val submittedNanos = System.nanoTime()
         val completed = AtomicBoolean(false)
         val connection = AtomicReference<HttpURLConnection?>(null)
         @Volatile var future: Future<*>? = null
         @Volatile var deadlineFuture: ScheduledFuture<*>? = null
+        @Volatile var workerStartedNanos: Long = 0L
+        @Volatile var networkElapsedNanos: Long = 0L
+        @Volatile var attemptCount: Int = 0
     }
 
     /** Backward-compatible entry point retained for transport tests and older callers. */
@@ -60,7 +66,7 @@ internal class StacyAiClient(
         useWebSearch: Boolean = false,
         onRetry: ((Int, Long, Int) -> Unit)? = null,
         callback: (CoreResult) -> Unit,
-    ) = chat(message, LEGACY_CONVERSATION_ID, useWebSearch, onRetry, callback)
+    ) = chat(message, LEGACY_CONVERSATION_ID, useWebSearch, onRetry, null, callback)
 
     /** Production entry point; context is isolated by the local conversation ID. */
     fun chat(
@@ -68,6 +74,7 @@ internal class StacyAiClient(
         conversationId: String,
         useWebSearch: Boolean = false,
         onRetry: ((Int, Long, Int) -> Unit)? = null,
+        absoluteDeadlineNanos: Long? = null,
         callback: (CoreResult) -> Unit,
     ) {
         val cleaned = message.trim()
@@ -80,7 +87,7 @@ internal class StacyAiClient(
             return
         }
         val budgetMs = if (useWebSearch) SEARCH_DEADLINE_MS else CHAT_DEADLINE_MS
-        submitRequest(conversationId, budgetMs, callback) { request ->
+        submitRequest(conversationId, budgetMs, callback, absoluteDeadlineNanos) { request ->
             val key = secrets.getGeminiApiKey()
             if (key.isNullOrBlank()) {
                 errorResult("A IA generativa ainda não está conectada. Abra Menu → Ajustes → Conectar IA e salve uma chave Gemini API válida.")
@@ -119,7 +126,7 @@ internal class StacyAiClient(
     fun cancelConversation(conversationId: String) {
         activeRequests[conversationId]?.let { request ->
             request.connection.getAndSet(null)?.disconnect()
-            request.future?.cancel(true)
+            cancelQueuedFuture(request)
             finish(request, errorResult("A solicitação foi cancelada."))
         }
     }
@@ -128,11 +135,18 @@ internal class StacyAiClient(
         conversationId: String,
         budgetMs: Long,
         callback: (CoreResult) -> Unit,
+        absoluteDeadlineNanos: Long? = null,
         work: (PendingRequest) -> CoreResult,
     ) {
+        val nowNanos = System.nanoTime()
         val request = PendingRequest(
             conversationId = conversationId,
-            deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(budgetMs),
+            deadlineNanos = absoluteDeadlineNanos ?: nowNanos + TimeUnit.MILLISECONDS.toNanos(budgetMs),
+            profile = when {
+                conversationId == TEST_CONVERSATION_ID -> "connection"
+                budgetMs == SEARCH_DEADLINE_MS -> "research"
+                else -> "chat"
+            },
             callback = callback,
         )
         if (activeRequests.putIfAbsent(conversationId, request) != null) {
@@ -142,7 +156,7 @@ internal class StacyAiClient(
 
         request.deadlineFuture = deadlineExecutor.schedule({
             request.connection.getAndSet(null)?.disconnect()
-            request.future?.cancel(true)
+            cancelQueuedFuture(request)
             finish(
                 request,
                 errorResult(
@@ -155,10 +169,11 @@ internal class StacyAiClient(
                     },
                 ),
             )
-        }, budgetMs, TimeUnit.MILLISECONDS)
+        }, remainingMs(request), TimeUnit.MILLISECONDS)
 
         try {
             request.future = executor.submit {
+                request.workerStartedNanos = System.nanoTime()
                 val result = try {
                     if (remainingMs(request) <= 0L) {
                         errorResult("A solicitação expirou enquanto aguardava disponibilidade do núcleo.")
@@ -184,11 +199,28 @@ internal class StacyAiClient(
         request.deadlineFuture?.cancel(false)
         request.connection.getAndSet(null)?.disconnect()
         activeRequests.remove(request.conversationId, request)
+        val now = System.nanoTime()
+        val queueMs = if (request.workerStartedNanos == 0L) -1L
+            else TimeUnit.NANOSECONDS.toMillis(request.workerStartedNanos - request.submittedNanos)
+        val totalMs = TimeUnit.NANOSECONDS.toMillis(now - request.submittedNanos)
+        val networkMs = TimeUnit.NANOSECONDS.toMillis(request.networkElapsedNanos)
+        val outcome = if (result.tipo.equals("erro", true) || result.tipo.equals("error", true)) "error" else "success"
+        Log.i(
+            METRICS_TAG,
+            "profile=${request.profile} queue_ms=$queueMs network_ms=$networkMs total_ms=$totalMs attempts=${request.attemptCount} outcome=$outcome",
+        )
         mainHandler.post { request.callback(result) }
     }
 
     private fun post(callback: (CoreResult) -> Unit, result: CoreResult) {
         mainHandler.post { callback(result) }
+    }
+
+    private fun cancelQueuedFuture(request: PendingRequest) {
+        val future = request.future
+        future?.cancel(true)
+        if (future is Runnable) executor.remove(future)
+        executor.purge()
     }
 
     private fun remainingMs(request: PendingRequest): Long =
@@ -208,7 +240,9 @@ internal class StacyAiClient(
         var activePreviousInteractionId = previousInteractionId
         var retriedWithoutPreviousInteraction = false
         while (remainingMs(pending) > MIN_ATTEMPT_BUDGET_MS && !Thread.currentThread().isInterrupted) {
+            pending.attemptCount = attempt
             var connection: HttpURLConnection? = null
+            val attemptStartedNanos = System.nanoTime()
             try {
                 val generation = JSONObject()
                     .put("thinking_level", if (useWebSearch) "medium" else "low")
@@ -308,6 +342,20 @@ internal class StacyAiClient(
             } catch (_: UnknownHostException) {
                 return errorResult("Sem conexão com a internet. Os comandos locais continuam disponíveis.")
             } catch (_: SocketTimeoutException) {
+                val delayMs = calculateRetryDelayMs(connection, attempt)
+                if (attempt < MAX_HTTP_ATTEMPTS && remainingMs(pending) > delayMs + MIN_ATTEMPT_BUDGET_MS) {
+                    connection?.disconnect()
+                    pending.connection.compareAndSet(connection, null)
+                    runCatching { onRetry?.invoke(attempt, delayMs, 408) }
+                    try {
+                        Thread.sleep(delayMs)
+                    } catch (_: InterruptedException) {
+                        Thread.currentThread().interrupt()
+                        return errorResult("A tentativa automática de conexão com a IA foi interrompida.")
+                    }
+                    attempt++
+                    continue
+                }
                 if (remainingMs(pending) <= 0L) break
                 return errorResult("O tempo de conexão com a IA expirou. Verifique a rede e tente novamente.")
             } catch (error: Exception) {
@@ -316,6 +364,7 @@ internal class StacyAiClient(
                 }
                 return errorResult("Falha na conexão com a IA Gemini: ${(error.message ?: "erro inesperado").take(MAX_ERROR_DETAIL)}")
             } finally {
+                pending.networkElapsedNanos += System.nanoTime() - attemptStartedNanos
                 pending.connection.compareAndSet(connection, null)
                 connection?.disconnect()
             }
@@ -420,7 +469,7 @@ internal class StacyAiClient(
     fun shutdown() {
         activeRequests.values.toList().forEach { request ->
             request.connection.getAndSet(null)?.disconnect()
-            request.future?.cancel(true)
+            cancelQueuedFuture(request)
             finish(request, errorResult("A solicitação foi interrompida porque o núcleo foi encerrado."))
         }
         executor.shutdownNow()
@@ -429,6 +478,7 @@ internal class StacyAiClient(
     }
 
     private companion object {
+        const val METRICS_TAG = "StacyAiMetrics"
         const val ENDPOINT = "https://generativelanguage.googleapis.com/v1/interactions"
         const val MODEL = "gemini-3.8-flash"
         const val CONNECT_TIMEOUT_MS = 5_000
