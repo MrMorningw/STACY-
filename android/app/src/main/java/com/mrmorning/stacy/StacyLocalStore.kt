@@ -131,7 +131,7 @@ internal class StacyLocalStore(
         readableDatabase.query(
             "conversations",
             arrayOf("id", "title", "created_at", "updated_at", "last_message_preview"),
-            null, null, null, null, "updated_at DESC, id DESC",
+            null, null, null, null, "julianday(updated_at) DESC, id DESC",
             limit.coerceIn(1, 500).toString(),
         ).use { cursor ->
             while (cursor.moveToNext()) {
@@ -211,7 +211,7 @@ internal class StacyLocalStore(
             "conversation_messages",
             arrayOf("id", "conversation_id", "role", "text", "created_at", "request_id", "state"),
             "conversation_id = ?", arrayOf(conversationId), null, null,
-            "created_at ASC, rowid ASC", limit.coerceIn(1, 2000).toString(),
+            "rowid DESC", limit.coerceIn(1, 2000).toString(),
         ).use { cursor ->
             while (cursor.moveToNext()) {
                 output.add(
@@ -223,6 +223,7 @@ internal class StacyLocalStore(
                 )
             }
         }
+        output.reverse()
         return output
     }
 
@@ -244,6 +245,15 @@ internal class StacyLocalStore(
             "id = ?", arrayOf(conversationId),
         )
     }
+
+    @Synchronized
+    fun clearAllPreviousInteractionIds(): Int =
+        writableDatabase.update(
+            "conversations",
+            ContentValues().apply { putNull("previous_interaction_id") },
+            "previous_interaction_id IS NOT NULL",
+            null,
+        )
 
     @Synchronized
     fun deleteConversation(conversationId: String): Boolean =
