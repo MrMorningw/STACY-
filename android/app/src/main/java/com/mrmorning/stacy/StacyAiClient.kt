@@ -399,8 +399,8 @@ internal class StacyAiClient(
         return transientRateLimit && !quotaFailure
     }
 
-    private fun calculateRetryDelayMs(connection: HttpURLConnection, failedAttempt: Int): Long {
-        val retryAfter = connection.getHeaderField("Retry-After")?.trim()
+    private fun calculateRetryDelayMs(connection: HttpURLConnection?, failedAttempt: Int): Long {
+        val retryAfter = connection?.getHeaderField("Retry-After")?.trim()
         val seconds = retryAfter?.toLongOrNull()?.takeIf { it >= 0L }
         val dateDelay = if (seconds == null && !retryAfter.isNullOrBlank()) {
             runCatching {
