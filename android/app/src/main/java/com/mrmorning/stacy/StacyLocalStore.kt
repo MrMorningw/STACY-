@@ -126,13 +126,13 @@ internal class StacyLocalStore(
     }
 
     @Synchronized
-    fun listConversations(limit: Int = 100): List<StacyConversation> {
+    fun listConversations(limit: Int = 100, offset: Int = 0): List<StacyConversation> {
         val output = ArrayList<StacyConversation>()
         readableDatabase.query(
             "conversations",
             arrayOf("id", "title", "created_at", "updated_at", "last_message_preview"),
             null, null, null, null, "julianday(updated_at) DESC, id DESC",
-            limit.coerceIn(1, 500).toString(),
+            "${limit.coerceIn(1, 500)} OFFSET ${offset.coerceAtLeast(0)}",
         ).use { cursor ->
             while (cursor.moveToNext()) {
                 output.add(
