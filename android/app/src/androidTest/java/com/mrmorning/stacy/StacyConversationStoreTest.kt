@@ -15,7 +15,7 @@ class StacyConversationStoreTest {
     @Test
     fun conversationsAndMessagesSurviveReopenAndDeleteOnlySelectedSession() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val name = "stacy_history_test_\${UUID.randomUUID()}.db"
+        val name = "stacy_history_test_${UUID.randomUUID()}.db"
         try {
             val store = StacyLocalStore(context, name)
             store.addTask("Tarefa preservada")
@@ -55,7 +55,7 @@ class StacyConversationStoreTest {
     @Test
     fun versionOneDatabaseMigratesWithoutLosingTasksOrMemories() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val name = "stacy_migration_test_\${UUID.randomUUID()}.db"
+        val name = "stacy_migration_test_${UUID.randomUUID()}.db"
         try {
             val file = context.getDatabasePath(name)
             file.parentFile?.mkdirs()
