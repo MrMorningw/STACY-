@@ -36,6 +36,8 @@ class MainActivity : ComponentActivity() {
     private var sectionOpen = false
     private var chatOpen = false
     private var aiConnectionStatus = "SEM CHAVE"
+    private var conversationListOffset = 0
+    private var conversationListExhausted = false
     private var voiceEnabled = true
     private lateinit var updater: StacyUpdater
     private var pendingFileChooser: ValueCallback<Array<Uri>>? = null
@@ -409,14 +411,18 @@ class MainActivity : ComponentActivity() {
         @JavascriptInterface fun stacyOpenCalendar() { runOnUiThread { reportAutomationOutcome(androidAutomation.openCalendar(), "Calendário do Android aberto.") } }
         @JavascriptInterface fun stacyShareText(text: String) { runOnUiThread { reportAutomationOutcome(androidAutomation.shareText(text, "Compartilhar pela STACY"), "Menu de compartilhamento aberto.") } }
         @JavascriptInterface fun stacyGetConversations() {
-            runOnUiThread { publishConversationList() }
+            runOnUiThread { publishConversationList(reset = true) }
+        }
+
+        @JavascriptInterface fun stacyLoadMoreConversations() {
+            runOnUiThread { publishConversationList(reset = false) }
         }
 
         @JavascriptInterface fun stacyOpenConversation(id: String) {
             runOnUiThread {
                 if (historyStore.getConversation(id) == null) {
                     webCoreStatus("Esta conversa não existe mais no histórico local.")
-                    publishConversationList()
+                    publishConversationList(reset = true)
                     return@runOnUiThread
                 }
                 activeConversationId = id
@@ -476,16 +482,27 @@ class MainActivity : ComponentActivity() {
         )
     }
 
-    private fun publishConversationList() {
+    private fun publishConversationList(reset: Boolean = true) {
         if (!webPageLoaded || !::webView.isInitialized) return
+        if (reset) {
+            conversationListOffset = 0
+            conversationListExhausted = false
+        }
+        if (conversationListExhausted) return
         val rows = org.json.JSONArray()
-        historyStore.listConversations().forEach { item ->
+        val batch = historyStore.listConversations(100, conversationListOffset)
+        batch.forEach { item ->
             rows.put(JSONObject().put("id", item.id).put("title", item.title).put("preview", item.preview).put("updatedAt", item.updatedAt))
         }
-        webView.evaluateJavascript(
-            "if(typeof window.stacyRenderConversations==='function'){window.stacyRenderConversations($rows);}",
-            null,
-        )
+        conversationListOffset += batch.size
+        conversationListExhausted = batch.size < 100
+        val hasMore = !conversationListExhausted
+        val script = if (reset) {
+            "if(typeof window.stacyRenderConversations==='function'){window.stacyRenderConversations($rows,$hasMore);}"
+        } else {
+            "if(typeof window.stacyAppendConversations==='function'){window.stacyAppendConversations($rows,$hasMore);}"
+        }
+        webView.evaluateJavascript(script, null)
     }
 
     private fun publishActiveConversation() {
