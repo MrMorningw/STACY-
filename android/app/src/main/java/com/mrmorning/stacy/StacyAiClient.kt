@@ -379,30 +379,36 @@ internal class StacyAiClient(
     }
 
     private fun httpError(statusCode: Int, detail: String, attempts: Int): CoreResult {
+        val normalized = detail.lowercase(Locale.ROOT)
         val explanation = when (statusCode) {
-            400 -> "A API Gemini recusou a solicitação (HTTP 400)."
-            401, 403 -> "A chave Gemini foi recusada ou não tem permissão para este modelo."
-            404 -> "A API Gemini não encontrou o recurso solicitado (HTTP 404)."
-            408 -> "A API Gemini demorou para responder (HTTP 408)."
-            429 -> "A API Gemini atingiu um limite de uso ou cota (HTTP 429)."
-            503 -> "A API Gemini está temporariamente sobrecarregada (HTTP 503)."
-            in 500..599 -> "A API Gemini apresentou uma instabilidade temporária (HTTP $statusCode)."
-            else -> "A API Gemini retornou HTTP $statusCode."
+            400 -> "O Gemini recusou o formato desta solicitação. A chave foi salva, mas este teste não confirmou a conexão."
+            401 -> "A chave Gemini foi recusada. Confira se ela está correta e ativa no Google AI Studio."
+            403 -> "A chave foi reconhecida, mas não tem autorização para acessar este recurso ou modelo."
+            404 -> "O serviço Gemini não encontrou o recurso solicitado. A conexão não foi validada."
+            408 -> "O Gemini demorou para responder. Verifique a rede e tente novamente."
+            429 -> {
+                val exhaustedQuota = listOf("per day", "daily", "quota", "billing", "spend cap", "limit: 20 requests")
+                    .any(normalized::contains)
+                if (exhaustedQuota) {
+                    "A cota de uso da API Gemini foi atingida. A chave continua salva, mas a conexão ainda não foi validada. Consulte o uso e os limites do projeto no Google AI Studio ou aguarde a renovação da cota."
+                } else {
+                    "O Gemini aplicou um limite temporário de solicitações. A chave não foi considerada inválida; aguarde antes de tentar novamente."
+                }
+            }
+            503 -> "O serviço Gemini está temporariamente sobrecarregado. Tente novamente mais tarde."
+            in 500..599 -> "O serviço Gemini apresentou uma instabilidade temporária (código $statusCode)."
+            else -> "Não foi possível validar a conexão com o Gemini (código $statusCode)."
         }
-        val retryNote = if (attempts > 1) " A STACY realizou $attempts tentativas totais." else ""
-        return errorResult(if (detail.isBlank()) "$explanation$retryNote" else "$explanation$retryNote Detalhe: ${detail.take(MAX_ERROR_DETAIL)}")
+        val retryNote = if (attempts > 1) " Foram feitas $attempts tentativas." else ""
+        return errorResult(explanation + retryNote)
     }
 
     private fun isRetryableHttpStatus(statusCode: Int, detail: String): Boolean {
         if (statusCode == 408 || statusCode in 500..599) return true
-        if (statusCode != 429) return false
-        val normalized = detail.lowercase(Locale.ROOT)
-        val quotaFailure = listOf("quota", "billing", "prepay", "daily limit", "per day").any(normalized::contains)
-        val transientRateLimit = listOf(
-            "rate limit", "rate_limit", "too many requests",
-            "requests per minute", "requests per second", "rate exceeded",
-        ).any(normalized::contains)
-        return transientRateLimit && !quotaFailure
+        // Do not blindly replay 429: the response may represent a daily/project quota
+        // that cannot recover inside the chat deadline. Surface a single actionable result.
+        if (statusCode == 429) return false
+        return false
     }
 
     private fun calculateRetryDelayMs(connection: HttpURLConnection?, failedAttempt: Int): Long {
