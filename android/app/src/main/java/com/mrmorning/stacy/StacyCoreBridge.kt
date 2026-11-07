@@ -3,12 +3,14 @@ package com.mrmorning.stacy
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.Normalizer
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 
 /** Android-native router. Generative requests carry an explicit conversation ID. */
 class StacyCoreBridge(private val context: Context) {
@@ -18,6 +20,7 @@ class StacyCoreBridge(private val context: Context) {
     private val busyConversations = ConcurrentHashMap.newKeySet<String>()
 
     fun process(message: String, conversationId: String? = null, onQueued: () -> Unit = {}) {
+        val requestStartedNanos = System.nanoTime()
         val normalized = message.trim()
         if (normalized.isEmpty()) return
         val conversation = runCatching { localStore.getOrCreateConversation(conversationId) }.getOrElse {
@@ -53,8 +56,10 @@ class StacyCoreBridge(private val context: Context) {
         }
 
         onQueued()
+        var requestProfile = "local"
         fun deliver(raw: CoreResult, state: String) {
             val result = raw.copy(conversationId = conversation.id, requestId = requestId)
+            val persistenceStartedNanos = System.nanoTime()
             try {
                 localStore.updateMessageState(requestId, "user", if (state == "failed") "failed" else "completed")
                 if (result.response.isNotBlank()) {
@@ -91,7 +96,14 @@ class StacyCoreBridge(private val context: Context) {
             }
             busyConversations.remove(conversation.id)
             CoreStatusStore.publish(context, "")
-            CoreResultStore.publish(context, result)
+            val persistMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - persistenceStartedNanos)
+            val totalMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - requestStartedNanos)
+            CoreResultStore.publish(context, result) {
+                Log.i(
+                    "StacyCoreMetrics",
+                    "profile=$requestProfile total_ms=$totalMs history_persist_ms=$persistMs outcome=${if (state == "failed") "error" else "success"}",
+                )
+            }
             CorePhaseStore.publish(context, if (state == "failed") "erro" else "respondendo")
         }
 
@@ -101,31 +113,22 @@ class StacyCoreBridge(private val context: Context) {
             return
         }
 
-        val useWebSearch = shouldUseWebSearch(normalized)
+        val useWebSearch = StacyRequestClassifier.requiresWebSearch(normalized)
+        requestProfile = if (useWebSearch) "research" else "chat"
+        val budgetMs = if (useWebSearch) SEARCH_DEADLINE_MS else CHAT_DEADLINE_MS
+        val absoluteDeadlineNanos = requestStartedNanos + TimeUnit.MILLISECONDS.toNanos(budgetMs)
         CorePhaseStore.publish(context, if (useWebSearch) "pesquisando" else "pensando")
         aiClient.chat(
             message = normalized,
             conversationId = conversation.id,
             useWebSearch = useWebSearch,
             onRetry = ::publishRetryStatus,
+            absoluteDeadlineNanos = absoluteDeadlineNanos,
         ) { result ->
             deliver(result, if (result.tipo.equals("erro", true) || result.tipo.equals("error", true)) "failed" else "completed")
         }
     }
 
-    private fun shouldUseWebSearch(message: String): Boolean {
-        val normalized = Normalizer.normalize(message, Normalizer.Form.NFD)
-            .replace(Regex("\\p{Mn}+"), "")
-            .lowercase(Locale.ROOT)
-        val webIntents = listOf(
-            "pesquise", "pesquisar", "pesquisa na web", "pesquisa na internet",
-            "busque na web", "procure na internet", "na internet", "na web",
-            "noticias", "hoje", "atualmente", "agora", "mais recente", "ultimas",
-            "ultimo", "ultima", "preco", "cotacao", "onde assistir", "fontes",
-            "referencias", "situacao atual", "quem e o atual", "pesquise sobre",
-        )
-        return webIntents.any(normalized::contains)
-    }
 
     /** Health check never reads or updates a conversation's remote context. */
     fun testConnection(callback: (CoreResult) -> Unit) {
@@ -141,6 +144,11 @@ class StacyCoreBridge(private val context: Context) {
             context,
             "Gemini temporariamente indisponível (HTTP $statusCode). Nova tentativa $attempt/4 em ${delayMs} ms.",
         )
+    }
+
+    private companion object {
+        const val CHAT_DEADLINE_MS = 10_000L
+        const val SEARCH_DEADLINE_MS = 60_000L
     }
 
     fun shutdown() {
@@ -192,4 +200,34 @@ object CoreStatusStore {
     fun subscribe(listener: (String) -> Unit) { this.listener = listener }
     fun clear() { listener = null }
     fun publish(context: Context, status: String) { mainHandler.post { listener?.invoke(status) } }
+}
+
+internal object StacyRequestClassifier {
+    private val explicitResearchIntents = listOf(
+        "pesquise", "pesquisar", "pesquisa na web", "pesquisa na internet",
+        "busque na web", "busque na internet", "procure na web", "procure na internet",
+        "na internet", "na web", "fontes externas", "referencias atuais",
+        "noticias de hoje", "ultimas noticias", "onde assistir",
+    )
+    private val currentSignals = listOf(
+        "hoje", "agora", "atualmente", "atual", "mais recente", "mais recentes",
+        "ultima versao", "ultimo lancamento", "ultimas", "neste momento",
+        "este ano", "em 2026",
+    )
+    private val currentTopics = listOf(
+        "noticia", "preco", "cotacao", "taxa", "clima", "tempo", "placar",
+        "resultado", "evento", "lancamento", "versao", "atualizacao",
+        "presidente", "governador", "prefeito", "legislacao", "lei",
+        "horario", "disponibilidade", "estoque", "mercado", "jogo",
+        "partida", "eleicao", "pesquisa eleitoral",
+    )
+
+    fun requiresWebSearch(message: String): Boolean {
+        val normalized = Normalizer.normalize(message, Normalizer.Form.NFD)
+            .replace(Regex("\\p{Mn}+"), "")
+            .lowercase(Locale.ROOT)
+        if (explicitResearchIntents.any(normalized::contains)) return true
+        return currentSignals.any(normalized::contains) &&
+            currentTopics.any(normalized::contains)
+    }
 }
