@@ -123,9 +123,21 @@ class MainActivity : ComponentActivity() {
                 } else if (result.response.isNotBlank()) {
                     val isError = result.tipo.equals("erro", ignoreCase = true) ||
                         result.tipo.equals("error", ignoreCase = true)
-                    if (isError && (result.response.contains("HTTP 401") || result.response.contains("HTTP 403"))) {
-                        aiConnectionStatus = "ERRO DE AUTENTICAÇÃO"
-                        webAiStatus(aiConnectionStatus)
+                    if (isError) {
+                        val detail = result.response.lowercase()
+                        val invalidatesConnection = when {
+                            detail.contains("http 401") || detail.contains("http 403") ||
+                                detail.contains("chave gemini foi recusada") -> "ERRO DE AUTENTICAÇÃO"
+                            detail.contains("http 429") || detail.contains("cota") -> "ERRO DE COTA/LIMITE"
+                            detail.contains("http 5") || detail.contains("sem conexão com a internet") ||
+                                detail.contains("tempo de conexão com a ia expirou") ||
+                                detail.contains("prazo total da solicitação") -> "CONEXÃO NÃO CONFIRMADA"
+                            else -> null
+                        }
+                        if (invalidatesConnection != null) {
+                            aiConnectionStatus = invalidatesConnection
+                            webAiStatus(aiConnectionStatus)
+                        }
                     }
                     vm.onCoreResponse(result)
                     webResponse(formatResponseWithSources(result), result.tipo)
@@ -274,7 +286,10 @@ class MainActivity : ComponentActivity() {
             .setView(entry)
             .setPositiveButton("Salvar e testar", null)
             .setNeutralButton("Apagar chave") { _, _ ->
-                runCatching { store.clearGeminiApiKey() }
+                runCatching {
+                    store.clearGeminiApiKey()
+                    historyStore.clearAllPreviousInteractionIds()
+                }
                     .onSuccess {
                         aiConnectionStatus = "SEM CHAVE"
                         webAiStatus(aiConnectionStatus)
@@ -295,7 +310,9 @@ class MainActivity : ComponentActivity() {
             val key = entry.text?.toString()?.trim().orEmpty()
             if (key.isNotBlank()) {
                 try {
+                    val previousKey = store.getGeminiApiKey()
                     store.saveGeminiApiKey(key)
+                    if (previousKey != key) historyStore.clearAllPreviousInteractionIds()
                     aiConnectionStatus = "CHAVE SALVA · NÃO VERIFICADA"
                     webAiStatus(aiConnectionStatus)
                 } catch (error: Exception) {
