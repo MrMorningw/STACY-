@@ -205,6 +205,7 @@ internal class StacyAiClient(
         onRetry: ((Int, Long, Int) -> Unit)?,
     ): CoreResult {
         var attempt = 1
+        var activePreviousInteractionId = previousInteractionId
         var retriedWithoutPreviousInteraction = false
         while (remainingMs(pending) > MIN_ATTEMPT_BUDGET_MS && !Thread.currentThread().isInterrupted) {
             var connection: HttpURLConnection? = null
@@ -222,7 +223,7 @@ internal class StacyAiClient(
                 if (useWebSearch) {
                     payload.put("tools", JSONArray().put(JSONObject().put("type", "google_search")))
                 }
-                previousInteractionId?.takeIf { it.isNotBlank() }?.let {
+                activePreviousInteractionId?.takeIf { it.isNotBlank() }?.let {
                     payload.put("previous_interaction_id", it)
                 }
 
@@ -247,11 +248,12 @@ internal class StacyAiClient(
 
                 if (statusCode !in 200..299) {
                     val detail = responseJson.optJSONObject("error")?.optString("message").orEmpty()
-                    if (!retriedWithoutPreviousInteraction && previousInteractionId != null &&
+                    if (!retriedWithoutPreviousInteraction && activePreviousInteractionId != null &&
                         isStaleInteraction(statusCode, detail)
                     ) {
                         if (conversationId == LEGACY_CONVERSATION_ID) secrets.clearPreviousInteractionId()
                         else localStore.savePreviousInteractionId(conversationId, null)
+                        activePreviousInteractionId = null
                         retriedWithoutPreviousInteraction = true
                         connection.disconnect()
                         pending.connection.compareAndSet(connection, null)
