@@ -29,7 +29,8 @@ internal data class StacyConversationMessage(
     val state: String,
 )
 
-internal class StacyLocalStore(context: Context) :
+internal class StacyLocalStore(
+    context: Context,
     databaseName: String = "stacy_local.db",
 ) : SQLiteOpenHelper(context.applicationContext, databaseName, null, DATABASE_VERSION) {
 
