@@ -829,7 +829,7 @@ function sendComposerMessage(){
    appendStacyChatMessage(text,"user","",chatIsOpen);
    window.stacyChatSetPending();
    startStacyProcessingStages(text);
-   Android.stacySendForConversation(text, activeConversationId);
+   Android.stacySendForConversation(text, window.stacyActiveConversationId||'');
  }else{
    window.stacyNativeResponse && window.stacyNativeResponse("A ponte nativa da STACY não está disponível.","erro");
  }
@@ -1246,7 +1246,7 @@ animationFrameId=requestAnimationFrame(animate);
       appendStacyChatMessage(value,'user','',chatIsOpen);
       window.stacyChatSetPending();
       startStacyProcessingStages(value);
-      Android.stacySendForConversation(value, activeConversationId);
+      Android.stacySendForConversation(value, window.stacyActiveConversationId||'');
     }else{
       window.stacyNativeResponse('A ponte nativa da STACY não está disponível.','erro');
     }
