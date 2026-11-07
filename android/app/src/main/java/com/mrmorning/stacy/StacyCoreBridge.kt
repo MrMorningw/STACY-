@@ -21,7 +21,7 @@ class StacyCoreBridge(private val context: Context) {
         val conversation = runCatching { localStore.getOrCreateConversation(conversationId) }.getOrElse {
             CoreResultStore.publish(
                 context,
-                CoreResult("erro", "Não foi possível abrir o histórico desta conversa: \${it.message ?: "falha no banco local"}.", 1, "Falha de persistência."),
+                CoreResult("erro", "Não foi possível abrir o histórico desta conversa: ${it.message ?: "falha no banco local"}.", 1, "Falha de persistência."),
             )
             return
         }
@@ -52,7 +52,7 @@ class StacyCoreBridge(private val context: Context) {
                     context,
                     result.copy(
                         tipo = "erro",
-                        response = "A resposta chegou, mas não foi possível confirmar sua gravação no histórico local. \${persistenceError.message ?: "Falha de persistência."}",
+                        response = "A resposta chegou, mas não foi possível confirmar sua gravação no histórico local. ${persistenceError.message ?: "Falha de persistência."}",
                         exitCode = 1,
                         stderr = "Falha ao persistir a resposta.",
                     ),
@@ -108,7 +108,7 @@ class StacyCoreBridge(private val context: Context) {
     private fun publishRetryStatus(attempt: Int, delayMs: Long, statusCode: Int) {
         CoreStatusStore.publish(
             context,
-            "Gemini temporariamente indisponível (HTTP $statusCode). Nova tentativa $attempt/4 em \${delayMs} ms.",
+            "Gemini temporariamente indisponível (HTTP $statusCode). Nova tentativa $attempt/4 em ${delayMs} ms.",
         )
     }
 
