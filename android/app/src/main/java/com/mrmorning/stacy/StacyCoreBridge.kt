@@ -204,9 +204,9 @@ object CoreStatusStore {
 
 internal object StacyRequestClassifier {
     private val explicitResearchIntents = listOf(
-        "pesquise", "pesquisar", "pesquisa na web", "pesquisa na internet",
-        "busque na web", "busque na internet", "procure na web", "procure na internet",
-        "na internet", "na web", "fontes externas", "referencias atuais",
+        "pesquise na web", "pesquise na internet", "pesquisa na web", "pesquisa na internet",
+        "pesquise sobre", "pesquise fontes", "busque na web", "busque na internet",
+        "procure na web", "procure na internet", "fontes externas", "referencias atuais",
         "noticias de hoje", "ultimas noticias", "onde assistir",
     )
     private val currentSignals = listOf(
