@@ -348,10 +348,12 @@ class MainActivity : ComponentActivity() {
                 aiConnectionStatus = if (connected) "CONECTADA · TESTE REAL APROVADO" else {
                     val detail = result.response.lowercase()
                     when {
-                        detail.contains("401") || detail.contains("403") || detail.contains("chave") -> "ERRO DE AUTENTICAÇÃO"
-                        detail.contains("429") || detail.contains("cota") -> "ERRO DE COTA/LIMITE"
-                        detail.contains("internet") || detail.contains("conexão") || detail.contains("tempo") -> "SEM CONEXÃO CONFIRMADA"
-                        else -> "ERRO NO TESTE DE CONEXÃO"
+                        detail.contains("429") || detail.contains("cota") || detail.contains("limite temporário") -> "LIMITE OU COTA ATINGIDA · CHAVE NÃO VALIDADA"
+                        detail.contains("401") -> "CHAVE RECUSADA"
+                        detail.contains("403") -> "CHAVE SEM PERMISSÃO"
+                        detail.contains("sem conexão") || detail.contains("internet") || detail.contains("demorou para responder") || detail.contains("tempo de conexão") -> "CONEXÃO NÃO VALIDADA"
+                        detail.contains("chave") && (detail.contains("recusada") || detail.contains("incorreta")) -> "CHAVE RECUSADA"
+                        else -> "TESTE NÃO CONCLUÍDO"
                     }
                 }
                 webAiStatus(aiConnectionStatus)
