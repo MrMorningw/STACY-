@@ -39,12 +39,12 @@ class StacyWebViewBridgeTest {
                 },
             )
             evaluate(webView, "window.stacySetAnimationsEnabled(false)")
-            evaluate(webView, "window.stacyNativeCoreStatus('Gemini indisponível. Tentativa automática 1/3.')")
+            evaluate(webView, "window.stacyNativeCoreStatus('Gemini indisponível. Tentativa automática 1/4.')")
             assertTrue(
                 "Retry status must be visible in the existing STACY information line",
                 evaluate(
                     webView,
-                    "document.getElementById('infoText').innerText.includes('Tentativa automática 1/3')",
+                    "document.getElementById('infoText').innerText.includes('Tentativa automática 1/4')",
                 ) == "true",
             )
             evaluate(webView, "window.stacyNativeCoreStatus('')")
