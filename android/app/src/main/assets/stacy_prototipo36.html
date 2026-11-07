@@ -1011,6 +1011,7 @@ animationFrameId=requestAnimationFrame(animate);
     view.inert=false;
     document.body.classList.add('stacy-section-active');
     back.focus();
+    if(key==='config' && window.stacyNativeAiStatus)window.stacyNativeAiStatus(window.stacyAiConnectionStatus||'CHAVE NÃO VERIFICADA');
     if(key==='conversas' && window.Android && typeof Android.stacyGetConversations==='function')Android.stacyGetConversations();
     if(window.stacySyncNavigationState)window.stacySyncNavigationState();
   }
@@ -1072,8 +1073,9 @@ animationFrameId=requestAnimationFrame(animate);
   window.stacyActiveConversationId='';
   window.stacyConversationDetailOpen=false;
   window.stacyNativeAiStatus=function(status){
+    window.stacyAiConnectionStatus=String(status||'SEM CHAVE');
     const el=document.getElementById('stacyAiConnectionStatus');
-    if(el)el.textContent=String(status||'SEM CHAVE');
+    if(el)el.textContent=window.stacyAiConnectionStatus;
   };
   window.stacySetActiveConversationId=function(id){
     window.stacyActiveConversationId=String(id||'');
