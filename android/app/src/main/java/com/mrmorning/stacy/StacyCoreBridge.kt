@@ -65,9 +65,9 @@ class StacyCoreBridge(private val context: Context) {
                                 val item = sources.optJSONObject(index) ?: return@mapNotNull null
                                 val url = item.optString("url")
                                 if (!url.startsWith("https://")) null
-                                else "${item.optString("titulo", "Fonte")}\\n$url"
+                                else "${item.optString("titulo", "Fonte")}\n$url"
                             }
-                            if (sourceLines.isNotEmpty()) append("\\n\\nFontes consultadas:\\n").append(sourceLines.joinToString("\\n\\n"))
+                            if (sourceLines.isNotEmpty()) append("\n\nFontes consultadas:\n").append(sourceLines.joinToString("\n\n"))
                         }
                     }
                     localStore.addConversationMessage(
@@ -76,6 +76,7 @@ class StacyCoreBridge(private val context: Context) {
                     )
                 }
             } catch (persistenceError: Exception) {
+                runCatching { localStore.updateMessageState(requestId, "user", "failed") }
                 CoreResultStore.publish(
                     context,
                     result.copy(
