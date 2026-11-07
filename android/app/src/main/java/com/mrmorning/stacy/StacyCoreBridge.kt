@@ -7,6 +7,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.text.Normalizer
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 import java.util.UUID
 
 /** Android-native router. Generative requests carry an explicit conversation ID. */
@@ -14,6 +15,7 @@ class StacyCoreBridge(private val context: Context) {
     private val localStore = StacyLocalStore(context.applicationContext)
     private val nativeCore = StacyNativeCore(localStore)
     private val aiClient = StacyAiClient(context.applicationContext)
+    private val busyConversations = ConcurrentHashMap.newKeySet<String>()
 
     fun process(message: String, conversationId: String? = null, onQueued: () -> Unit = {}) {
         val normalized = message.trim()
@@ -25,10 +27,24 @@ class StacyCoreBridge(private val context: Context) {
             )
             return
         }
+        if (!busyConversations.add(conversation.id)) {
+            CoreResultStore.publish(
+                context,
+                CoreResult(
+                    "erro",
+                    "Já existe uma resposta em andamento nesta conversa. Aguarde a conclusão antes de enviar outra mensagem.",
+                    1,
+                    "Solicitação duplicada bloqueada.",
+                    conversationId = conversation.id,
+                ),
+            )
+            return
+        }
         val requestId = UUID.randomUUID().toString()
         try {
             localStore.addConversationMessage(conversation.id, "user", normalized, requestId, state = "pending")
         } catch (error: Exception) {
+            busyConversations.remove(conversation.id)
             CoreResultStore.publish(
                 context,
                 CoreResult("erro", "Não foi possível salvar sua mensagem antes do envio. A solicitação não foi enviada.", 1, error.message ?: "Falha ao persistir mensagem.", conversationId = conversation.id),
@@ -42,8 +58,26 @@ class StacyCoreBridge(private val context: Context) {
             try {
                 localStore.updateMessageState(requestId, "user", if (state == "failed") "failed" else "completed")
                 if (result.response.isNotBlank()) {
+                    val historyText = buildString {
+                        append(result.response)
+                        result.fontes?.let { sources ->
+                            val sourceLines = (0 until sources.length()).mapNotNull { index ->
+                                val item = sources.optJSONObject(index) ?: return@mapNotNull null
+                                val url = item.optString("url")
+                                if (!url.startsWith("https://")) null
+                                else "${item.optString("titulo", "Fonte")}
+$url"
+                            }
+                            if (sourceLines.isNotEmpty()) append("
+
+Fontes consultadas:
+").append(sourceLines.joinToString("
+
+"))
+                        }
+                    }
                     localStore.addConversationMessage(
-                        conversation.id, "assistant", result.response, requestId,
+                        conversation.id, "assistant", historyText, requestId,
                         state = if (state == "failed") "failed" else "completed",
                     )
                 }
@@ -57,8 +91,10 @@ class StacyCoreBridge(private val context: Context) {
                         stderr = "Falha ao persistir a resposta.",
                     ),
                 )
+                busyConversations.remove(conversation.id)
                 return
             }
+            busyConversations.remove(conversation.id)
             CoreStatusStore.publish(context, "")
             CoreResultStore.publish(context, result)
             CorePhaseStore.publish(context, if (state == "failed") "erro" else "respondendo")
@@ -113,6 +149,7 @@ class StacyCoreBridge(private val context: Context) {
     }
 
     fun shutdown() {
+        busyConversations.clear()
         aiClient.shutdown()
         localStore.close()
     }
