@@ -7,11 +7,37 @@ import android.database.sqlite.SQLiteOpenHelper
 import java.text.Normalizer
 import java.time.Instant
 import java.util.Locale
+import java.util.UUID
 
 internal data class StacyTask(val id: Long, val title: String, val dueHint: String?, val done: Boolean)
 
-internal class StacyLocalStore(context: Context) :
-    SQLiteOpenHelper(context.applicationContext, "stacy_local.db", null, 1) {
+internal data class StacyConversation(
+    val id: String,
+    val title: String,
+    val createdAt: String,
+    val updatedAt: String,
+    val preview: String,
+)
+
+internal data class StacyConversationMessage(
+    val id: String,
+    val conversationId: String,
+    val role: String,
+    val text: String,
+    val createdAt: String,
+    val requestId: String?,
+    val state: String,
+)
+
+internal class StacyLocalStore(
+    context: Context,
+    databaseName: String = "stacy_local.db",
+) : SQLiteOpenHelper(context.applicationContext, databaseName, null, DATABASE_VERSION) {
+
+    override fun onConfigure(db: SQLiteDatabase) {
+        super.onConfigure(db)
+        db.setForeignKeyConstraintsEnabled(true)
+    }
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL("""CREATE TABLE tasks (
@@ -28,10 +54,220 @@ internal class StacyLocalStore(context: Context) :
         )""".trimIndent())
         db.execSQL("CREATE INDEX tasks_done_idx ON tasks(done, id DESC)")
         db.execSQL("CREATE INDEX memories_id_idx ON memories(id DESC)")
+        createConversationTables(db)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        // Keep user data; future schema changes must use explicit additive migrations.
+        if (oldVersion < 2) createConversationTables(db)
+        // Future schema changes must be additive and preserve tasks/memories/history.
+    }
+
+    private fun createConversationTables(db: SQLiteDatabase) {
+        db.execSQL("""CREATE TABLE IF NOT EXISTS conversations (
+            id TEXT PRIMARY KEY NOT NULL,
+            title TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            last_message_preview TEXT NOT NULL DEFAULT '',
+            previous_interaction_id TEXT
+        )""".trimIndent())
+        db.execSQL("""CREATE TABLE IF NOT EXISTS conversation_messages (
+            id TEXT PRIMARY KEY NOT NULL,
+            conversation_id TEXT NOT NULL,
+            role TEXT NOT NULL CHECK(role IN ('user','assistant','system')),
+            text TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            request_id TEXT,
+            state TEXT NOT NULL DEFAULT 'completed',
+            FOREIGN KEY(conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+        )""".trimIndent())
+        db.execSQL("CREATE INDEX IF NOT EXISTS conversations_updated_idx ON conversations(updated_at DESC)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS messages_conversation_idx ON conversation_messages(conversation_id, created_at, id)")
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS messages_request_role_idx ON conversation_messages(request_id, role) WHERE request_id IS NOT NULL")
+    }
+
+    @Synchronized
+    fun createConversation(): StacyConversation {
+        val now = Instant.now().toString()
+        val id = UUID.randomUUID().toString()
+        writableDatabase.insertOrThrow(
+            "conversations", null,
+            ContentValues().apply {
+                put("id", id)
+                put("title", "Nova conversa")
+                put("created_at", now)
+                put("updated_at", now)
+                put("last_message_preview", "")
+            },
+        )
+        return StacyConversation(id, "Nova conversa", now, now, "")
+    }
+
+    @Synchronized
+    fun getOrCreateConversation(id: String? = null): StacyConversation {
+        val candidate = id?.takeIf { it.isNotBlank() }
+        if (candidate != null) getConversation(candidate)?.let { return it }
+        return createConversation()
+    }
+
+    @Synchronized
+    fun getConversation(id: String): StacyConversation? {
+        readableDatabase.query(
+            "conversations",
+            arrayOf("id", "title", "created_at", "updated_at", "last_message_preview"),
+            "id = ?", arrayOf(id), null, null, null, "1",
+        ).use { cursor ->
+            if (!cursor.moveToFirst()) return null
+            return StacyConversation(
+                cursor.getString(0), cursor.getString(1), cursor.getString(2),
+                cursor.getString(3), cursor.getString(4),
+            )
+        }
+    }
+
+    @Synchronized
+    fun listConversations(limit: Int = 100, offset: Int = 0): List<StacyConversation> {
+        val output = ArrayList<StacyConversation>()
+        readableDatabase.query(
+            "conversations",
+            arrayOf("id", "title", "created_at", "updated_at", "last_message_preview"),
+            null, null, null, null, "julianday(updated_at) DESC, id DESC",
+            "${limit.coerceIn(1, 500)} OFFSET ${offset.coerceAtLeast(0)}",
+        ).use { cursor ->
+            while (cursor.moveToNext()) {
+                output.add(
+                    StacyConversation(
+                        cursor.getString(0), cursor.getString(1), cursor.getString(2),
+                        cursor.getString(3), cursor.getString(4),
+                    ),
+                )
+            }
+        }
+        return output
+    }
+
+    @Synchronized
+    fun addConversationMessage(
+        conversationId: String,
+        role: String,
+        text: String,
+        requestId: String? = null,
+        state: String = "completed",
+    ): StacyConversationMessage {
+        require(role in setOf("user", "assistant", "system")) { "Papel de mensagem inválido." }
+        val cleaned = text.trim()
+        require(cleaned.isNotEmpty()) { "A mensagem não pode ficar vazia." }
+        require(cleaned.length <= MAX_MESSAGE_CHARS) { "A mensagem excede o limite local de armazenamento." }
+        require(getConversation(conversationId) != null) { "A conversa selecionada não existe mais." }
+        val id = UUID.randomUUID().toString()
+        val now = Instant.now().toString()
+        val database = writableDatabase
+        database.beginTransaction()
+        try {
+            val values = ContentValues().apply {
+                put("id", id)
+                put("conversation_id", conversationId)
+                put("role", role)
+                put("text", cleaned)
+                put("created_at", now)
+                put("request_id", requestId)
+                put("state", state)
+            }
+            database.insertOrThrow("conversation_messages", null, values)
+            val current = getConversation(conversationId)
+            val title = if (role == "user" && current?.title == "Nova conversa") {
+                cleaned.replace(Regex("\\s+"), " ").take(TITLE_MAX_CHARS)
+            } else current?.title ?: "Conversa"
+            database.update(
+                "conversations",
+                ContentValues().apply {
+                    put("title", title)
+                    put("updated_at", now)
+                    put("last_message_preview", cleaned.replace(Regex("\\s+"), " ").take(PREVIEW_MAX_CHARS))
+                },
+                "id = ?", arrayOf(conversationId),
+            )
+            database.setTransactionSuccessful()
+        } finally {
+            database.endTransaction()
+        }
+        return StacyConversationMessage(id, conversationId, role, cleaned, now, requestId, state)
+    }
+
+    @Synchronized
+    fun updateMessageState(requestId: String, role: String, state: String) {
+        if (requestId.isBlank() || role !in setOf("user", "assistant", "system")) return
+        writableDatabase.update(
+            "conversation_messages",
+            ContentValues().apply { put("state", state) },
+            "request_id = ? AND role = ?", arrayOf(requestId, role),
+        )
+    }
+
+    @Synchronized
+    fun listConversationMessages(conversationId: String, limit: Int = 500): List<StacyConversationMessage> {
+        val output = ArrayList<StacyConversationMessage>()
+        readableDatabase.query(
+            "conversation_messages",
+            arrayOf("id", "conversation_id", "role", "text", "created_at", "request_id", "state"),
+            "conversation_id = ?", arrayOf(conversationId), null, null,
+            "rowid DESC", limit.coerceIn(1, 2000).toString(),
+        ).use { cursor ->
+            while (cursor.moveToNext()) {
+                output.add(
+                    StacyConversationMessage(
+                        cursor.getString(0), cursor.getString(1), cursor.getString(2),
+                        cursor.getString(3), cursor.getString(4),
+                        cursor.getString(5), cursor.getString(6),
+                    ),
+                )
+            }
+        }
+        output.reverse()
+        return output
+    }
+
+    @Synchronized
+    fun getPreviousInteractionId(conversationId: String): String? =
+        readableDatabase.query(
+            "conversations", arrayOf("previous_interaction_id"),
+            "id = ?", arrayOf(conversationId), null, null, null, "1",
+        ).use { cursor ->
+            if (cursor.moveToFirst()) cursor.getString(0)?.takeIf { it.isNotBlank() } else null
+        }
+
+    @Synchronized
+    fun savePreviousInteractionId(conversationId: String, interactionId: String?) {
+        val cleaned = interactionId?.trim()?.takeIf { it.isNotEmpty() }
+        writableDatabase.update(
+            "conversations",
+            ContentValues().apply { put("previous_interaction_id", cleaned) },
+            "id = ?", arrayOf(conversationId),
+        )
+    }
+
+    @Synchronized
+    fun clearAllPreviousInteractionIds(): Int =
+        writableDatabase.update(
+            "conversations",
+            ContentValues().apply { putNull("previous_interaction_id") },
+            "previous_interaction_id IS NOT NULL",
+            null,
+        )
+
+    @Synchronized
+    fun deleteConversation(conversationId: String): Boolean =
+        writableDatabase.delete("conversations", "id = ?", arrayOf(conversationId)) == 1
+
+    @Synchronized
+    fun clearConversationHistory(): Int =
+        writableDatabase.delete("conversations", null, null)
+
+    @Synchronized
+    fun markPendingMessagesInterrupted() {
+        writableDatabase.execSQL(
+            "UPDATE conversation_messages SET state = 'interrupted' WHERE state = 'pending'",
+        )
     }
 
     @Synchronized
@@ -107,4 +343,11 @@ internal class StacyLocalStore(context: Context) :
             .lowercase(Locale.ROOT)
             .replace(Regex("\\s+"), " ")
             .trim()
+
+    private companion object {
+        const val DATABASE_VERSION = 2
+        const val MAX_MESSAGE_CHARS = 100_000
+        const val TITLE_MAX_CHARS = 64
+        const val PREVIEW_MAX_CHARS = 120
+    }
 }
