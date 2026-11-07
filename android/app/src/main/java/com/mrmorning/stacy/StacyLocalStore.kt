@@ -30,7 +30,8 @@ internal data class StacyConversationMessage(
 )
 
 internal class StacyLocalStore(context: Context) :
-    SQLiteOpenHelper(context.applicationContext, "stacy_local.db", null, DATABASE_VERSION) {
+    databaseName: String = "stacy_local.db",
+) : SQLiteOpenHelper(context.applicationContext, databaseName, null, DATABASE_VERSION) {
 
     override fun onConfigure(db: SQLiteDatabase) {
         super.onConfigure(db)
