@@ -155,8 +155,9 @@ internal class StacyAiClient(
         }
 
         request.deadlineFuture = deadlineExecutor.schedule({
-            request.connection.getAndSet(null)?.disconnect()
-            cancelQueuedFuture(request)
+            // Complete with the deadline-specific result before interrupting the worker.
+            // Otherwise the worker can win the completion race and surface a generic
+            // "request interrupted" error instead of the actual timeout to the UI.
             finish(
                 request,
                 errorResult(
@@ -169,6 +170,8 @@ internal class StacyAiClient(
                     },
                 ),
             )
+            request.connection.getAndSet(null)?.disconnect()
+            cancelQueuedFuture(request)
         }, remainingMs(request), TimeUnit.MILLISECONDS)
 
         try {
