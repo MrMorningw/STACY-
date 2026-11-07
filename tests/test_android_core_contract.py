@@ -21,8 +21,10 @@ class TestAndroidCoreResponseContract(unittest.TestCase):
         cls.publisher = (ROOT / "scripts/publish_stacy_update.sh").read_text(encoding="utf-8")
 
     def test_message_has_a_complete_ui_to_core_and_back_path(self):
-        self.assertIn('Android.stacySend(text)', self.html)
+        self.assertIn('Android.stacySendForConversation(text, window.stacyActiveConversationId||\'\')', self.html)
+        self.assertIn('fun stacySendForConversation(message: String, conversationId: String)', self.activity)
         self.assertIn('fun stacySend(message: String)', self.activity)
+        self.assertIn('conversationId = activeConversationId', self.activity)
         self.assertIn('coreBridge.process(', self.activity)
         self.assertIn('aiClient.chat(', self.bridge)
         self.assertIn('StacyAiClient', self.bridge)
