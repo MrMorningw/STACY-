@@ -829,6 +829,7 @@ function sendComposerMessage(){
    appendStacyChatMessage(text,"user","",chatIsOpen);
    window.stacyChatSetPending();
    startStacyProcessingStages(text);
+   if(window.stacySyncNavigationState)window.stacySyncNavigationState();
    Android.stacySendForConversation(text, window.stacyActiveConversationId||'');
  }else{
    window.stacyNativeResponse && window.stacyNativeResponse("A ponte nativa da STACY não está disponível.","erro");
@@ -1246,6 +1247,7 @@ animationFrameId=requestAnimationFrame(animate);
       appendStacyChatMessage(value,'user','',chatIsOpen);
       window.stacyChatSetPending();
       startStacyProcessingStages(value);
+      if(window.stacySyncNavigationState)window.stacySyncNavigationState();
       Android.stacySendForConversation(value, window.stacyActiveConversationId||'');
     }else{
       window.stacyNativeResponse('A ponte nativa da STACY não está disponível.','erro');
