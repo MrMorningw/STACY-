@@ -338,6 +338,12 @@ class MainActivity : ComponentActivity() {
                 else if (activeConversationId.isBlank() || historyStore.getConversation(activeConversationId) == null) {
                     activeConversationId = historyStore.createConversation().id
                 }
+                // Sending from the home/orb starts a clean session; an explicitly opened
+                // history session keeps its existing context and message sequence.
+                if (!chatOpen && historyStore.listConversationMessages(activeConversationId).isNotEmpty()) {
+                    activeConversationId = historyStore.createConversation().id
+                    publishActiveConversationId()
+                }
                 publishNavigationState()
                 responseHandler.removeCallbacksAndMessages(null)
                 webState("pensando")
