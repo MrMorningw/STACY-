@@ -10,6 +10,7 @@ import android.os.Bundle
 import android.content.Intent
 import android.net.Uri
 import android.webkit.JavascriptInterface
+import android.webkit.JsResult
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.webkit.WebChromeClient
@@ -118,7 +119,7 @@ class MainActivity : ComponentActivity() {
                 val action = result.androidAction
                 if (action != null) {
                     webState("respondendo")
-                    handleAndroidAction(action)
+                    handleAndroidAction(action, result.conversationId, result.requestId)
                 } else if (result.response.isNotBlank()) {
                     val isError = result.tipo.equals("erro", ignoreCase = true) ||
                         result.tipo.equals("error", ignoreCase = true)
@@ -164,6 +165,17 @@ class MainActivity : ComponentActivity() {
                 }
             }
             webChromeClient = object : WebChromeClient() {
+                override fun onJsConfirm(view: WebView?, url: String?, message: String?, result: JsResult?): Boolean {
+                    val pending = result ?: return false
+                    AlertDialog.Builder(this@MainActivity)
+                        .setMessage(message ?: "Deseja confirmar esta ação?")
+                        .setPositiveButton("Confirmar") { _, _ -> pending.confirm() }
+                        .setNegativeButton("Cancelar") { _, _ -> pending.cancel() }
+                        .setOnCancelListener { pending.cancel() }
+                        .show()
+                    return true
+                }
+
                 override fun onShowFileChooser(webView: WebView?, filePathCallback: ValueCallback<Array<Uri>>?, fileChooserParams: FileChooserParams?): Boolean {
                     pendingFileChooser?.onReceiveValue(null)
                     pendingFileChooser = filePathCallback ?: return false
@@ -196,7 +208,7 @@ class MainActivity : ComponentActivity() {
         return if (lines.isEmpty()) result.response else result.response + "\n\nFontes consultadas:\n" + lines.joinToString("\n\n")
     }
 
-    private fun handleAndroidAction(action: JSONObject) {
+    private fun handleAndroidAction(action: JSONObject, conversationId: String?, requestId: String?) {
         val operation = action.optString("acao")
         val outcome = when (operation) {
             "abrir_configuracoes" -> androidAutomation.openSettings()
@@ -222,6 +234,9 @@ class MainActivity : ComponentActivity() {
                     "compartilhar_texto" -> "Menu de compartilhamento aberto. Escolha o aplicativo e confirme o envio, senhor."
                     else -> outcome.message
                 }
+                if (conversationId != null) {
+                    runCatching { historyStore.addConversationMessage(conversationId, "assistant", message, requestId, "completed") }
+                }
                 vm.addAssistantMessage(message)
                 if (voiceEnabled) textToSpeech.speak(message)
                 webResponse(message, "resposta")
@@ -229,6 +244,9 @@ class MainActivity : ComponentActivity() {
                 responseHandler.postDelayed({ webState("online") }, 1200L)
             }
             is AutomationResult.Failure -> {
+                if (conversationId != null) {
+                    runCatching { historyStore.addConversationMessage(conversationId, "assistant", outcome.message, requestId, "failed") }
+                }
                 vm.onCoreError(outcome.message)
                 if (voiceEnabled) textToSpeech.speak(outcome.message)
                 webResponse(outcome.message, "erro")
@@ -487,6 +505,15 @@ class MainActivity : ComponentActivity() {
         val message = when (outcome) {
             is AutomationResult.Success -> successMessage
             is AutomationResult.Failure -> outcome.message
+        }
+        runCatching {
+            historyStore.addConversationMessage(
+                activeConversationId,
+                "assistant",
+                message,
+                java.util.UUID.randomUUID().toString(),
+                if (outcome is AutomationResult.Success) "completed" else "failed",
+            )
         }
         if (outcome is AutomationResult.Success) vm.addAssistantMessage(message) else vm.onCoreError(message)
         if (voiceEnabled) textToSpeech.speak(message)
