@@ -65,15 +65,9 @@ class StacyCoreBridge(private val context: Context) {
                                 val item = sources.optJSONObject(index) ?: return@mapNotNull null
                                 val url = item.optString("url")
                                 if (!url.startsWith("https://")) null
-                                else "${item.optString("titulo", "Fonte")}
-$url"
+                                else "${item.optString("titulo", "Fonte")}\\n$url"
                             }
-                            if (sourceLines.isNotEmpty()) append("
-
-Fontes consultadas:
-").append(sourceLines.joinToString("
-
-"))
+                            if (sourceLines.isNotEmpty()) append("\\n\\nFontes consultadas:\\n").append(sourceLines.joinToString("\\n\\n"))
                         }
                     }
                     localStore.addConversationMessage(
