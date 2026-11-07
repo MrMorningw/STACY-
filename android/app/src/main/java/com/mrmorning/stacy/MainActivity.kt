@@ -281,7 +281,7 @@ class MainActivity : ComponentActivity() {
                     aiConnectionStatus = "CHAVE SALVA · NÃO VERIFICADA"
                     webAiStatus(aiConnectionStatus)
                 } catch (error: Exception) {
-                    entry.error = "Falha ao salvar: \${error.message ?: "erro desconhecido"}"
+                    entry.error = "Falha ao salvar: ${error.message ?: "erro desconhecido"}"
                     entry.requestFocus()
                     return@setOnClickListener
                 }
@@ -472,7 +472,7 @@ class MainActivity : ComponentActivity() {
     private fun webAiStatus(status: String) {
         if (!::webView.isInitialized) return
         webView.evaluateJavascript(
-            "if(typeof window.stacyNativeAiStatus==='function'){window.stacyNativeAiStatus(\${JSONObject.quote(status)});}",
+            "if(typeof window.stacyNativeAiStatus==='function'){window.stacyNativeAiStatus(${JSONObject.quote(status)});}",
             null,
         )
     }
