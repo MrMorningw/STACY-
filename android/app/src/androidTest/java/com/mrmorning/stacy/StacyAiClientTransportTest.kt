@@ -252,10 +252,51 @@ class StacyAiClientTransportTest {
         }
     }
 
+    @Test
+    fun chatDeadlineEndsSlowResponseAndReturnsControlToTheUi() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val secrets = StacySecretStore(context)
+        secrets.clearGeminiApiKey()
+        secrets.saveGeminiApiKey("test-only-key")
+        val server = FakeInteractionsServer(
+            listOf(
+                FakeResponse(
+                    status = 200,
+                    body = """{"id":"late-interaction","status":"completed","output_text":"Resposta atrasada."}""",
+                    delayBeforeResponseMs = 9_500L,
+                ),
+            ),
+        )
+        val client = StacyAiClient(context, server.url)
+        val latch = CountDownLatch(1)
+        val result = AtomicReference<CoreResult?>()
+        try {
+            server.start()
+            val startedAt = System.nanoTime()
+            client.chat("Teste de limite total de espera.") {
+                result.set(it)
+                latch.countDown()
+            }
+            assertTrue("A request must return when its absolute deadline expires", latch.await(12, TimeUnit.SECONDS))
+            val elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAt)
+            assertTrue("The chat deadline should include network wait and retries (elapsed=$elapsedMs ms)", elapsedMs in 9_000L..11_500L)
+            assertEquals("erro", result.get()?.tipo)
+            assertTrue(result.get()?.response.orEmpty().contains("limite de 10 segundos") ||
+                result.get()?.response.orEmpty().contains("prazo total"))
+            assertEquals("A response received after the deadline must not replace the stored session context", null, secrets.getPreviousInteractionId())
+        } finally {
+            client.shutdown()
+            secrets.clearGeminiApiKey()
+            secrets.clearPreviousInteractionId()
+            server.close()
+        }
+    }
+
     private data class FakeResponse(
         val status: Int,
         val body: String,
         val headers: Map<String, String> = emptyMap(),
+        val delayBeforeResponseMs: Long = 0L,
     )
 
     private class FakeInteractionsServer(
@@ -297,6 +338,7 @@ class StacyAiClientTransportTest {
                             }
                             requests.add(headers.joinToString("\n") + "\n\n" + requestBody)
 
+                            if (response.delayBeforeResponseMs > 0L) Thread.sleep(response.delayBeforeResponseMs)
                             val responseBytes = response.body.toByteArray(StandardCharsets.UTF_8)
                             val reason = when (response.status) {
                                 200 -> "OK"
