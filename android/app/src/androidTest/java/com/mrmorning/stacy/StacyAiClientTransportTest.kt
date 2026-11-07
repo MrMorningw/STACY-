@@ -64,8 +64,8 @@ class StacyAiClientTransportTest {
             assertTrue("Request must declare JSON content", firstBody.contains("Content-Type: application/json"))
             assertTrue(firstBody.contains("\"previous_interaction_id\":\"expired-interaction\""))
             assertFalse(secondBody.contains("previous_interaction_id"))
-            assertTrue(firstBody.contains("\"max_output_tokens\":32768"))
-            assertTrue(secondBody.contains("\"max_output_tokens\":32768"))
+            assertTrue(firstBody.contains("\"max_output_tokens\":4096"))
+            assertTrue(secondBody.contains("\"max_output_tokens\":4096"))
             assertEquals("fresh-interaction", secrets.getPreviousInteractionId())
             assertEquals(null, server.failure.get())
         } finally {
@@ -164,9 +164,9 @@ class StacyAiClientTransportTest {
 
             assertTrue("The client did not stop after the retry limit", latch.await(15, TimeUnit.SECONDS))
             val elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAt)
-            assertTrue("Retries must use progressive backoff rather than an immediate retry", elapsedMs >= 6_500L)
+            assertTrue("Retries must use bounded backoff and stay within the total 10-second deadline", elapsedMs in 2_000L..9_999L)
             assertEquals("erro", result.get()?.tipo)
-            assertTrue(result.get()?.response.orEmpty().contains("4 tentativas automáticas"))
+            assertTrue(result.get()?.response.orEmpty().contains("4 tentativas totais"))
             assertEquals(4, server.requests.size)
             assertEquals(listOf(1, 2, 3), retryAttempts.toList())
             assertEquals(null, server.failure.get())
@@ -211,6 +211,43 @@ class StacyAiClientTransportTest {
         } finally {
             client.shutdown()
             secrets.clearGeminiApiKey()
+            server.close()
+        }
+    }
+
+    @Test
+    fun connectionTestDoesNotUseOrReplaceConversationContext() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val secrets = StacySecretStore(context)
+        secrets.clearGeminiApiKey()
+        secrets.saveGeminiApiKey("test-only-key")
+        secrets.savePreviousInteractionId("user-conversation-context")
+
+        val server = FakeInteractionsServer(
+            listOf(
+                FakeResponse(
+                    status = 200,
+                    body = """{"id":"health-check-context","status":"completed","output_text":"Conexão da STACY validada."}""",
+                ),
+            ),
+        )
+        val client = StacyAiClient(context, server.url)
+        val latch = CountDownLatch(1)
+        val result = AtomicReference<CoreResult?>()
+        try {
+            server.start()
+            client.testConnection {
+                result.set(it)
+                latch.countDown()
+            }
+            assertTrue("The isolated connection test did not finish", latch.await(5, TimeUnit.SECONDS))
+            assertEquals("resposta", result.get()?.tipo)
+            assertFalse("A health check must not carry the user's previous interaction ID", server.requests.single().contains("previous_interaction_id"))
+            assertEquals("user-conversation-context", secrets.getPreviousInteractionId())
+        } finally {
+            client.shutdown()
+            secrets.clearGeminiApiKey()
+            secrets.clearPreviousInteractionId()
             server.close()
         }
     }
