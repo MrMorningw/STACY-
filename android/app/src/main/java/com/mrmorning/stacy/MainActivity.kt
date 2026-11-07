@@ -122,6 +122,10 @@ class MainActivity : ComponentActivity() {
                 } else if (result.response.isNotBlank()) {
                     val isError = result.tipo.equals("erro", ignoreCase = true) ||
                         result.tipo.equals("error", ignoreCase = true)
+                    if (isError && (result.response.contains("HTTP 401") || result.response.contains("HTTP 403"))) {
+                        aiConnectionStatus = "ERRO DE AUTENTICAÇÃO"
+                        webAiStatus(aiConnectionStatus)
+                    }
                     vm.onCoreResponse(result)
                     webResponse(formatResponseWithSources(result), result.tipo)
                     webState(if (isError) "erro" else "respondendo")
@@ -152,7 +156,7 @@ class MainActivity : ComponentActivity() {
                 override fun onPageFinished(view: WebView, url: String) {
                     super.onPageFinished(view, url)
                     webPageLoaded = true
-                    publishActiveConversation()
+                    publishActiveConversationId()
                     val hasKey = StacySecretStore(this@MainActivity).hasGeminiApiKey()
                     aiConnectionStatus = if (hasKey) "CHAVE SALVA · NÃO VERIFICADA" else "SEM CHAVE"
                     webAiStatus(aiConnectionStatus)
@@ -334,7 +338,6 @@ class MainActivity : ComponentActivity() {
                 else if (activeConversationId.isBlank() || historyStore.getConversation(activeConversationId) == null) {
                     activeConversationId = historyStore.createConversation().id
                 }
-                chatOpen = true
                 publishNavigationState()
                 responseHandler.removeCallbacksAndMessages(null)
                 webState("pensando")
@@ -422,6 +425,14 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+    }
+
+    private fun publishActiveConversationId() {
+        if (!webPageLoaded || !::webView.isInitialized) return
+        webView.evaluateJavascript(
+            "if(typeof window.stacySetActiveConversationId==='function'){window.stacySetActiveConversationId(${JSONObject.quote(activeConversationId)});}",
+            null,
+        )
     }
 
     private fun publishConversationList() {
