@@ -147,7 +147,7 @@ internal class StacyAiClient(
                 request,
                 errorResult(
                     if (conversationId == TEST_CONVERSATION_ID) {
-                        "O teste da conexão Gemini excedeu \${budgetMs / 1000}s."
+                        "O teste da conexão Gemini excedeu ${budgetMs / 1000}s."
                     } else if (budgetMs == SEARCH_DEADLINE_MS) {
                         "A pesquisa excedeu o limite de espera. Tente novamente."
                     } else {
@@ -169,7 +169,7 @@ internal class StacyAiClient(
                     Thread.currentThread().interrupt()
                     errorResult("A solicitação foi interrompida.")
                 } catch (error: Exception) {
-                    errorResult("Falha ao preparar a solicitação da IA: \${(error.message ?: "erro inesperado").take(MAX_ERROR_DETAIL)}")
+                    errorResult("Falha ao preparar a solicitação da IA: ${(error.message ?: "erro inesperado").take(MAX_ERROR_DETAIL)}")
                 }
                 finish(request, result)
             }
@@ -314,7 +314,7 @@ internal class StacyAiClient(
                 if (Thread.currentThread().isInterrupted) {
                     return errorResult("A solicitação foi interrompida.")
                 }
-                return errorResult("Falha na conexão com a IA Gemini: \${(error.message ?: "erro inesperado").take(MAX_ERROR_DETAIL)}")
+                return errorResult("Falha na conexão com a IA Gemini: ${(error.message ?: "erro inesperado").take(MAX_ERROR_DETAIL)}")
             } finally {
                 pending.connection.compareAndSet(connection, null)
                 connection?.disconnect()
@@ -335,7 +335,7 @@ internal class StacyAiClient(
             else -> "A API Gemini retornou HTTP $statusCode."
         }
         val retryNote = if (attempts > 1) " A STACY realizou $attempts tentativas totais." else ""
-        return errorResult(if (detail.isBlank()) "$explanation$retryNote" else "$explanation$retryNote Detalhe: \${detail.take(MAX_ERROR_DETAIL)}")
+        return errorResult(if (detail.isBlank()) "$explanation$retryNote" else "$explanation$retryNote Detalhe: ${detail.take(MAX_ERROR_DETAIL)}")
     }
 
     private fun isRetryableHttpStatus(statusCode: Int, detail: String): Boolean {
