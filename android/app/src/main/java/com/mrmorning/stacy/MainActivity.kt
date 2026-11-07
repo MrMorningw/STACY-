@@ -15,6 +15,7 @@ import android.webkit.WebViewClient
 import android.webkit.WebChromeClient
 import android.webkit.ValueCallback
 import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.ViewModelProvider
 import org.json.JSONObject
@@ -26,6 +27,14 @@ class MainActivity : ComponentActivity() {
     private lateinit var androidAutomation: AndroidAutomation
     private lateinit var webView: WebView
     private lateinit var vm: StacyViewModel
+    private lateinit var historyStore: StacyLocalStore
+    private lateinit var backCallback: OnBackPressedCallback
+    private var activeConversationId: String = ""
+    private var webPageLoaded = false
+    private var drawerOpen = false
+    private var sectionOpen = false
+    private var chatOpen = false
+    private var aiConnectionStatus = "SEM CHAVE"
     private var voiceEnabled = true
     private lateinit var updater: StacyUpdater
     private var pendingFileChooser: ValueCallback<Array<Uri>>? = null
@@ -55,6 +64,24 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        historyStore = StacyLocalStore(this)
+        historyStore.markPendingMessagesInterrupted()
+        activeConversationId = historyStore.listConversations().firstOrNull()?.id
+            ?: historyStore.createConversation().id
+        backCallback = object : OnBackPressedCallback(false) {
+            override fun handleOnBackPressed() {
+                if (!webPageLoaded || !::webView.isInitialized) {
+                    isEnabled = false
+                    return
+                }
+                webView.evaluateJavascript(
+                    "if(typeof window.stacyNativeBack==='function'){window.stacyNativeBack();}",
+                    null,
+                )
+            }
+        }
+        onBackPressedDispatcher.addCallback(this, backCallback)
+
         vm = ViewModelProvider(this)[StacyViewModel::class.java]
         coreBridge = StacyCoreBridge(this)
         androidAutomation = AndroidAutomation(this)
@@ -77,6 +104,7 @@ class MainActivity : ComponentActivity() {
         vm.bindCore { message ->
             coreBridge.process(
                 message = message,
+                conversationId = activeConversationId,
                 onQueued = { runOnUiThread { webState("pensando") } },
             )
         }
@@ -86,6 +114,7 @@ class MainActivity : ComponentActivity() {
 
         CoreResultStore.subscribe { result ->
             runOnUiThread {
+                if (result.conversationId != null && result.conversationId != activeConversationId) return@runOnUiThread
                 val action = result.androidAction
                 if (action != null) {
                     webState("respondendo")
@@ -119,7 +148,17 @@ class MainActivity : ComponentActivity() {
             settings.domStorageEnabled = true
             settings.allowFileAccess = true
             settings.allowContentAccess = true
-            webViewClient = WebViewClient()
+            webViewClient = object : WebViewClient() {
+                override fun onPageFinished(view: WebView, url: String) {
+                    super.onPageFinished(view, url)
+                    webPageLoaded = true
+                    publishActiveConversation()
+                    val hasKey = StacySecretStore(this@MainActivity).hasGeminiApiKey()
+                    aiConnectionStatus = if (hasKey) "CHAVE SALVA · NÃO VERIFICADA" else "SEM CHAVE"
+                    webAiStatus(aiConnectionStatus)
+                    publishNavigationState()
+                }
+            }
             webChromeClient = object : WebChromeClient() {
                 override fun onShowFileChooser(webView: WebView?, filePathCallback: ValueCallback<Array<Uri>>?, fileChooserParams: FileChooserParams?): Boolean {
                     pendingFileChooser?.onReceiveValue(null)
@@ -203,21 +242,27 @@ class MainActivity : ComponentActivity() {
             maxLines = 1
         }
         val message = if (hasSavedKey) {
-            "Uma chave já está salva com criptografia do Android. Informe outra para substituí-la ou deixe vazio para testar a chave atual. As mensagens são enviadas ao Google; a STACY usa o ID de interação armazenado no aparelho para manter o contexto no serviço."
+            "Uma chave está salva com criptografia do Android, mas isso não confirma conexão ativa. Informe outra para substituí-la ou deixe vazio para testar a chave atual. O teste é isolado e não altera o histórico de conversas."
         } else {
-            "Configure uma chave Gemini API para ativar a conversa generativa. Crie uma chave em https://aistudio.google.com/apikey. A chave é cifrada no aparelho e não é enviada ao repositório. As mensagens são enviadas ao Google; para manter o contexto, o serviço armazena as interações de acordo com a retenção da conta. Não envie senhas ou segredos."
+            "Configure uma chave Gemini API para ativar a conversa generativa. Crie uma chave em https://aistudio.google.com/apikey. A chave é cifrada no aparelho e não é enviada ao repositório. O teste verifica o acesso real ao Gemini sem criar uma conversa."
         }
         val dialog = AlertDialog.Builder(this)
             .setTitle("Conectar IA da STACY")
             .setMessage(message)
             .setView(entry)
-            // The positive-button listener is installed after show() so Android
-            // does not dismiss the dialog before storage has been verified.
             .setPositiveButton("Salvar e testar", null)
-            .setNeutralButton("Apagar chave e contexto") { _, _ ->
-                store.clearGeminiApiKey()
-                webResponse("A chave da IA e o vínculo de contexto foram removidos deste aparelho. Os comandos locais continuam disponíveis.", "resposta")
-                webState("online")
+            .setNeutralButton("Apagar chave") { _, _ ->
+                runCatching { store.clearGeminiApiKey() }
+                    .onSuccess {
+                        aiConnectionStatus = "SEM CHAVE"
+                        webAiStatus(aiConnectionStatus)
+                        webCoreStatus("Chave Gemini removida do armazenamento seguro.")
+                        webState("online")
+                    }
+                    .onFailure {
+                        webCoreStatus("Não foi possível remover a chave do armazenamento seguro.")
+                        webState("erro")
+                    }
             }
             .setNegativeButton("Cancelar", null)
             .create()
@@ -229,8 +274,10 @@ class MainActivity : ComponentActivity() {
             if (key.isNotBlank()) {
                 try {
                     store.saveGeminiApiKey(key)
+                    aiConnectionStatus = "CHAVE SALVA · NÃO VERIFICADA"
+                    webAiStatus(aiConnectionStatus)
                 } catch (error: Exception) {
-                    entry.error = "Falha ao salvar: ${error.message ?: "erro desconhecido"}"
+                    entry.error = "Falha ao salvar: \${error.message ?: "erro desconhecido"}"
                     entry.requestFocus()
                     return@setOnClickListener
                 }
@@ -240,12 +287,7 @@ class MainActivity : ComponentActivity() {
                 return@setOnClickListener
             }
 
-            // Confirm that the encrypted value can be read back before closing.
-            val savedKey = try {
-                store.getGeminiApiKey()
-            } catch (error: Exception) {
-                null
-            }
+            val savedKey = runCatching { store.getGeminiApiKey() }.getOrNull()
             if (savedKey.isNullOrBlank() || (key.isNotBlank() && savedKey != key)) {
                 entry.error = "A chave não foi confirmada no armazenamento seguro. Tente novamente."
                 entry.requestFocus()
@@ -254,10 +296,26 @@ class MainActivity : ComponentActivity() {
 
             entry.error = null
             dialog.dismiss()
+            aiConnectionStatus = "VERIFICANDO CONEXÃO…"
+            webAiStatus(aiConnectionStatus)
+            webCoreStatus("Testando autenticação e resposta do Gemini…")
             webState("pensando")
-            webResponse("Chave salva e confirmada no armazenamento seguro. Verificando a conexão com a IA...", "resposta")
             coreBridge.testConnection { result ->
-                CoreResultStore.publish(this@MainActivity, result)
+                val connected = !result.tipo.equals("erro", ignoreCase = true) &&
+                    !result.tipo.equals("error", ignoreCase = true) &&
+                    result.response.isNotBlank()
+                aiConnectionStatus = if (connected) "CONECTADA · TESTE REAL APROVADO" else {
+                    val detail = result.response.lowercase()
+                    when {
+                        detail.contains("401") || detail.contains("403") || detail.contains("chave") -> "ERRO DE AUTENTICAÇÃO"
+                        detail.contains("429") || detail.contains("cota") -> "ERRO DE COTA/LIMITE"
+                        detail.contains("internet") || detail.contains("conexão") || detail.contains("tempo") -> "SEM CONEXÃO CONFIRMADA"
+                        else -> "ERRO NO TESTE DE CONEXÃO"
+                    }
+                }
+                webAiStatus(aiConnectionStatus)
+                webCoreStatus(if (connected) "Conexão com o Gemini validada por resposta real." else result.response)
+                webState(if (connected) "online" else "erro")
             }
         }
     }
@@ -265,7 +323,19 @@ class MainActivity : ComponentActivity() {
     inner class StacyJsBridge {
         @JavascriptInterface
         fun stacySend(message: String) {
+            stacySendForConversation(message, activeConversationId)
+        }
+
+        @JavascriptInterface
+        fun stacySendForConversation(message: String, conversationId: String) {
             runOnUiThread {
+                val selected = historyStore.getConversation(conversationId)?.id
+                if (selected != null) activeConversationId = selected
+                else if (activeConversationId.isBlank() || historyStore.getConversation(activeConversationId) == null) {
+                    activeConversationId = historyStore.createConversation().id
+                }
+                chatOpen = true
+                publishNavigationState()
                 responseHandler.removeCallbacksAndMessages(null)
                 webState("pensando")
                 vm.onInputChanged(message)
@@ -294,6 +364,106 @@ class MainActivity : ComponentActivity() {
         @JavascriptInterface fun stacyOpenAndroidSettings() { runOnUiThread { reportAutomationOutcome(androidAutomation.openSettings(), "Configurações do Android abertas.") } }
         @JavascriptInterface fun stacyOpenCalendar() { runOnUiThread { reportAutomationOutcome(androidAutomation.openCalendar(), "Calendário do Android aberto.") } }
         @JavascriptInterface fun stacyShareText(text: String) { runOnUiThread { reportAutomationOutcome(androidAutomation.shareText(text, "Compartilhar pela STACY"), "Menu de compartilhamento aberto.") } }
+        @JavascriptInterface fun stacyGetConversations() {
+            runOnUiThread { publishConversationList() }
+        }
+
+        @JavascriptInterface fun stacyOpenConversation(id: String) {
+            runOnUiThread {
+                if (historyStore.getConversation(id) == null) {
+                    webCoreStatus("Esta conversa não existe mais no histórico local.")
+                    publishConversationList()
+                    return@runOnUiThread
+                }
+                activeConversationId = id
+                chatOpen = true
+                publishActiveConversation()
+                publishNavigationState()
+            }
+        }
+
+        @JavascriptInterface fun stacyNewConversation() {
+            runOnUiThread {
+                activeConversationId = historyStore.createConversation().id
+                chatOpen = true
+                publishActiveConversation()
+                publishNavigationState()
+            }
+        }
+
+        @JavascriptInterface fun stacyDeleteConversation(id: String) {
+            runOnUiThread {
+                coreBridge.cancelConversation(id)
+                val deleted = historyStore.deleteConversation(id)
+                if (deleted && activeConversationId == id) {
+                    activeConversationId = historyStore.createConversation().id
+                    publishActiveConversation()
+                }
+                publishConversationList()
+            }
+        }
+
+        @JavascriptInterface fun stacyClearConversationHistory() {
+            runOnUiThread {
+                historyStore.listConversations().forEach { coreBridge.cancelConversation(it.id) }
+                historyStore.clearConversationHistory()
+                activeConversationId = historyStore.createConversation().id
+                publishActiveConversation()
+                publishConversationList()
+            }
+        }
+
+        @JavascriptInterface fun stacySetNavigationState(drawer: Boolean, section: Boolean, chat: Boolean) {
+            runOnUiThread {
+                drawerOpen = drawer
+                sectionOpen = section
+                chatOpen = chat
+                publishNavigationState()
+            }
+        }
+
+    }
+
+    private fun publishConversationList() {
+        if (!webPageLoaded || !::webView.isInitialized) return
+        val rows = org.json.JSONArray()
+        historyStore.listConversations().forEach { item ->
+            rows.put(JSONObject().put("id", item.id).put("title", item.title).put("preview", item.preview).put("updatedAt", item.updatedAt))
+        }
+        webView.evaluateJavascript(
+            "if(typeof window.stacyRenderConversations==='function'){window.stacyRenderConversations($rows);}",
+            null,
+        )
+    }
+
+    private fun publishActiveConversation() {
+        if (!webPageLoaded || !::webView.isInitialized) return
+        val conversation = historyStore.getConversation(activeConversationId) ?: return
+        val messages = org.json.JSONArray()
+        historyStore.listConversationMessages(conversation.id).forEach { item ->
+            messages.put(
+                JSONObject().put("id", item.id).put("role", item.role).put("text", item.text)
+                    .put("createdAt", item.createdAt).put("state", item.state),
+            )
+        }
+        val payload = JSONObject().put("id", conversation.id).put("title", conversation.title).put("messages", messages)
+        webView.evaluateJavascript(
+            "if(typeof window.stacyLoadConversation==='function'){window.stacyLoadConversation($payload);}",
+            null,
+        )
+    }
+
+    private fun publishNavigationState() {
+        if (!::backCallback.isInitialized) return
+        backCallback.isEnabled = drawerOpen || sectionOpen || chatOpen
+    }
+
+    private fun webAiStatus(status: String) {
+        if (!::webView.isInitialized) return
+        webView.evaluateJavascript(
+            "if(typeof window.stacyNativeAiStatus==='function'){window.stacyNativeAiStatus(\${JSONObject.quote(status)});}",
+            null,
+        )
     }
 
     private fun reportAutomationOutcome(outcome: AutomationResult, successMessage: String) {
@@ -359,12 +529,15 @@ class MainActivity : ComponentActivity() {
         pendingFileChooser?.onReceiveValue(null)
         pendingFileChooser = null
         responseHandler.removeCallbacksAndMessages(null)
+        webPageLoaded = false
+        if (::backCallback.isInitialized) backCallback.isEnabled = false
         CoreResultStore.clear()
         CorePhaseStore.clear()
         CoreStatusStore.clear()
         if (::voiceInput.isInitialized) voiceInput.destroy()
         if (::textToSpeech.isInitialized) textToSpeech.shutdown()
         if (::coreBridge.isInitialized) coreBridge.shutdown()
+        if (::historyStore.isInitialized) historyStore.close()
         if (::webView.isInitialized) { webView.removeJavascriptInterface("Android"); webView.destroy() }
         super.onDestroy()
     }
