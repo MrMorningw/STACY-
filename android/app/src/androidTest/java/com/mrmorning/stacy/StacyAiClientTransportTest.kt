@@ -27,6 +27,7 @@ class StacyAiClientTransportTest {
         val secrets = StacySecretStore(context)
         secrets.clearGeminiApiKey()
         secrets.saveGeminiApiKey("test-only-key")
+        secrets.setGeminiFreeTierConfirmed(true)
         secrets.savePreviousInteractionId("expired-interaction")
 
         val server = FakeInteractionsServer(
@@ -81,6 +82,7 @@ class StacyAiClientTransportTest {
         val secrets = StacySecretStore(context)
         secrets.clearGeminiApiKey()
         secrets.saveGeminiApiKey("test-only-key")
+        secrets.setGeminiFreeTierConfirmed(true)
 
         val server = FakeInteractionsServer(
             listOf(
@@ -137,6 +139,7 @@ class StacyAiClientTransportTest {
         val secrets = StacySecretStore(context)
         secrets.clearGeminiApiKey()
         secrets.saveGeminiApiKey("test-only-key")
+        secrets.setGeminiFreeTierConfirmed(true)
 
         val server = FakeInteractionsServer(
             List(4) {
@@ -183,6 +186,7 @@ class StacyAiClientTransportTest {
         val secrets = StacySecretStore(context)
         secrets.clearGeminiApiKey()
         secrets.saveGeminiApiKey("test-only-key")
+        secrets.setGeminiFreeTierConfirmed(true)
 
         val server = FakeInteractionsServer(
             listOf(
@@ -221,6 +225,7 @@ class StacyAiClientTransportTest {
         val secrets = StacySecretStore(context)
         secrets.clearGeminiApiKey()
         secrets.saveGeminiApiKey("test-only-key")
+        secrets.setGeminiFreeTierConfirmed(true)
         secrets.savePreviousInteractionId("user-conversation-context")
 
         val server = FakeInteractionsServer(
@@ -258,6 +263,7 @@ class StacyAiClientTransportTest {
         val secrets = StacySecretStore(context)
         secrets.clearGeminiApiKey()
         secrets.saveGeminiApiKey("test-only-key")
+        secrets.setGeminiFreeTierConfirmed(true)
         val server = FakeInteractionsServer(
             listOf(
                 FakeResponse(
@@ -288,6 +294,43 @@ class StacyAiClientTransportTest {
             client.shutdown()
             secrets.clearGeminiApiKey()
             secrets.clearPreviousInteractionId()
+            server.close()
+        }
+    }
+
+    @Test
+    fun externalCallsAreBlockedUntilFreeTierIsExplicitlyConfirmed() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val secrets = StacySecretStore(context)
+        secrets.clearGeminiApiKey()
+        secrets.saveGeminiApiKey("test-only-key")
+        // Saving a new key must not implicitly authorize billable remote calls.
+        assertFalse(secrets.isGeminiFreeTierConfirmed())
+
+        val server = FakeInteractionsServer(
+            listOf(
+                FakeResponse(
+                    status = 200,
+                    body = """{"id":"must-not-be-requested","status":"completed","output_text":"Não deveria ser chamado."}""",
+                ),
+            ),
+        )
+        val client = StacyAiClient(context, server.url)
+        val latch = CountDownLatch(1)
+        val result = AtomicReference<CoreResult?>()
+        try {
+            server.start()
+            client.chat("Não deve enviar requisição sem confirmação.") {
+                result.set(it)
+                latch.countDown()
+            }
+            assertTrue("The blocked request did not return", latch.await(5, TimeUnit.SECONDS))
+            assertEquals("erro", result.get()?.tipo)
+            assertTrue(result.get()?.response.orEmpty().contains("Modo sem custos ativos"))
+            assertTrue("No HTTP request may be sent without explicit Free-tier acknowledgement", server.requests.isEmpty())
+        } finally {
+            client.shutdown()
+            secrets.clearGeminiApiKey()
             server.close()
         }
     }
