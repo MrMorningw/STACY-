@@ -88,16 +88,20 @@ internal class StacyAiClient(
         }
         val budgetMs = if (useWebSearch) SEARCH_DEADLINE_MS else CHAT_DEADLINE_MS
         submitRequest(conversationId, budgetMs, callback, absoluteDeadlineNanos) { request ->
-            val key = secrets.getGeminiApiKey()
-            if (key.isNullOrBlank()) {
-                errorResult("A IA generativa ainda não está conectada. Abra Menu → Ajustes → Conectar IA e salve uma chave Gemini API válida.")
+            if (!secrets.isGeminiFreeTierConfirmed()) {
+                errorResult("Modo sem custos ativos: a IA externa está bloqueada. Os comandos, tarefas e a memória locais continuam disponíveis. Para habilitar o Gemini, confirme primeiro no Google AI Studio que o projeto está no nível Free, sem faturamento vinculado.")
             } else {
+                val key = secrets.getGeminiApiKey()
+                if (key.isNullOrBlank()) {
+                    errorResult("A chave Gemini não está salva. Nenhuma chamada externa foi realizada.")
+                } else {
                 val priorId = if (conversationId == LEGACY_CONVERSATION_ID) {
                     secrets.getPreviousInteractionId()
                 } else {
                     localStore.getPreviousInteractionId(conversationId)
                 }
-                requestGemini(key, cleaned, useWebSearch, conversationId, priorId, true, request, onRetry)
+                    requestGemini(key, cleaned, useWebSearch, conversationId, priorId, true, request, onRetry)
+                }
             }
         }
     }
@@ -105,10 +109,13 @@ internal class StacyAiClient(
     /** Real authenticated generation; does not read or mutate any conversation context. */
     fun testConnection(callback: (CoreResult) -> Unit) {
         submitRequest(TEST_CONVERSATION_ID, CONNECTION_DEADLINE_MS, callback) { request ->
-            val key = secrets.getGeminiApiKey()
-            if (key.isNullOrBlank()) {
-                errorResult("Nenhuma chave Gemini API está salva neste aparelho.")
+            if (!secrets.isGeminiFreeTierConfirmed()) {
+                errorResult("Teste bloqueado: confirme explicitamente que o projeto Gemini está no nível Free e sem faturamento vinculado.")
             } else {
+                val key = secrets.getGeminiApiKey()
+                if (key.isNullOrBlank()) {
+                    errorResult("Nenhuma chave Gemini API está salva neste aparelho.")
+                } else {
                 requestGemini(
                     apiKey = key,
                     message = "Responda somente com: Conexão da STACY validada.",
@@ -119,6 +126,7 @@ internal class StacyAiClient(
                     pending = request,
                     onRetry = null,
                 )
+                }
             }
         }
     }
