@@ -172,8 +172,14 @@ class MainActivity : ComponentActivity() {
                     super.onPageFinished(view, url)
                     webPageLoaded = true
                     publishActiveConversationId()
-                    val hasKey = StacySecretStore(this@MainActivity).hasGeminiApiKey()
-                    aiConnectionStatus = if (hasKey) "CHAVE SALVA · NÃO VERIFICADA" else "SEM CHAVE"
+                    val secretStore = StacySecretStore(this@MainActivity)
+                    aiConnectionStatus = when {
+                        secretStore.hasGeminiApiKey() && secretStore.isGeminiFreeTierConfirmed() ->
+                            "GEMINI FREE CONFIRMADO · NÃO TESTADO"
+                        secretStore.hasGeminiApiKey() ->
+                            "CHAVE SALVA · IA EXTERNA BLOQUEADA"
+                        else -> "MODO LOCAL · SEM API EXTERNA"
+                    }
                     webAiStatus(aiConnectionStatus)
                     publishNavigationState()
                 }
@@ -278,24 +284,24 @@ class MainActivity : ComponentActivity() {
             maxLines = 1
         }
         val message = if (hasSavedKey) {
-            "Uma chave está salva com criptografia do Android, mas isso não confirma conexão ativa. Informe outra para substituí-la ou deixe vazio para testar a chave atual. O teste é isolado e não altera o histórico de conversas."
+            "Uma chave está salva com criptografia do Android, mas o uso externo permanece BLOQUEADO. Para habilitá-lo, confirme que o projeto no Google AI Studio está no nível Free e sem faturamento vinculado. A STACY não consegue verificar o nível de cobrança da sua conta. O teste abaixo envia uma requisição real."
         } else {
-            "Configure uma chave Gemini API para ativar a conversa generativa. Crie uma chave em https://aistudio.google.com/apikey. A chave é cifrada no aparelho e não é enviada ao repositório. O teste verifica o acesso real ao Gemini sem criar uma conversa."
+            "A STACY funciona com recursos locais sem chave ou pagamento. Para habilitar conversas generativas externas, crie uma chave em https://aistudio.google.com/apikey. ATENÇÃO: só prossiga se o projeto estiver no nível Free e sem faturamento vinculado. A STACY não consegue verificar isso. A chave é cifrada no aparelho."
         }
         val dialog = AlertDialog.Builder(this)
             .setTitle("Conectar IA da STACY")
             .setMessage(message)
             .setView(entry)
-            .setPositiveButton("Salvar e testar", null)
+            .setPositiveButton("Confirmar Free Tier e testar", null)
             .setNeutralButton("Apagar chave") { _, _ ->
                 runCatching {
                     store.clearGeminiApiKey()
                     historyStore.clearAllPreviousInteractionIds()
                 }
                     .onSuccess {
-                        aiConnectionStatus = "SEM CHAVE"
+                        aiConnectionStatus = "MODO LOCAL · SEM API EXTERNA"
                         webAiStatus(aiConnectionStatus)
-                        webCoreStatus("Chave Gemini removida do armazenamento seguro.")
+                        webCoreStatus("Chave Gemini removida. Chamadas externas desativadas; os recursos locais permanecem disponíveis.")
                         webState("online")
                     }
                     .onFailure {
@@ -335,11 +341,19 @@ class MainActivity : ComponentActivity() {
                 return@setOnClickListener
             }
 
+            try {
+                store.setGeminiFreeTierConfirmed(true)
+            } catch (error: Exception) {
+                entry.error = "Não foi possível ativar a política Free Tier: ${error.message ?: "erro desconhecido"}"
+                entry.requestFocus()
+                return@setOnClickListener
+            }
+
             entry.error = null
             dialog.dismiss()
-            aiConnectionStatus = "VERIFICANDO CONEXÃO…"
+            aiConnectionStatus = "FREE TIER CONFIRMADO · VERIFICANDO…"
             webAiStatus(aiConnectionStatus)
-            webCoreStatus("Testando autenticação e resposta do Gemini…")
+            webCoreStatus("Enviando uma requisição de teste ao Gemini. A STACY não consegue verificar a situação de faturamento da conta.")
             webState("pensando")
             coreBridge.testConnection { result ->
                 val connected = !result.tipo.equals("erro", ignoreCase = true) &&
