@@ -57,11 +57,35 @@ class StacyCoreBridge(private val context: Context) {
 
         onQueued()
         var requestProfile = "local"
+        var useWebSearch = false
         fun deliver(raw: CoreResult, state: String) {
-            val result = raw.copy(conversationId = conversation.id, requestId = requestId)
+            val verdict = StacyGrillSupervisor.review(
+                request = normalized,
+                candidate = raw,
+                requiresExternalEvidence = useWebSearch,
+            )
+            val reviewedRaw = if (verdict.approved) {
+                raw
+            } else {
+                Log.w(
+                    "StacyGrill",
+                    "decision=VETO risk=${verdict.risk} findings=${verdict.findings.joinToString("|")}",
+                )
+                CoreResult(
+                    tipo = "erro",
+                    response = "A GRILL interrompeu a entrega porque não foi possível validar a integridade ou a segurança do resultado. Nenhuma ação bloqueada foi executada.",
+                    exitCode = 1,
+                    stderr = verdict.findings.joinToString("; "),
+                )
+            }
+            if (verdict.approved) {
+                Log.i("StacyGrill", "decision=APPROVE risk=${verdict.risk}")
+            }
+            val effectiveState = if (verdict.approved) state else "failed"
+            val result = reviewedRaw.copy(conversationId = conversation.id, requestId = requestId)
             val persistenceStartedNanos = System.nanoTime()
             try {
-                localStore.updateMessageState(requestId, "user", if (state == "failed") "failed" else "completed")
+                localStore.updateMessageState(requestId, "user", if (effectiveState == "failed") "failed" else "completed")
                 if (result.response.isNotBlank()) {
                     val historyText = buildString {
                         append(result.response)
@@ -77,7 +101,7 @@ class StacyCoreBridge(private val context: Context) {
                     }
                     localStore.addConversationMessage(
                         conversation.id, "assistant", historyText, requestId,
-                        state = if (state == "failed") "failed" else "completed",
+                        state = if (effectiveState == "failed") "failed" else "completed",
                     )
                 }
             } catch (persistenceError: Exception) {
@@ -101,10 +125,10 @@ class StacyCoreBridge(private val context: Context) {
             CoreResultStore.publish(context, result) {
                 Log.i(
                     "StacyCoreMetrics",
-                    "profile=$requestProfile total_ms=$totalMs history_persist_ms=$persistMs outcome=${if (state == "failed") "error" else "success"}",
+                    "profile=$requestProfile total_ms=$totalMs history_persist_ms=$persistMs outcome=${if (effectiveState == "failed") "error" else "success"}",
                 )
             }
-            CorePhaseStore.publish(context, if (state == "failed") "erro" else "respondendo")
+            CorePhaseStore.publish(context, if (effectiveState == "failed") "erro" else "respondendo")
         }
 
         val localResult = nativeCore.process(normalized)
@@ -113,7 +137,7 @@ class StacyCoreBridge(private val context: Context) {
             return
         }
 
-        val useWebSearch = StacyRequestClassifier.requiresWebSearch(normalized)
+        useWebSearch = StacyRequestClassifier.requiresWebSearch(normalized)
         requestProfile = if (useWebSearch) "research" else "chat"
         val budgetMs = if (useWebSearch) SEARCH_DEADLINE_MS else CHAT_DEADLINE_MS
         val absoluteDeadlineNanos = requestStartedNanos + TimeUnit.MILLISECONDS.toNanos(budgetMs)
