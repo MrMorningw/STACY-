@@ -21,6 +21,20 @@ internal class StacySecretStore(context: Context) {
 
     fun hasGeminiApiKey(): Boolean = getGeminiApiKey() != null
 
+    /**
+     * Remote calls are disabled by default. This flag is only a user
+     * acknowledgement that the linked AI Studio project is on the Free tier.
+     * The app cannot independently inspect the provider billing account.
+     */
+    fun isGeminiFreeTierConfirmed(): Boolean =
+        preferences.getBoolean(FREE_TIER_CONFIRMED, false)
+
+    fun setGeminiFreeTierConfirmed(confirmed: Boolean) = synchronized(LOCK) {
+        check(
+            preferences.edit().putBoolean(FREE_TIER_CONFIRMED, confirmed).commit(),
+        ) { "Não foi possível confirmar a política de custo zero." }
+    }
+
     fun getGeminiApiKey(): String? = synchronized(LOCK) {
         val encoded = preferences.getString(ENCRYPTED_KEY, null) ?: return@synchronized null
         try {
@@ -54,6 +68,7 @@ internal class StacySecretStore(context: Context) {
         check(
             preferences.edit()
                 .putString(ENCRYPTED_KEY, Base64.encodeToString(envelope, Base64.NO_WRAP))
+                .putBoolean(FREE_TIER_CONFIRMED, false)
                 .remove(PREVIOUS_INTERACTION_ID)
                 .commit(),
         ) { "Não foi possível confirmar a gravação da chave no armazenamento local." }
@@ -64,6 +79,7 @@ internal class StacySecretStore(context: Context) {
             preferences.edit()
                 .remove(ENCRYPTED_KEY)
                 .remove(PREVIOUS_INTERACTION_ID)
+                .remove(FREE_TIER_CONFIRMED)
                 .commit(),
         ) { "Não foi possível confirmar a remoção da chave e do contexto local." }
     }
@@ -106,6 +122,7 @@ internal class StacySecretStore(context: Context) {
     private companion object {
         const val PREFERENCES = "stacy_secure_settings"
         const val ENCRYPTED_KEY = "gemini_api_key_encrypted"
+        const val FREE_TIER_CONFIRMED = "gemini_free_tier_confirmed"
         const val PREVIOUS_INTERACTION_ID = "gemini_previous_interaction_id"
         const val KEY_ALIAS = "stacy.gemini.api-key.aes"
         const val ANDROID_KEYSTORE = "AndroidKeyStore"
