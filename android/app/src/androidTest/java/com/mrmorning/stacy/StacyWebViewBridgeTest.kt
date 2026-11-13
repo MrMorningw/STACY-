@@ -92,7 +92,7 @@ class StacyWebViewBridgeTest {
     }
 
     @Test
-    fun missingGeminiKeyProducesVisibleAssistantErrorInsteadOfAnEmptyBubble() {
+    fun unconfiguredRemoteProviderProducesVisibleLocalModeNoticeInsteadOfAnEmptyBubble() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             lateinit var webView: WebView
             scenario.onActivity { activity ->
@@ -141,14 +141,15 @@ class StacyWebViewBridgeTest {
                         "var log=document.getElementById('stacyChatLog'); " +
                         "var replies=log ? log.querySelectorAll('.stacy-chat-row.assistant .stacy-chat-bubble') : []; " +
                         "return replies.length === 1 && " +
-                        "replies[0].innerText.includes('IA generativa ainda não está conectada') && " +
+                        "replies[0].innerText.includes('conversa generativa externa permanece bloqueada') && " +
+                        "replies[0].innerText.includes('Tarefas, memória e comandos locais continuam disponíveis') && " +
                         "!log.innerText.includes('Não foi possível concluir. Verifique a conexão da IA ou tente novamente.'); " +
                     "})()",
                 ) == "true"
             }
             val diagnostics = if (returned) "" else webViewSnapshot(webView)
             assertTrue(
-                "A missing API key must produce one real diagnostic bubble. " +
+                "A missing API key must produce one explicit local-mode bubble. " +
                     "Submit=$submitSnapshot; DOM=$diagnostics",
                 returned,
             )
