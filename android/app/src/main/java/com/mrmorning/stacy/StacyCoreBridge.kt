@@ -17,6 +17,7 @@ class StacyCoreBridge(private val context: Context) {
     private val localStore = StacyLocalStore(context.applicationContext)
     private val nativeCore = StacyNativeCore(localStore)
     private val aiClient = StacyAiClient(context.applicationContext)
+    private val secretStore = StacySecretStore(context.applicationContext)
     private val busyConversations = ConcurrentHashMap.newKeySet<String>()
 
     fun process(message: String, conversationId: String? = null, onQueued: () -> Unit = {}) {
@@ -137,7 +138,25 @@ class StacyCoreBridge(private val context: Context) {
             return
         }
 
-        useWebSearch = StacyRequestClassifier.requiresWebSearch(normalized)
+        val aiRoute = StacyAiRouter.choose(
+            message = normalized,
+            freeTierConfirmed = secretStore.isGeminiFreeTierConfirmed(),
+            apiKeyAvailable = secretStore.hasGeminiApiKey(),
+        )
+        useWebSearch = aiRoute.useWebSearch
+        if (aiRoute.provider == StacyAiProvider.NONE) {
+            deliver(
+                CoreResult(
+                    tipo = "offline",
+                    response = StacyAiRouter.offlineMessage(aiRoute),
+                    exitCode = 0,
+                    stderr = "",
+                ),
+                "completed",
+            )
+            return
+        }
+
         requestProfile = if (useWebSearch) "research" else "chat"
         val budgetMs = if (useWebSearch) SEARCH_DEADLINE_MS else CHAT_DEADLINE_MS
         val absoluteDeadlineNanos = requestStartedNanos + TimeUnit.MILLISECONDS.toNanos(budgetMs)
